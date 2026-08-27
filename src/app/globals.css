@@ -1,26 +1,101 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --bg-desktop: #37324a;
+  --bg-desktop-2: #4a4166;
+  --bg-window: #ece6d8;
+  --bg-window-header: #d8c9a3;
+  --bg-taskbar: #241f33;
+  --ink: #241f33;
+  --ink-soft: #5b5470;
+  --accent-chattr: #6c63ff;
+  --accent-taskflow: #f2a541;
+  --accent-pulse: #34c3a3;
+  --accent-danger: #e0556f;
+  --accent-help: #4f9dd8;
+  --accent-reviews: #5fae6f;
+  --accent-notes: #e8b23f;
+  --accent-office: #b8794f;
+  --accent-egg: #c26bd9;
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  --color-bg-desktop: var(--bg-desktop);
+  --color-bg-window: var(--bg-window);
+  --color-bg-window-header: var(--bg-window-header);
+  --color-bg-taskbar: var(--bg-taskbar);
+  --color-ink: var(--ink);
+  --color-ink-soft: var(--ink-soft);
+  --color-accent-chattr: var(--accent-chattr);
+  --color-accent-taskflow: var(--accent-taskflow);
+  --color-accent-pulse: var(--accent-pulse);
+  --color-accent-danger: var(--accent-danger);
+  --color-accent-help: var(--accent-help);
+  --color-accent-reviews: var(--accent-reviews);
+  --color-accent-notes: var(--accent-notes);
+  --color-accent-office: var(--accent-office);
+  --color-accent-egg: var(--accent-egg);
+  --font-pixel: var(--font-pixel);
+  --font-body: var(--font-body);
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--bg-desktop);
+  color: var(--ink);
+  font-family: var(--font-body), Arial, Helvetica, sans-serif;
+}
+
+.font-pixel {
+  font-family: var(--font-pixel), monospace;
+}
+
+/* Hard-edged pixel bevel, no blur — light on top/left, dark on bottom/right */
+.pixel-border {
+  border: 2px solid var(--ink);
+  box-shadow:
+    inset 2px 2px 0 rgba(255, 255, 255, 0.5),
+    inset -2px -2px 0 rgba(0, 0, 0, 0.25),
+    4px 4px 0 rgba(0, 0, 0, 0.35);
+  image-rendering: pixelated;
+}
+
+/* Base color + a faint crosshatch texture behind everything. The actual
+   sky/sun/mountain scene is no longer painted here — it's rendered as a
+   real <svg> by Wallpaper.tsx, because the sun needs to live in the exact
+   same coordinate space as the mountain polygons to stay geometrically
+   locked to them (see that file's comment). This class just supplies the
+   texture and fallback color behind that SVG and around its edges. */
+.pixel-desktop-bg {
+  background-image:
+    repeating-linear-gradient(45deg, rgba(255, 255, 255, 0.025) 0 2px, transparent 2px 16px),
+    repeating-linear-gradient(-45deg, rgba(255, 255, 255, 0.02) 0 2px, transparent 2px 16px);
+  background-color: #1f1147;
+  image-rendering: pixelated;
+}
+
+.pixel-scrollbar::-webkit-scrollbar {
+  width: 10px;
+}
+.pixel-scrollbar::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.15);
+}
+.pixel-scrollbar::-webkit-scrollbar-thumb {
+  background: var(--ink-soft);
+  border: 2px solid var(--ink);
+}
+
+/* Faint ruled-paper texture for Notes — enough to feel like a designed
+   surface instead of a bare <textarea>, subtle enough not to fight with
+   whatever the player is actually typing. */
+.pixel-notes-paper {
+  background-color: #fffdf6;
+  background-image: repeating-linear-gradient(
+    to bottom,
+    transparent,
+    transparent 23px,
+    rgba(36, 31, 51, 0.08) 23px,
+    rgba(36, 31, 51, 0.08) 24px
+  );
+  background-attachment: local;
+  line-height: 24px;
 }
