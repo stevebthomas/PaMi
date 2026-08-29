@@ -85,6 +85,7 @@ function DeskCard({
   timestamp,
   available,
   onOpen,
+  titleOverride,
 }: {
   avatar: React.ReactNode;
   name: string;
@@ -92,6 +93,10 @@ function DeskCard({
   timestamp: string;
   available: boolean;
   onOpen?: () => void;
+  /** Overrides the default "Message {name} in Chattr" / "{name} is heads
+   * down" title text — used by Maya's card, whose click opens a channel
+   * rather than a DM. */
+  titleOverride?: string;
 }) {
   return (
     <div className="group relative">
@@ -111,7 +116,7 @@ function DeskCard({
               }
             : undefined
         }
-        title={available ? `Message ${name} in Chattr` : `${name} is heads down`}
+        title={titleOverride ?? (available ? `Message ${name} in Chattr` : `${name} is heads down`)}
         className={`pixel-border flex items-start gap-2 bg-white p-2 text-xs text-ink ${
           available ? "cursor-pointer hover:bg-[#f4f0e4]" : "cursor-default"
         }`}
@@ -232,6 +237,68 @@ function EngineeringRoom() {
   );
 }
 
+/** Maya's task blurb before her 12:30 PM design-review question fires — matches
+ * the B2 standup line's framing of her work (listing wireframes). */
+const MAYA_TASK_BEFORE = "Heads-down on the listing wireframes.";
+/** After maya-design-question fires, she's waiting on a call on Theo's
+ * save-for-later interaction (the actual content of that message). */
+const MAYA_TASK_AFTER = "Wants a call on the save-for-later interaction for Theo's ticket.";
+/** Sim-minute Maya started today's wireframe work — used for the "since" hover
+ * timestamp before her question fires (matches the engineer taskStartMinutes
+ * convention). Picked to read naturally against her 12:30 PM (750) event. */
+const MAYA_TASK_START_MINUTES = 540; // 9:00 AM
+/** The event id gating Maya's blurb switch — see day1-scenario.ts. */
+const MAYA_DESIGN_QUESTION_EVENT_ID = "maya-design-question";
+
+/**
+ * Maya's Design-room card. She's a real Day 1 character (the #design-review
+ * question at 12:30 PM) but is deliberately NOT in ENGINEERS (worldCanon's
+ * squad of 5 is canon-locked) and NOT a DmContactId (she has no DM channel),
+ * so her data lives here rather than in worldCanon, and her click action
+ * opens Chattr on #design-review instead of a DM. Kept to one card — Design
+ * isn't meant to look as populated as Engineering.
+ */
+function DesignRoom() {
+  const firedEventIds = useSimStore((s) => s.firedEventIds);
+  const setActiveChannel = useSimStore((s) => s.setActiveChannel);
+  const openWindow = useWindowStore((s) => s.openWindow);
+  const questionFired = firedEventIds.has(MAYA_DESIGN_QUESTION_EVENT_ID);
+
+  function openDesignReview() {
+    openWindow(
+      "chattr",
+      CHATTR_WINDOW_SIZE,
+      typeof window !== "undefined" ? window.innerWidth : 1024,
+      typeof window !== "undefined" ? window.innerHeight : 640
+    );
+    setActiveChannel("design-review");
+  }
+
+  return (
+    <div className="flex h-full min-h-0 flex-col">
+      <div className="shrink-0 border-b-2 border-ink bg-white px-3 py-2">
+        <div className="font-pixel text-[10px] text-ink">DESIGN</div>
+        <div className="text-[10px] text-ink-soft">Maya, on the redesign.</div>
+      </div>
+      <div className="pixel-scrollbar grid min-h-0 flex-1 grid-cols-2 gap-2 overflow-y-auto bg-[#dfd6bd] p-2 content-start">
+        <DeskCard
+          avatar={<GenericAvatar hair="#3a2e28" skin="#c98a5e" accent="#c46fa1" />}
+          name="Maya"
+          task={questionFired ? MAYA_TASK_AFTER : MAYA_TASK_BEFORE}
+          timestamp={
+            questionFired
+              ? `since ${formatSimTime(750)}`
+              : `since ${formatSimTime(MAYA_TASK_START_MINUTES)}`
+          }
+          available
+          onOpen={openDesignReview}
+          titleOverride="Message Maya in #design-review"
+        />
+      </div>
+    </div>
+  );
+}
+
 function PlaceholderRoom({ label }: { label: string }) {
   return (
     <div className="flex h-full min-h-0 flex-col items-center justify-center gap-2 bg-[#dfd6bd] p-4 text-center">
@@ -241,17 +308,22 @@ function PlaceholderRoom({ label }: { label: string }) {
   );
 }
 
-const PLACEHOLDER_ROOMS = ["SALES", "DESIGN", "OPS / SUPPORT", "LEGAL"];
+const PLACEHOLDER_ROOMS = ["SALES", "OPS / SUPPORT", "LEGAL"];
 
-/** Visual room layout of the company. Engineering is the only room with real
- * content — everything else is an explicit, labeled placeholder (per spec:
- * not populated with data/interactivity beyond Engineering, not a place to
- * direct background engineers, not wired to cost/resourcing tradeoffs). */
+/** Visual room layout of the company. Engineering has the full squad;
+ * Design has Maya's single card (she's a real Day 1 character, just not one
+ * of Raj's five engineers or a DM contact). Everything else remains an
+ * explicit, labeled placeholder (per spec: not populated with data/
+ * interactivity, not a place to direct background engineers, not wired to
+ * cost/resourcing tradeoffs). */
 export function OfficeApp() {
   return (
     <div className="pixel-scrollbar grid h-full min-h-0 w-full grid-cols-1 gap-2 overflow-y-auto p-2 md:grid-cols-2">
       <div className="pixel-border min-h-[300px] overflow-hidden">
         <EngineeringRoom />
+      </div>
+      <div className="pixel-border min-h-[140px] overflow-hidden">
+        <DesignRoom />
       </div>
       {PLACEHOLDER_ROOMS.map((label) => (
         <div key={label} className="pixel-border min-h-[140px] overflow-hidden">

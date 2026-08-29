@@ -46,7 +46,6 @@ export function ScorecardDetail({ record }: { record: DayScorecardRecord | Playt
   const studyAreasLoading = "studyAreasLoading" in record && record.studyAreasLoading;
   const noEngagement = "noEngagement" in record && record.noEngagement;
   const crossFunctionalLoading = "crossFunctionalLoading" in record && record.crossFunctionalLoading;
-  const easterEggsFound = "easterEggsFound" in record ? record.easterEggsFound : null;
 
   return (
     <>
@@ -149,27 +148,10 @@ export function ScorecardDetail({ record }: { record: DayScorecardRecord | Playt
         </div>
       )}
 
-      {/* Deliberately last, deliberately styled unlike anything above —
-          dashed border, no progress bar, no numeric score of any kind.
-          This is flavor, not evaluation; nothing here fed the bars up top. */}
-      {easterEggsFound && easterEggsFound.length > 0 && (
-        <div
-          className="mt-4 border-2 border-dashed bg-white p-3 text-xs text-ink"
-          style={{ borderColor: "var(--accent-egg)" }}
-        >
-          <div className="mb-2 font-pixel text-[9px] text-accent-egg">
-            EASTER EGGS FOUND: {easterEggsFound.length}
-          </div>
-          <ul className="space-y-1">
-            {easterEggsFound.map((egg) => (
-              <li key={egg.id} className="text-ink-soft">
-                {egg.label}
-              </li>
-            ))}
-          </ul>
-          <div className="mt-2 text-[10px] italic text-ink-soft">Just for fun, doesn&apos;t affect your score.</div>
-        </div>
-      )}
+      {/* Easter-egg display was removed deliberately (tone) — Day 1 Complete
+          shouldn't undercut itself with achievement tracking. The underlying
+          tracking (easterEggsFound, EasterEggDiscovery, the NPC reactions)
+          stays; only this panel goes. */}
     </>
   );
 }
