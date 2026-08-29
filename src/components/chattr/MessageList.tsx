@@ -24,18 +24,42 @@ export function MessageList() {
       {messages.length === 0 && (
         <p className="mt-6 text-center text-sm text-ink-soft">Nothing here yet.</p>
       )}
-      {messages.map((m) => (
-        <div key={m.id} className="mb-3 flex gap-2">
-          <PixelAvatar agentId={m.senderId} sizeClassName="h-8 w-8" />
-          <div className="min-w-0">
-            <div className="flex items-baseline gap-2">
-              <span className="text-sm font-semibold text-ink">{AGENT_NAMES[m.senderId]}</span>
-              <span className="text-[11px] text-ink-soft">{formatSimTime(m.sentAtSimMinutes)}</span>
+      {messages.map((m) => {
+        // System-voice messages (the 8:30 welcome, the 9:00 standup digest,
+        // resolution updates, the postmortem prompt, Derek-DM notification
+        // lines) are the sim's own narrator/ambient voice, not a coworker
+        // typing — give them a visually distinct treatment so the register
+        // reads differently at a glance. Keyed strictly on senderId ===
+        // "system" so NPC dialogue and player messages stay pixel-identical
+        // to before.
+        const isSystem = m.senderId === "system";
+        return (
+          <div key={m.id} className="mb-3 flex gap-2">
+            <PixelAvatar agentId={m.senderId} sizeClassName="h-8 w-8" />
+            <div className="min-w-0">
+              <div className="flex items-baseline gap-2">
+                <span
+                  className={
+                    isSystem
+                      ? "text-sm font-semibold font-pixel text-ink-soft"
+                      : "text-sm font-semibold text-ink"
+                  }
+                >
+                  {AGENT_NAMES[m.senderId]}
+                </span>
+                <span className="text-[11px] text-ink-soft">{formatSimTime(m.sentAtSimMinutes)}</span>
+              </div>
+              {isSystem ? (
+                <p className="whitespace-pre-wrap border-l-2 border-[#5b5470] bg-[#5b5470]/10 py-0.5 pl-2 text-sm italic leading-snug text-ink-soft">
+                  {m.content}
+                </p>
+              ) : (
+                <p className="whitespace-pre-wrap text-sm leading-snug text-ink">{m.content}</p>
+              )}
             </div>
-            <p className="whitespace-pre-wrap text-sm leading-snug text-ink">{m.content}</p>
           </div>
-        </div>
-      ))}
+        );
+      })}
       {showTyping && pendingReplyFrom && (
         <div className="mb-3 flex items-center gap-2 text-xs italic text-ink-soft">
           <PixelAvatar agentId={pendingReplyFrom} sizeClassName="h-6 w-6" />

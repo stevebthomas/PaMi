@@ -397,7 +397,7 @@ export const day1ScenarioEvents: ScenarioEvent[] = [
     eventType: "chattr_message",
     agentId: "theo",
     channel: "random",
-    content: "Hey, dumb question probably, but does anyone know where the bathroom is on this floor? I've been wandering for like five minutes.",
+    content: "Hey, dumb question probably, but does anyone know where the bathroom is on this floor? I've been wandering for like five minutes 😅",
     easterEgg: { label: "Helped Theo find the bathroom" },
   },
   {
@@ -410,7 +410,7 @@ export const day1ScenarioEvents: ScenarioEvent[] = [
     eventType: "chattr_message",
     agentId: "theo",
     channel: "random",
-    content: "Is anyone doing a lunch order today? If so, count me in, I completely forgot to bring anything.",
+    content: "Is anyone doing a lunch order today? If so, count me in, I completely forgot to bring anything 🙃",
     easterEgg: { label: "Joined Theo's lunch order" },
   },
   {
