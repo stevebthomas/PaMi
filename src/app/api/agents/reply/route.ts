@@ -1,22 +1,32 @@
 import { NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { getAnthropicClient, getPersonaModel, extractText, extractUsage, stripEmDashes } from "@/lib/agents/anthropic";
-import { AGENT_SYSTEM_PROMPTS, moodContextLine, commitmentContextLine, reactionContextLine, easterEggReactionLine, groundingContextLine } from "@/lib/agents/prompts";
+import {
+  AGENT_SYSTEM_PROMPTS,
+  moodContextLine,
+  commitmentContextLine,
+  rosterContextLine,
+  elapsedTimeContextLine,
+  reactionContextLine,
+  easterEggReactionLine,
+  groundingContextLine,
+} from "@/lib/agents/prompts";
 import type { AgentId, Message, StateBag } from "@/lib/sim/types";
 
 interface ReplyRequestBody {
   agentId: AgentId;
-  /** Now carries each message's `sentAtSimMinutes` alongside sender/content.
-   * Consumed by an upcoming subtask (A3/A4) that makes NPC replies aware of
-   * how long ago things were said; the current prompt assembly ignores it. */
+  /** Carries each message's `sentAtSimMinutes` alongside sender/content —
+   * elapsedTimeContextLine reads this to find the replying agent's own most
+   * recent message and how long ago it was. */
   history: Pick<Message, "senderId" | "content" | "sentAtSimMinutes">[];
   state: StateBag;
-  /** Current sim-clock minute at send time. Threaded through for the upcoming
-   * elapsed-time-awareness subtask (A3/A4); unused by prompt assembly today. */
+  /** Current sim-clock minute at send time — fed to elapsedTimeContextLine
+   * alongside `history` to compute the elapsed-time-awareness context (A4). */
   clockMinutes?: number;
   /** Present participants (AgentIds) in the channel being replied in — see
-   * presentInChannel in src/lib/sim/roster.ts. For the upcoming channel-roster
-   * injection subtask (A3/A4); unused by prompt assembly today. */
+   * presentInChannel in src/lib/sim/roster.ts. Fed to rosterContextLine (A3)
+   * so a persona knows who else is in the room and can address them directly
+   * instead of talking about them in the third person. */
   channelRoster?: AgentId[];
   /** Set only for a triggered agent-to-agent reaction call — appends that
    * persona's "how I react to another agent" instruction on top of the
@@ -62,15 +72,6 @@ export async function POST(request: Request) {
     channelRoster,
   } = body;
 
-  // clockMinutes, channelRoster, and each history entry's sentAtSimMinutes are
-  // now received and typed here, but deliberately NOT wired into prompt
-  // assembly in this subtask — an upcoming subtask (A3/A4) injects elapsed-time
-  // and channel-roster context into the persona prompts. Referenced via `void`
-  // so they're provably parsed/available now without changing any model-visible
-  // output. Do not fold them into the `system` string below.
-  void clockMinutes;
-  void channelRoster;
-
   const systemPrompt = AGENT_SYSTEM_PROMPTS[agentId];
   if (!systemPrompt) {
     return NextResponse.json({ error: `No persona configured for agent "${agentId}"` }, { status: 400 });
@@ -99,6 +100,8 @@ export async function POST(request: Request) {
     const groundingLine =
       groundingChannelLabel && groundingTranscript ? groundingContextLine(groundingChannelLabel, groundingTranscript) : "";
     const personaLine = personaContext ?? "";
+    const rosterLine = rosterContextLine(agentId, channelRoster);
+    const elapsedLine = elapsedTimeContextLine(agentId, clockMinutes, history);
     const response = await client.messages.create({
       model: getPersonaModel(agentId),
       max_tokens: 900,
@@ -106,6 +109,8 @@ export async function POST(request: Request) {
         systemPrompt +
         moodContextLine(agentId, state) +
         commitmentContextLine(agentId, state) +
+        rosterLine +
+        elapsedLine +
         reactionLine +
         eggLine +
         groundingLine +

@@ -1,5 +1,7 @@
-import type { AgentId, StateBag } from "../sim/types";
+import type { AgentId, Message, StateBag } from "../sim/types";
+import { AGENT_NAMES } from "../sim/types";
 import { BASELINE_RATE, APPLE_PAY_INCIDENT_FAILURE_POINTS, PAYOUT_PIPELINE } from "../sim/worldCanon";
+import { formatSimClock } from "../sim/timeOfDay";
 
 /** Apple Pay's own success-rate floor during the incident, derived from canon
  * (BASELINE_RATE minus the incident's Apple-Pay-only failure points) rather
@@ -475,6 +477,104 @@ export function commitmentContextLine(agentId: AgentId, state: StateBag): string
     `\nIf the player is genuinely telling you one of these for the very first time in their latest message, just respond to that naturally, this note only exists so you don't act surprised by something that's already been settled.` +
     playerOwesNote
   );
+}
+
+/**
+ * Channel-presence context for the REPLYING persona (A3) — the fix for an
+ * NPC discussing someone who is actually present in the same channel as if
+ * they were an absent third party (live-observed bug: Raj talking about
+ * Marcus in third person in #incidents — "Marcus flagged it to me... let me
+ * know if Marcus needs anything from me" — while Marcus was an active
+ * participant in that same channel). Lists who else (besides this agent) is
+ * present in the channel this reply is going into (see channelRoster /
+ * presentInChannel in roster.ts) and instructs the NPC to address a present
+ * person directly when they come up, reserving third person for someone
+ * genuinely not in this channel.
+ *
+ * Returns "" for a DM (the roster is always exactly [this agent, "player"],
+ * nothing useful to add) and for a missing/empty roster (old callers, tests)
+ * so prompt output for every caller that doesn't pass channelRoster is
+ * byte-for-byte unchanged.
+ */
+export function rosterContextLine(agentId: AgentId, channelRoster?: AgentId[]): string {
+  if (!channelRoster || channelRoster.length === 0) return "";
+  // A DM roster is always exactly [the NPC, "player"] — nothing useful to say.
+  if (channelRoster.length === 2) return "";
+
+  const others = channelRoster.filter((id) => id !== agentId && id !== "system");
+  if (others.length === 0) return "";
+
+  const names = others.map((id) => (id === "player" ? "the player" : AGENT_NAMES[id]));
+  const list = names.length === 1 ? names[0] : `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`;
+
+  return `\n\nAlso in this channel right now, able to see this reply: ${list}. If any of them comes up in what you're about to say, address them directly (talk to them, second person, or name them like they're in the room) rather than describing them as if they're elsewhere. Only talk about someone in the third person, like they're not around, if they are genuinely NOT in this list.`;
+}
+
+/**
+ * Natural-language gap for a duration in minutes, matching how a person
+ * would actually say it ("17 min ago", "about 2 hours ago") rather than a
+ * raw minute count once it gets large. A tiny local copy of the same shape
+ * as `describeGap` in incidentTimeline.ts, not imported from it: that
+ * function is private (unexported) and incidentTimeline.ts is outside this
+ * subtask's allowed change set (only prompts.ts / the reply route / a small
+ * roster.ts helper), so exporting it there isn't an option here — even
+ * though there's no actual import-cycle risk (prompts.ts would reach
+ * incidentTimeline.ts -> day1-scenario.ts -> taskflowStore.ts / commitments.ts
+ * / obligations.ts / payoutCanon.ts, none of which import prompts.ts).
+ */
+function describeElapsedGap(minutes: number): string {
+  if (minutes < 60) return `${minutes} min ago`;
+  const hours = Math.round(minutes / 60);
+  if (hours === 1) return "about an hour ago";
+  return `about ${hours} hours ago`;
+}
+
+/**
+ * Elapsed-sim-time context for the REPLYING persona (A4) — the fix for an
+ * NPC answering a time-sensitive question as though no time had passed, when
+ * the player actually replied much later (live-observed bug: Theo's 2:15 PM
+ * lunch-order question in #random answered as still-live by Theo 27
+ * sim-minutes after the player's reply). States the current sim-clock time
+ * and how long it's been since THIS agent's own most recent message in the
+ * history, then gives scaling guidance: a short gap reads live, a long gap
+ * (30+ sim minutes) since something time-sensitive should read like time
+ * actually passed rather than getting answered as still-current.
+ *
+ * jordan/chen/marcus separately receive a timestamped personaContext
+ * ("...current as of {clock}...", see buildEngineerPersonaContext /
+ * buildMarcusPersonaContext in dmContacts.ts) — this line can't contradict
+ * that since both read the same clockMinutes passed into this same request.
+ *
+ * Degrades gracefully: no clockMinutes => "" (old callers/tests, byte-for-
+ * byte unchanged output). clockMinutes present but no prior message from
+ * this agent in history (or none with a timestamp) => a current-time-only
+ * line, no gap claim.
+ */
+export function elapsedTimeContextLine(
+  agentId: AgentId,
+  clockMinutes: number | undefined,
+  history: Pick<Message, "senderId" | "content" | "sentAtSimMinutes">[],
+): string {
+  if (clockMinutes === undefined) return "";
+  const nowLabel = formatSimClock(clockMinutes);
+
+  const ownMessages = history.filter((m) => m.senderId === agentId && typeof m.sentAtSimMinutes === "number");
+  if (ownMessages.length === 0) {
+    return `\n\nThe current time is ${nowLabel}.`;
+  }
+
+  const lastOwn = ownMessages[ownMessages.length - 1];
+  const gap = Math.round(clockMinutes - lastOwn.sentAtSimMinutes);
+  if (gap <= 0) {
+    return `\n\nThe current time is ${nowLabel}. Your last message here was just now.`;
+  }
+
+  const scalingNote =
+    gap >= 30
+      ? ` That's a real gap, not a quick back-and-forth. If your last message asked or offered something time-sensitive (a question, plans that depend on timing, e.g. a lunch order), don't answer as if no time passed. Let it show: you may have moved on, sorted it out yourself already, or gently note the delay before continuing.`
+      : "";
+
+  return `\n\nThe current time is ${nowLabel}. Your last message here was ${describeElapsedGap(gap)}.${scalingNote}`;
 }
 
 /** One example line per persona for how they react when shown another
