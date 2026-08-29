@@ -102,6 +102,11 @@ export interface Message {
    * on player messages sent before the incident starts, and on any older
    * persisted message from before this field existed. */
   dashboard?: string;
+  /** A document chip rendered under the message content (e.g. Derek's
+   * welcome-doc attachment). Clicking it opens the doc in the in-sim Docs app
+   * (SIM_DOCS[docId]), never a real browser download. Optional: absent on
+   * almost all messages. */
+  attachment?: { label: string; docId: string };
 }
 
 export interface EvaluationScores {
@@ -511,6 +516,12 @@ export interface ScenarioEvent {
    * Deliberately NOT wired into requiresResponse/scoring in any way — see
    * the boundary comment at the discovery-tracking call site. */
   easterEgg?: { label: string };
+  /** A document chip to render under this event's Message once it fires (e.g.
+   * Derek's welcome-doc). Clicking it opens the doc in the in-sim Docs app
+   * (SIM_DOCS[docId]), never a real browser download. Optional: absent on
+   * almost every event; carried onto the created Message unchanged by
+   * advanceClock. */
+  attachment?: { label: string; docId: string };
 }
 
 /** Difficulty tier for player-facing ambient-help features (not for scoring
@@ -778,6 +789,13 @@ export interface StateBag {
    * subtask (A2); this is just the data. Empty for now. Must stay plain-JSON
    * (no Sets/Maps/closures) so it survives JSON round-tripping for persistence. */
   pendingObligations: ObligationEntry[];
+  /** The player's own name, captured on the orientation screen before Day 1
+   * starts (see setPlayerName / WelcomeScreen). Empty string until entered —
+   * which is also the state old persisted sessions and the HR orientation chat
+   * (which sends initialStateBag before any name exists) present, so every
+   * consumer must treat "" as "no name given." Plain string, so it round-trips
+   * through session persistence untouched. */
+  playerName: string;
   [key: string]: unknown;
 }
 
@@ -802,6 +820,7 @@ export const initialStateBag: StateBag = {
   payoutInconsistencySurfaced: false,
   commitmentLedger: [],
   pendingObligations: [],
+  playerName: "",
 };
 
 export const AGENT_NAMES: Record<AgentId, string> = {

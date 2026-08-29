@@ -1,4 +1,5 @@
 import { useSimStore } from "@/store/simStore";
+import { useDocsStore } from "@/store/docsStore";
 import type { AppId } from "./Desktop";
 import { AppIcon } from "@/components/shared/AppIcon";
 
@@ -10,6 +11,7 @@ const APPS: { id: AppId; label: string; enabled: boolean }[] = [
   { id: "reviews", label: "Reviews", enabled: true },
   { id: "notes", label: "Notes", enabled: true },
   { id: "office", label: "Office", enabled: true },
+  { id: "docs", label: "Docs", enabled: true },
 ];
 
 /** Bottom dock, purely for opening/switching apps — system controls
@@ -24,6 +26,8 @@ export function Taskbar({
   onSelectApp: (app: AppId) => void;
 }) {
   const pendingCount = useSimStore((s) => s.pendingResponseIds.size);
+  // Docs icon hops while its launch animation is in flight (see docsStore).
+  const docsLaunching = useDocsStore((s) => s.launching);
 
   return (
     <div className="flex h-16 shrink-0 items-center justify-center border-t-2 border-ink bg-bg-taskbar px-3">
@@ -40,7 +44,7 @@ export function Taskbar({
             }`}
             title={app.enabled ? app.label : `${app.label}, coming in a later phase`}
           >
-            <div className="relative">
+            <div className={`relative ${app.id === "docs" && docsLaunching ? "animate-dock-bounce" : ""}`}>
               <AppIcon id={app.id} sizeClassName="h-9 w-9" />
               {app.id === "chattr" && pendingCount > 0 && (
                 <span className="absolute -right-1.5 -top-1.5 flex h-4 min-w-4 items-center justify-center border-2 border-ink bg-accent-danger px-1 text-[9px] leading-none text-white">

@@ -1,6 +1,8 @@
 import { useEffect, useRef } from "react";
 import { AGENT_NAMES } from "@/lib/sim/types";
 import { formatSimTime, useSimStore } from "@/store/simStore";
+import { useDocsStore } from "@/store/docsStore";
+import { getSimDoc } from "@/data/simDocs";
 import { PixelAvatar } from "@/components/shared/PixelAvatar";
 import { TypingDots } from "@/components/shared/TypingDots";
 
@@ -12,6 +14,7 @@ export function MessageList() {
   // channel currently on screen — otherwise switching channels mid-reply
   // would show "X is typing" somewhere X isn't actually replying.
   const pendingReplyChannel = useSimStore((s) => s.pendingReplyChannel);
+  const openDocRequest = useDocsStore((s) => s.openDocRequest);
   const showTyping = pendingReplyFrom !== null && pendingReplyChannel === activeChannel;
   const bottomRef = useRef<HTMLDivElement>(null);
 
@@ -55,6 +58,21 @@ export function MessageList() {
                 </p>
               ) : (
                 <p className="whitespace-pre-wrap text-sm leading-snug text-ink">{m.content}</p>
+              )}
+              {/* Doc chip — opens in the in-sim Docs app, never a real
+                  download. Rendered ONLY when the attachment's docId resolves
+                  in SIM_DOCS, so a legacy persisted attachment carrying the old
+                  {label, href} shape (no docId) silently renders nothing rather
+                  than crashing. */}
+              {m.attachment && getSimDoc(m.attachment.docId) && (
+                <button
+                  type="button"
+                  onClick={() => openDocRequest(m.attachment!.docId)}
+                  className="pixel-border mt-1.5 inline-flex items-center gap-1 bg-white px-2 py-1 text-[11px] text-ink hover:-translate-y-0.5"
+                >
+                  <span>📄</span>
+                  {m.attachment.label}
+                </button>
               )}
             </div>
           </div>

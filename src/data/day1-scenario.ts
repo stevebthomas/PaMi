@@ -87,7 +87,8 @@ export const day1ScenarioEvents: ScenarioEvent[] = [
     agentId: "derek",
     channel: "dm_derek",
     content:
-      "Morning, and welcome to BazaarLoop. Glad to finally have someone owning search through checkout, it's been on my plate too long. Get settled in today, nothing urgent from me right now. I'm in and out of meetings but ping me if you need anything, I'll get back to you when I can.",
+      "Morning, and welcome to BazaarLoop. Glad to finally have someone owning search through checkout, it's been on my plate too long. Get settled in today, nothing urgent from me right now. I'm in and out of meetings but ping me if you need anything, I'll get back to you when I can. Oh, and I attached the intro doc I send every new hire, worth a skim when you get a minute.",
+    attachment: { label: "Welcome to BazaarLoop.md", docId: "derek-welcome-doc" },
   },
   {
     id: "raj-standup-heads-up",

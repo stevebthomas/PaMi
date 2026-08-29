@@ -10,7 +10,7 @@ import { Wallpaper } from "../desktop/Wallpaper";
  * — the sky/mountain/sun art lives in that one shared component now, not
  * in the pixel-desktop-bg CSS class, so it has to be rendered explicitly
  * here too or this screen loses its background entirely. */
-export function OnboardingScreen({ onStart }: { onStart: () => void }) {
+export function OnboardingScreen({ onStart }: { onStart: (name: string) => void }) {
   return (
     <div className="pixel-desktop-bg relative flex h-dvh w-full items-center justify-center p-4">
       <Wallpaper dayProgress={0} />

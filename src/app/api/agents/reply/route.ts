@@ -102,6 +102,13 @@ export async function POST(request: Request) {
     const personaLine = personaContext ?? "";
     const rosterLine = rosterContextLine(agentId, channelRoster);
     const elapsedLine = elapsedTimeContextLine(agentId, clockMinutes, history);
+    // Only when the player actually entered a name on the orientation screen —
+    // empty/absent (old sessions, the HR orientation chat's initialStateBag)
+    // appends nothing, keeping the prompt backward compatible.
+    const playerNameLine =
+      typeof state.playerName === "string" && state.playerName.trim()
+        ? `\n\nThe PM you are talking to (the "player") is named ${state.playerName.trim()}. Address them by name occasionally, the way a coworker would, not in every message.`
+        : "";
     const response = await client.messages.create({
       model: getPersonaModel(agentId),
       max_tokens: 900,
@@ -114,7 +121,8 @@ export async function POST(request: Request) {
         reactionLine +
         eggLine +
         groundingLine +
-        personaLine,
+        personaLine +
+        playerNameLine,
       messages,
     });
 

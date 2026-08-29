@@ -15,13 +15,15 @@ import { ReviewsApp } from "../reviews/ReviewsApp";
 import { NotesApp } from "../notes/NotesApp";
 import { TaskflowApp } from "../taskflow/TaskflowApp";
 import { OfficeApp } from "../office/OfficeApp";
+import { DocsApp } from "../docs/DocsApp";
 import { useSimStore } from "@/store/simStore";
 import { useWindowStore } from "@/store/windowStore";
+import { useDocsStore } from "@/store/docsStore";
 import { getSessionCostSummary } from "@/store/costStore";
 import { getAmbientTint, getDayProgress } from "@/lib/sim/timeOfDay";
 import { restoreSession, startSessionPersistence, resetSession } from "@/lib/sim/sessionPersistence";
 
-export type AppId = "chattr" | "pulse" | "taskflow" | "askClaude" | "reviews" | "notes" | "office";
+export type AppId = "chattr" | "pulse" | "taskflow" | "askClaude" | "reviews" | "notes" | "office" | "docs";
 
 const APP_DEFAULT_SIZE: Record<AppId, { width: number; height: number }> = {
   chattr: { width: 760, height: 600 },
@@ -31,6 +33,7 @@ const APP_DEFAULT_SIZE: Record<AppId, { width: number; height: number }> = {
   reviews: { width: 640, height: 580 },
   notes: { width: 480, height: 520 },
   office: { width: 860, height: 660 },
+  docs: { width: 640, height: 600 },
 };
 
 export function Desktop() {
@@ -51,6 +54,11 @@ export function Desktop() {
   const clockMinutes = useSimStore((s) => s.clockMinutes);
   const windows = useWindowStore((s) => s.windows);
   const openWindow = useWindowStore((s) => s.openWindow);
+  // Docs launch signal: the docsStore plays the dock-bounce, then flips
+  // pendingOpen so Desktop (the only caller of openWindow with real desk
+  // bounds) opens the window centered/cascaded like every other app.
+  const docsPendingOpen = useDocsStore((s) => s.pendingOpen);
+  const clearDocsPendingOpen = useDocsStore((s) => s.clearPendingOpen);
   const containerRef = useRef<HTMLDivElement>(null);
 
   const openApps = useMemo(() => new Set(Object.keys(windows) as AppId[]), [windows]);
@@ -104,6 +112,18 @@ export function Desktop() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [phase]);
 
+  // Opens the Docs window once the docsStore's launch animation completes and
+  // flips pendingOpen. Kept here (not in the store) so openWindow is still only
+  // ever called with real containerRef desk dimensions — the window then
+  // centers/cascades exactly like every other app. Clearing the flag after is
+  // idempotent under StrictMode (openWindow bringsToFront if already open).
+  useEffect(() => {
+    if (!docsPendingOpen) return;
+    const bounds = containerRef.current;
+    openWindow("docs", APP_DEFAULT_SIZE.docs, bounds?.clientWidth ?? 1024, bounds?.clientHeight ?? 640);
+    clearDocsPendingOpen();
+  }, [docsPendingOpen, openWindow, clearDocsPendingOpen]);
+
   // Neutral frame shown on the server and the first client render (identical on
   // both, so no hydration mismatch) until the mount effect decides resume vs.
   // onboarding. Uses the same background as the real screens so it reads as a
@@ -113,7 +133,14 @@ export function Desktop() {
   }
 
   if (phase === "onboarding") {
-    return <OnboardingScreen onStart={() => setPhase("desktop")} />;
+    return (
+      <OnboardingScreen
+        onStart={(name) => {
+          useSimStore.getState().setPlayerName(name);
+          setPhase("desktop");
+        }}
+      />
+    );
   }
 
   function handleSelectApp(id: AppId) {
@@ -182,6 +209,11 @@ export function Desktop() {
         {windows.office && (
           <DesktopWindow id="office" title="OFFICE" accentClassName="bg-accent-office/40" containerRef={containerRef}>
             <OfficeApp />
+          </DesktopWindow>
+        )}
+        {windows.docs && (
+          <DesktopWindow id="docs" title="DOCS" accentClassName="bg-accent-docs/40" containerRef={containerRef}>
+            <DocsApp />
           </DesktopWindow>
         )}
       </div>

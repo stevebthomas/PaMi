@@ -50,6 +50,14 @@ const ICONS: Record<AppId, IconDef> = {
     line: "#7a4d2f",
     grid: ["........", ".FFFFFF.", ".FLFLFF.", ".FFFFFF.", ".FLFLFF.", ".FFFFFF.", ".FFLLFF.", "........"],
   },
+  docs: {
+    // A page with a folded top-right corner (the 'L' notch) and ruled text
+    // lines below the fold.
+    bg: "#9b8ec4",
+    fg: "#ffffff",
+    line: "#5b5470",
+    grid: ["........", ".FFFFL..", ".FFFFFL.", ".FLLLLF.", ".F....F.", ".FLLLLF.", ".FFFFFF.", "........"],
+  },
 };
 
 export function AppIcon({ id, sizeClassName = "h-6 w-6" }: { id: AppId; sizeClassName?: string }) {

@@ -16,6 +16,7 @@
   --accent-reviews: #5fae6f;
   --accent-notes: #e8b23f;
   --accent-office: #b8794f;
+  --accent-docs: #9b8ec4;
   --accent-egg: #c26bd9;
 }
 
@@ -34,6 +35,7 @@
   --color-accent-reviews: var(--accent-reviews);
   --color-accent-notes: var(--accent-notes);
   --color-accent-office: var(--accent-office);
+  --color-accent-docs: var(--accent-docs);
   --color-accent-egg: var(--accent-egg);
   --font-pixel: var(--font-pixel);
   --font-body: var(--font-body);
@@ -82,6 +84,31 @@ body {
 .pixel-scrollbar::-webkit-scrollbar-thumb {
   background: var(--ink-soft);
   border: 2px solid var(--ink);
+}
+
+/* Retro dock-launch bounce — the app icon hops a few snappy times over the
+   Docs launch window (~0.9s), like a classic OS dock icon while its app opens.
+   Purely decorative; see docsStore's LAUNCH_MS. */
+@keyframes dock-bounce {
+  0% { transform: translateY(0); }
+  15% { transform: translateY(-9px); }
+  30% { transform: translateY(0); }
+  45% { transform: translateY(-6px); }
+  60% { transform: translateY(0); }
+  78% { transform: translateY(-3px); }
+  90% { transform: translateY(0); }
+  100% { transform: translateY(0); }
+}
+.animate-dock-bounce {
+  animation: dock-bounce 0.9s ease-out;
+}
+
+/* Busy pointer during an app launch — applied to <body> by docsStore while a
+   launch animation is in flight, and always reverted when the window opens.
+   The descendant selector makes it win over elements' own cursors. */
+.cursor-busy,
+.cursor-busy * {
+  cursor: progress !important;
 }
 
 /* Faint ruled-paper texture for Notes — enough to feel like a designed

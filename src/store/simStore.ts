@@ -202,6 +202,7 @@ interface SimState {
   recordFollowUpTicket: (day: number, ticketTitle: string) => void;
   setNotesText: (text: string) => void;
   setDifficulty: (difficulty: Difficulty) => void;
+  setPlayerName: (name: string) => void;
 }
 
 // Alias, not a reimplementation: formatSimClock in timeOfDay.ts is the
@@ -481,7 +482,11 @@ export const useSimStore = create<SimState>((set, get) => ({
   firedEventIds: new Set(),
   evaluations: {},
   helpQueries: [],
-  activeChannel: "general",
+  // Opens on Derek's 8:30 AM welcome DM (derek-welcome-dm, day1-scenario.ts)
+  // rather than #general, so the first thing a fresh session sees is his
+  // welcome instead of it sitting hidden behind an unread dot. Restored
+  // sessions overwrite this with their saved channel (sessionPersistence.ts).
+  activeChannel: "dm_derek",
   pendingReplyFrom: null,
   pendingReplyChannel: null,
   unreadChannels: new Set(),
@@ -537,6 +542,7 @@ export const useSimStore = create<SimState>((set, get) => ({
           content: e.contentFor ? e.contentFor(s.stateBag) : e.content,
           sentAtSimMinutes: e.triggerTimeMinutes,
           createdAt: Date.now(),
+          attachment: e.attachment,
         }));
 
         const fired = new Set(s.firedEventIds);
@@ -1660,6 +1666,7 @@ export const useSimStore = create<SimState>((set, get) => ({
 
   setNotesText: (text) => set({ notesText: text }),
   setDifficulty: (difficulty) => set({ difficulty }),
+  setPlayerName: (name) => set((s) => ({ stateBag: { ...s.stateBag, playerName: name.trim() } })),
 }));
 
 export { formatSimTime };
