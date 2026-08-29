@@ -68,6 +68,23 @@ export const day1ScenarioEvents: ScenarioEvent[] = [
       "Welcome to BazaarLoop. Today is Monday, your first day owning the buyer experience surface area. Keep an eye on #general and #incidents. The day starts now.",
   },
   {
+    // Fires at the same clock minute as sys-welcome so Derek's DM is never
+    // empty on first open (previously silent from 8:30 AM session start
+    // until his 1:30 PM escalation, which read as broken on day one).
+    // Deliberately generic first-day warmth, not a task: no requiresResponse,
+    // no tooling orientation, and no promise of constant availability, so it
+    // doesn't sit oddly next to his later "just saw the #incidents thread"
+    // recap ask.
+    id: "derek-welcome-dm",
+    day: 1,
+    triggerTimeMinutes: 510, // 8:30 AM
+    eventType: "chattr_message",
+    agentId: "derek",
+    channel: "dm_derek",
+    content:
+      "Morning, and welcome to BazaarLoop. Glad to finally have someone owning search through checkout, it's been on my plate too long. Get settled in today, nothing urgent from me right now. I'm in and out of meetings but ping me if you need anything, I'll get back to you when I can.",
+  },
+  {
     id: "raj-standup-heads-up",
     day: 1,
     triggerTimeMinutes: 515, // 8:35 AM
@@ -113,7 +130,7 @@ export const day1ScenarioEvents: ScenarioEvent[] = [
     agentId: "system",
     channel: "general",
     content:
-      "**Daily Standup, 9:00 AM**\n\n**Raj:** \"Jordan and Chen are mid-sprint on the checkout redesign, no blockers there. Rest of the team's heads-down on their own stuff. I want eyes on payment service tech debt soon.\"\n**Priya:** \"Support queue's a little heavier than usual this morning, mostly checkout-related. Keeping an eye on it.\"\n**Design:** \"Listing page wireframes are up in #design-review whenever you get a sec.\"\n\n*Nothing here is flagged urgent, but you've already heard from Priya once this morning.*",
+      "**Daily Standup, 9:00 AM**\n\n**Raj:** \"Jordan and Chen are mid-sprint on the checkout redesign, no blockers there. Rest of the team's heads-down on their own stuff. I want eyes on payment service tech debt soon.\"\n**Priya:** \"Support queue's a little heavier than usual this morning, mostly checkout-related. Keeping an eye on it.\"\n**Design:** \"Heads-down on the listing page wireframes this morning, will post something in #design-review around midday.\"\n\n*Nothing here is flagged urgent, but you've already heard from Priya once this morning.*",
   },
   {
     id: "priya-incidents-escalation",

@@ -1,6 +1,6 @@
 import type { AgentId, Message, StateBag } from "../sim/types";
 import { AGENT_NAMES } from "../sim/types";
-import { BASELINE_RATE, APPLE_PAY_INCIDENT_FAILURE_POINTS, PAYOUT_PIPELINE } from "../sim/worldCanon";
+import { BASELINE_RATE, APPLE_PAY_INCIDENT_FAILURE_POINTS, PAYOUT_PIPELINE, SAVE_INTERACTION_PRIOR_TEST } from "../sim/worldCanon";
 import { formatSimClock } from "../sim/timeOfDay";
 
 /** Apple Pay's own success-rate floor during the incident, derived from canon
@@ -279,11 +279,22 @@ You don't need a long justification either way, you just want a decision so Theo
 Default emotional baseline: Easygoing and patient. Nothing here is urgent enough to justify
 pressure, so you never escalate, chase, or read into a delay.
 
+Facts you know if asked (ONLY if the player specifically asks about data, numbers, or a past
+test, never volunteer this on your own): there's an old experiment on a similar save interaction,
+directional only, not a perfect match for this exact feature. The animated "saved!" confirmation
+drove roughly +${SAVE_INTERACTION_PRIOR_TEST.animatedSavesLiftPoints}% more saves but about
+${SAVE_INTERACTION_PRIOR_TEST.animatedAovDropPoints}% lower AOV. The silent, instant version drove
+roughly +${SAVE_INTERACTION_PRIOR_TEST.silentCompletionLiftPoints}% higher purchase completion but
+about ${SAVE_INTERACTION_PRIOR_TEST.silentSavesDropPoints}% fewer saves. If asked, present both
+sides plainly as a genuine tradeoff, a real number pulling in each direction. This data does not
+give you a preference: you still don't have one, even if the player asks which you'd personally
+pick.
+
 Rules:
 - Stay in character. Never break the fourth wall. Never mention you are an AI.
 - Whichever option the player picks (animation or silent, or a reasonable middle ground), treat it
   as equally fine, say thanks briefly, and move on. Don't relitigate, don't ask for more detail,
-  don't express a preference of your own even if pushed.
+  don't express a preference of your own even if pushed, even after sharing the numbers above.
 - If the player seems to be in the middle of something else (an incident, an urgent conversation),
   don't push for an immediate answer or escalate. This is genuinely not urgent, so let it sit
   patiently.

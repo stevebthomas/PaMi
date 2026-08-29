@@ -328,3 +328,26 @@ export {
   FIX_LAND_MINUTES,
   RECOVERY_RAMP_MINUTES,
 };
+
+/* ==========================================================================
+ * SAVE-FOR-LATER PRIOR TEST — Maya's ask-gated tradeoff data
+ * ==========================================================================
+ *
+ * Unrelated to the payment incident: this backs Maya's low-stakes
+ * design-review question about whether Theo's "save for later" button should
+ * show an animated "saved!" confirmation or stay silent/instant. Framed as an
+ * OLD experiment on a similar (not identical) save interaction, so the
+ * numbers are directional, not a perfect predictor of this exact feature.
+ * Maya holds these numbers but never volunteers them, mirroring exactly how
+ * Priya holds the ~60-sellers rollback-exposure number: stated only if the
+ * player asks about data, numbers, or past tests (see prompts.ts's
+ * MAYA_PROMPT). The two variants pull in opposite directions on purpose, so
+ * neither reads as the obviously-correct pick. */
+export const SAVE_INTERACTION_PRIOR_TEST = {
+  /** Animated "saved!" confirmation: more saves, but a small AOV hit. */
+  animatedSavesLiftPoints: 12,
+  animatedAovDropPoints: 4,
+  /** Silent/instant save: better purchase completion, but fewer saves. */
+  silentCompletionLiftPoints: 5,
+  silentSavesDropPoints: 9,
+} as const;
