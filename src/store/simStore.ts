@@ -1274,6 +1274,11 @@ export const useSimStore = create<SimState>((set, get) => ({
               strategicThinking: result.strategicThinking,
             },
             feedback: result.feedback,
+            // C2: capture the evaluator's per-message claims ledger (grounding
+            // statuses + any explicit source attributions). Used at day end for
+            // the attribution credibility signal (see analyzeAttributions).
+            // Guarded so an old/failed response with no ledger degrades cleanly.
+            ...(Array.isArray(result.claims) ? { claims: result.claims } : {}),
           };
           const nextMood: StateBag = { ...s.stateBag };
           const avg =

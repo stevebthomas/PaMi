@@ -727,6 +727,17 @@ specific claim, not wave it through. Do not reward a message just because it has
 hits the right keywords (blast radius, ETA, ownership). Reward it only if what it claims is actually
 grounded in what the transcript shows the player had been told by that point.
 
+Attribution is a SEPARATE axis from grounding, recorded on the SAME claim. When the graded message
+explicitly credits a specific person as the source of a claim ("that's Priya's estimate", "per Raj",
+"Marcus says", "according to Derek", "Raj told me the ETA"), record that person's name on that claim
+as "attributedTo". This is only about who the player NAMED as the source, and it is INDEPENDENT of the
+claim's grounding status: a claim can be "attributedTo" Priya and still be UNSOURCED if Priya never
+actually supplied it earlier in the transcript — a player pinning a number on someone they never got
+it from is exactly the case worth recording, not smoothing over. Record only an attribution the player
+actually stated in words; if a claim carries no explicit "so-and-so said / so-and-so's" credit, omit
+the "attributedTo" field for that claim entirely. Never infer or guess an attribution the player did
+not make, and do not treat the player citing themselves as an attribution.
+
 Do not over-correct. A claim that IS backed by an earlier NPC or system line (Raj's "~3% of attempts",
 Priya's "14 tickets in the last hour", the resolution update's error rate) stays grounded even when
 the player relays it to someone else, so do not flag those. And a claim the player clearly labels as
@@ -823,7 +834,7 @@ Return ONLY valid JSON matching this exact shape, no other text. Fill "claims" F
 decide the scores, so your grounding check actually drives them. List only specific factual claims;
 if the message makes none (for example a #design-review reply or a pure clarifying question), use an
 empty array.
-{"claims": [{"claim": "<the specific claim, short>", "status": "GROUNDED"|"UNSOURCED"|"CHALLENGED", "source": "<for GROUNDED, quote the NPC/system line that supplied it; otherwise a short note on why it is unsourced or who challenged it>"}], "tone": <0-10 int>, "speed": <0-10 int>, "completeness": <0-10 int>, "strategicThinking": <0-10 int>, "feedback": "<one or two sentence coaching note, second person, direct>"}`;
+{"claims": [{"claim": "<the specific claim, short>", "status": "GROUNDED"|"UNSOURCED"|"CHALLENGED", "source": "<for GROUNDED, quote the NPC/system line that supplied it; otherwise a short note on why it is unsourced or who challenged it>", "attributedTo": "<OPTIONAL: the person the player explicitly named as this claim's source, e.g. 'Priya'; OMIT this field entirely when the message made no explicit attribution>"}], "tone": <0-10 int>, "speed": <0-10 int>, "completeness": <0-10 int>, "strategicThinking": <0-10 int>, "feedback": "<one or two sentence coaching note, second person, direct>"}`;
 
 export const COORDINATION_PROMPT = `You are grading a Product Manager's cross-functional coordination during a live production
 incident, based on their full Slack transcript for the day (all channels and DMs).

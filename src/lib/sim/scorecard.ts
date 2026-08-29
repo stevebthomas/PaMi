@@ -1,5 +1,5 @@
-import type { CoachingEntry, Evaluation, Message, ScorecardCategory, ScorecardScores, StateBag, StudyAreaEntry, Ticket } from "./types";
-import { PAYMENTS_DOMAIN_ASSIGNEES, rosterName } from "./types";
+import type { AgentId, ClaimLedgerEntry, CoachingEntry, Evaluation, Message, ScorecardCategory, ScorecardScores, StateBag, StudyAreaEntry, Ticket } from "./types";
+import { AGENT_NAMES, PAYMENTS_DOMAIN_ASSIGNEES, rosterName } from "./types";
 import { STUDY_RESOURCES } from "../../data/study-resources";
 import { INCIDENT_DECLARED_AT } from "./incidentTimeline";
 import { day1ScenarioEvents } from "../../data/day1-scenario";
@@ -32,6 +32,157 @@ function scoreResponseTime(ackAt: number | null): number {
 function average(values: number[]): number {
   if (values.length === 0) return 0;
   return values.reduce((a, b) => a + b, 0) / values.length;
+}
+
+// ---------------------------------------------------------------------------
+// C2 — unverified-attribution credibility signal.
+//
+// When the player credits a specific person as the source of a claim ("that's
+// Priya's estimate") but never actually got that from them, it's a real
+// judgment/trust lapse. Nobody catches it live (by design: no NPC callout, no
+// mid-day UI signal) — in a real org it surfaces LATER, when stakeholders
+// compare notes. So this deliberately stays a DELAYED, SOCIAL consequence: the
+// day-end scorecard is the first and only place it shows up, as a small,
+// bounded stakeholderMgmt penalty plus a coaching note.
+//
+// The evaluator emits which claims the player attributed to whom (the ledger's
+// `attributedTo`), but that field — like all model output — is not trusted for
+// scoring. Whether the attributed NPC ACTUALLY supplied the thing is re-derived
+// here, deterministically, from real message history, via a pragmatic tiered
+// check. Its LIMITS, stated honestly:
+//   - Tier 1 (strong / "verified"): a message the attributed NPC sent to the
+//     player before the claim contains a NUMBER that also appears in the claim
+//     text. Number matching is digit-run based (commas stripped), so it catches
+//     "~60"/"60"/"60 sellers" but NOT spelled-out numbers ("sixty") and NOT a
+//     non-numeric fact ("Raj said it was a webhook bug"), which fall to Tier 2.
+//     It also depends on the model's short claim text actually carrying the
+//     figure; if the model summarized the claim without the number, Tier 1
+//     can't fire even when the NPC did state it.
+//   - Tier 2 (weak / "plausible but unconfirmed"): the player had SOME prior
+//     exchange with the attributed NPC (that NPC authored at least one message
+//     the player could see before the claim), but the specific figure isn't
+//     traceable to them. Could be a real off-transcript hallway conversation we
+//     can't see, or could be a misattribution — we can't tell, so it's flagged
+//     but treated more leniently than Tier 3.
+//   - Tier 3 ("never spoke to them"): the attributed NPC never sent the player
+//     a single message before the claim. Crediting a figure to someone you
+//     never spoke to is the clearest lapse.
+// Only Tier 1 counts as verified. Tier 2 and Tier 3 are "unverified".
+//
+// Every stored message in this single-player sim is player-visible (the store
+// only holds channels/DMs the player has access to), so "a channel the player
+// can read, or their DM" reduces to "any message in history from that NPC".
+// ---------------------------------------------------------------------------
+
+/** Strongest match wins: "verified" (Tier 1) > "plausible" (Tier 2) >
+ * "never-spoke" (Tier 3). Only "verified" escapes the credibility penalty. */
+export type AttributionVerdict = "verified" | "plausible" | "never-spoke";
+
+export interface AttributionFinding {
+  /** The claim (model's short summary) the player attributed to someone. */
+  claim: string;
+  /** The NPC the attribution resolved to. */
+  attributedTo: AgentId;
+  attributedToName: string;
+  verdict: AttributionVerdict;
+  /** Sim-minute of the player message that made the attributed claim (so the
+   * coaching note can be timestamped to the moment it happened). */
+  claimAtSimMinutes: number;
+  /** Short human-readable reason for the verdict — debugging / note aid. */
+  reason: string;
+}
+
+/** Digit-runs in a string, commas stripped ("~1,400 of 60" -> ["1400","60"]).
+ * Deliberately simple and syntactic: spelled-out numbers aren't extracted. */
+function extractNumbers(text: string): string[] {
+  const matches = text.match(/\d[\d,]*/g) ?? [];
+  return matches.map((m) => m.replace(/,/g, "")).filter((m) => m.length > 0);
+}
+
+/** Map a model-emitted attribution label ("Priya", "priya's", "Marcus") to a
+ * real NPC AgentId. Returns null when it can't be resolved to a known NPC (the
+ * player, the system, or an unrecognized name) — such a claim yields no signal
+ * rather than a guessed penalty. */
+function resolveAttributedAgent(attributedTo: string): AgentId | null {
+  // Lowercase, strip a trailing possessive ('s / ') and surrounding punctuation.
+  const norm = attributedTo
+    .toLowerCase()
+    .replace(/['’]s\b/g, "")
+    .replace(/[^a-z\s]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (norm.length === 0) return null;
+  for (const id of Object.keys(AGENT_NAMES) as AgentId[]) {
+    if (id === "player" || id === "system") continue;
+    const name = AGENT_NAMES[id].toLowerCase();
+    // Exact id/name, or the name appearing as a standalone word in the label
+    // ("priya estimate" after possessive-stripping).
+    if (norm === id || norm === name) return id;
+    const wordMatch = new RegExp(`\\b${name}\\b`).test(norm);
+    if (wordMatch) return id;
+  }
+  return null;
+}
+
+/** The tiered check for ONE attributed claim (see the block comment above). */
+function verifyAttribution(
+  claim: ClaimLedgerEntry,
+  claimMsg: Message,
+  agent: AgentId,
+  messages: Message[]
+): { verdict: AttributionVerdict; reason: string } {
+  const name = AGENT_NAMES[agent];
+  const priorFromAgent = messages.filter(
+    (m) => m.senderId === agent && m.id !== claimMsg.id && m.sentAtSimMinutes <= claimMsg.sentAtSimMinutes
+  );
+  if (priorFromAgent.length === 0) {
+    return { verdict: "never-spoke", reason: `${name} never messaged you before you cited them.` };
+  }
+  const claimNumbers = extractNumbers(claim.claim);
+  if (claimNumbers.length > 0) {
+    const agentNumbers = new Set(extractNumbers(priorFromAgent.map((m) => m.content).join(" ")));
+    const shared = claimNumbers.find((n) => agentNumbers.has(n));
+    if (shared) {
+      return { verdict: "verified", reason: `${name} stated "${shared}" to you earlier.` };
+    }
+  }
+  return {
+    verdict: "plausible",
+    reason: `You'd exchanged messages with ${name}, but they never stated the specific figure you credited to them.`,
+  };
+}
+
+/**
+ * Run the deterministic attribution check across every captured claims ledger.
+ * Exported so the headless C2 verification script (and any future test) can
+ * drive it directly. Reads `claims` off the Evaluation records and re-derives
+ * each attribution's verdict from real message history — see verifyAttribution.
+ */
+export function analyzeAttributions(
+  evaluations: Record<string, Evaluation>,
+  messages: Message[]
+): AttributionFinding[] {
+  const findings: AttributionFinding[] = [];
+  for (const e of Object.values(evaluations)) {
+    if (!e.claims || e.claims.length === 0) continue;
+    const claimMsg = messages.find((m) => m.id === e.messageId);
+    if (!claimMsg) continue;
+    for (const claim of e.claims) {
+      if (!claim.attributedTo) continue;
+      const agent = resolveAttributedAgent(claim.attributedTo);
+      if (!agent) continue; // couldn't map the named person to a real NPC -> no signal
+      const { verdict, reason } = verifyAttribution(claim, claimMsg, agent, messages);
+      findings.push({
+        claim: claim.claim,
+        attributedTo: agent,
+        attributedToName: AGENT_NAMES[agent],
+        verdict,
+        claimAtSimMinutes: claimMsg.sentAtSimMinutes,
+        reason,
+      });
+    }
+  }
+  return findings;
 }
 
 /** Same Day 1 scoring formula as before — just extracted into one place so
@@ -99,6 +250,43 @@ export function computeScorecard(
   // triage or communication-clarity one, so it only touches that dimension —
   // same additive-penalty pattern as noPostmortemPenalty above.
   const tradeoffEscalationPenalty = stateBag.tradeoffEscalatedToDerek ? 2 : 0;
+
+  // C2 — unverified-attribution credibility penalty (see analyzeAttributions
+  // and its block comment). A DELAYED, social consequence surfaced only here at
+  // day end: crediting a claim to someone who didn't actually supply it dents
+  // stakeholderMgmt, the dimension credibility with people lives on. Bounded and
+  // applied ONCE for the whole day (never per-claim, so a single message with a
+  // few attributions can't tank the score): -1.0 if any attribution is
+  // unverified, -1.5 if any credited someone the player never even spoke to.
+  // Verified (Tier 1) attributions cost nothing and get a small positive note.
+  const attributionFindings = analyzeAttributions(evaluations, messages);
+  const unverifiedAttributions = attributionFindings.filter((f) => f.verdict !== "verified");
+  const anyNeverSpoke = unverifiedAttributions.some((f) => f.verdict === "never-spoke");
+  const attributionPenalty = unverifiedAttributions.length === 0 ? 0 : anyNeverSpoke ? 1.5 : 1.0;
+
+  // One coaching note per attribution finding, labeled "Attribution accuracy"
+  // so C1's day-end summarizer folds it into the stakeholderMgmt explanation
+  // (see fetchScoreExplanations' graderNotes in simStore.ts). Verified ones get
+  // a brief credit; unverified ones name the specific claim and person.
+  const attributionNotes: CoachingEntry[] = attributionFindings.map((f) => {
+    let feedback: string;
+    if (f.verdict === "verified") {
+      feedback = `You credited ${f.attributedToName} as the source when you passed along "${f.claim}", and that checks out, they actually gave you that. Sourcing a number to the person it came from is exactly right.`;
+    } else if (f.verdict === "never-spoke") {
+      feedback = `You told someone "${f.claim}" was ${f.attributedToName}'s, but you never actually spoke to ${f.attributedToName} about it at all. Pinning a figure on a person you never checked with is a credibility risk. It holds up until stakeholders compare notes, and then it's your word that's in question, not theirs.`;
+    } else {
+      feedback = `You credited ${f.attributedToName} as the source of "${f.claim}", but ${f.attributedToName} never actually gave you that specific number. You'd traded messages with them, just not about this. Attributing a figure to someone you didn't get it from is the kind of thing that surfaces later, when they get asked about a number they never said.`;
+    }
+    return {
+      id: `attribution-${f.attributedTo}-${f.claimAtSimMinutes}`,
+      messageId: "attribution-accuracy",
+      messageContent: "",
+      sentAtSimMinutes: f.claimAtSimMinutes,
+      channel: "incidents" as const,
+      feedback,
+      label: "Attribution accuracy",
+    };
+  });
 
   const responseTime = scoreResponseTime(stateBag.respondedAtMinutes[INCIDENT_EVENT_ID] ?? null);
 
@@ -236,7 +424,10 @@ export function computeScorecard(
   const stakeholderMgmt = Math.max(
     0,
     (average(derekEvals.flatMap((e) => [e.scores.tone, e.scores.completeness])) ||
-      (DEREK_EVENT_ID in stateBag.respondedAtMinutes ? 4 : 1)) - noPostmortemPenalty - tradeoffEscalationPenalty
+      (DEREK_EVENT_ID in stateBag.respondedAtMinutes ? 4 : 1)) -
+      noPostmortemPenalty -
+      tradeoffEscalationPenalty -
+      attributionPenalty
   );
 
   // crossFunctional is deliberately a placeholder here — it's judged by a
@@ -280,6 +471,9 @@ export function computeScorecard(
     .sort((a, b) => a.sentAtSimMinutes - b.sentAtSimMinutes);
 
   coachingNotes.push(...assignmentNotes);
+  // C2 attribution notes (see attributionNotes above). Delayed-consequence by
+  // design: the scorecard is the first place any attribution slip is named.
+  coachingNotes.push(...attributionNotes);
 
   if (!stateBag.postmortemSubmitted) {
     coachingNotes.push({

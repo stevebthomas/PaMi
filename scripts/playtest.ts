@@ -643,6 +643,9 @@ async function runOnePlaytest(persona: Persona, runIndex: number, runsTotal: num
           eventId: gradingEventId,
           scores: { tone: result.tone, speed: result.speed, completeness: result.completeness, strategicThinking: result.strategicThinking },
           feedback: result.feedback,
+          // C2: mirror simStore — capture the claims ledger so headless
+          // playtest scorecards also reflect the attribution signal.
+          ...(Array.isArray(result.claims) ? { claims: result.claims } : {}),
         };
         if (channel === "incidents") {
           const avg = (result.tone + result.speed + result.completeness + result.strategicThinking) / 4;

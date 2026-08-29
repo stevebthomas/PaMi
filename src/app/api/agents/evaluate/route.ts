@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { getAnthropicClient, EVALUATOR_MODEL, extractText, extractUsage } from "@/lib/agents/anthropic";
 import { EVALUATOR_PROMPT } from "@/lib/agents/prompts";
+import { normalizeQuoteWhitespace } from "@/lib/sim/scorecard";
+import type { ClaimLedgerEntry } from "@/lib/sim/types";
 
 interface EvaluateRequestBody {
   /** The player's message being scored — must be the last entry in `transcript`. */
@@ -39,12 +41,54 @@ interface EvaluationResult {
   completeness: number;
   strategicThinking: number;
   feedback: string;
+  /** The evaluator's per-message claims ledger (C2), captured and code-validated
+   * here rather than discarded. See parseClaims / ClaimLedgerEntry. */
+  claims: ClaimLedgerEntry[];
 }
 
 function clampScore(value: unknown): number {
   const n = typeof value === "number" ? value : Number(value);
   if (!Number.isFinite(n)) return 5;
   return Math.max(0, Math.min(10, Math.round(n)));
+}
+
+const CLAIM_STATUSES = new Set<ClaimLedgerEntry["status"]>(["GROUNDED", "UNSOURCED", "CHALLENGED"]);
+
+/**
+ * Parse and CODE-VALIDATE the evaluator's claims ledger (C2). Every well-formed
+ * claim is KEPT — the claim itself is signal even when its evidence is bad — but
+ * the model-emitted `source` is treated as unverified: we independently check
+ * whether that quote actually appears in the transcript the route received and
+ * record the result as `sourceQuoteValidated`, rather than persisting it as if
+ * it were confirmed (docs/technical-audit.md:105, and the C1 validateQuotes
+ * pattern). This never DROPS a claim on a bad source; it only marks the source.
+ * The attribution field is carried through verbatim (only trimmed / omitted when
+ * empty); its deterministic verification happens later in scorecard.ts, not
+ * here, and deliberately does not depend on this `source` at all.
+ */
+function parseClaims(rawClaims: unknown, transcriptLineContents: string[]): ClaimLedgerEntry[] {
+  if (!Array.isArray(rawClaims)) return [];
+  const haystacks = transcriptLineContents.map(normalizeQuoteWhitespace).filter((h) => h.length > 0);
+  const claims: ClaimLedgerEntry[] = [];
+  for (const raw of rawClaims) {
+    if (typeof raw !== "object" || raw === null) continue;
+    const r = raw as Record<string, unknown>;
+    const claim = typeof r.claim === "string" ? r.claim.trim() : "";
+    if (claim.length === 0) continue;
+    const status =
+      typeof r.status === "string" && CLAIM_STATUSES.has(r.status as ClaimLedgerEntry["status"])
+        ? (r.status as ClaimLedgerEntry["status"])
+        : "UNSOURCED";
+    const source = typeof r.source === "string" ? r.source.trim() : "";
+    const normalizedSource = normalizeQuoteWhitespace(source);
+    const sourceQuoteValidated =
+      normalizedSource.length > 0 && haystacks.some((h) => h.includes(normalizedSource));
+    const attributedTo = typeof r.attributedTo === "string" ? r.attributedTo.trim() : "";
+    const entry: ClaimLedgerEntry = { claim, status, source, sourceQuoteValidated };
+    if (attributedTo.length > 0) entry.attributedTo = attributedTo;
+    claims.push(entry);
+  }
+  return claims;
 }
 
 /** Grades a player's message against the four Day 1 scoring dimensions,
@@ -112,7 +156,7 @@ export async function POST(request: Request) {
       // Matches every other evaluator route's fallback shape (degrade to a
       // neutral result instead of throwing an unhandled 500) — this route
       // used to be the one outlier that threw here.
-      return NextResponse.json({ tone: 5, speed: 5, completeness: 5, strategicThinking: 5, feedback: "", usage });
+      return NextResponse.json({ tone: 5, speed: 5, completeness: 5, strategicThinking: 5, feedback: "", claims: [], usage });
     }
     const parsed = JSON.parse(jsonMatch[0]);
 
@@ -122,6 +166,10 @@ export async function POST(request: Request) {
       completeness: clampScore(parsed.completeness),
       strategicThinking: clampScore(parsed.strategicThinking),
       feedback: typeof parsed.feedback === "string" ? parsed.feedback : "",
+      // Capture the ledger the evaluator already emits (the prompt fills "claims"
+      // before it scores). Validated against the transcript we received, never
+      // trusted blind — see parseClaims.
+      claims: parseClaims(parsed.claims, transcript.map((m) => m.content)),
     };
 
     return NextResponse.json({ ...result, usage });

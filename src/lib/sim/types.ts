@@ -111,12 +111,61 @@ export interface EvaluationScores {
   strategicThinking: number;
 }
 
+/**
+ * One entry in the per-message claims ledger the evaluator emits BEFORE it
+ * scores (see EVALUATOR_PROMPT). Each records one specific factual claim the
+ * graded player message made, its grounding status, and — new in C2 — who (if
+ * anyone) the player explicitly credited as its source.
+ *
+ * TRUST BOUNDARY: `claim`, `status`, `source`, and `attributedTo` are all
+ * MODEL-EMITTED and inherently unverified (docs/technical-audit.md:105). The
+ * claim itself is still signal worth keeping, but its EVIDENCE (`source`) is
+ * not trusted blind: `sourceQuoteValidated` records whether `source`, treated
+ * as a quote, was actually found verbatim (whitespace-normalized substring) in
+ * the real transcript the evaluate route received. That flag is only meaningful
+ * for GROUNDED claims (where `source` is meant to be a quote of the supplying
+ * line); for UNSOURCED/CHALLENGED, `source` is a free-text note and the flag is
+ * expected to be false. Crucially, the attribution SCORING signal (see
+ * analyzeAttributions in scorecard.ts) does NOT rely on the model's `source` at
+ * all — it re-derives, deterministically from message history, whether the
+ * attributed NPC actually supplied the thing.
+ *
+ * Plain-JSON (primitives only) so it round-trips through session persistence.
+ */
+export interface ClaimLedgerEntry {
+  /** The specific factual claim, as the model summarized it (short). */
+  claim: string;
+  /** The model's grounding verdict for this claim. */
+  status: "GROUNDED" | "UNSOURCED" | "CHALLENGED";
+  /** Model-emitted: for GROUNDED, a quote of the NPC/system line that supplied
+   * the claim; otherwise a short note on why it's unsourced / who challenged it.
+   * UNVERIFIED model output — see the trust-boundary note above. */
+  source: string;
+  /** Code-computed in the evaluate route: whether `source`, as a quote, is a
+   * real whitespace-normalized substring of some actual transcript line. Only
+   * meaningful for GROUNDED; typically false for UNSOURCED/CHALLENGED (where
+   * `source` is a note, not a quote). Never gates whether the claim is kept. */
+  sourceQuoteValidated: boolean;
+  /** The person the player EXPLICITLY credited as this claim's source in the
+   * graded message ("Priya's estimate", "per Raj", "Marcus says"). Absent when
+   * the message made no explicit attribution. Independent of `status`: a claim
+   * can be attributed to Priya and still be UNSOURCED if Priya never actually
+   * supplied it. Verified deterministically at day-end (analyzeAttributions). */
+  attributedTo?: string;
+}
+
 export interface Evaluation {
   id: string;
   messageId: string;
   eventId: string;
   scores: EvaluationScores;
   feedback: string;
+  /** The evaluator's per-message claims ledger (see ClaimLedgerEntry), captured
+   * from the evaluate route (C2). Optional: absent on side-channel evals
+   * (cs-template / tradeoff-decision, which carry no ledger) and on records
+   * produced before this field existed. Plain-JSON, round-trips through
+   * persistence untouched. */
+  claims?: ClaimLedgerEntry[];
 }
 
 /** One question asked to the "Ask Claude" glossary helper, for the
