@@ -392,6 +392,23 @@ export function buildPriyaCsResolvedFollowUp(): string {
 }
 
 /**
+ * Priya's rollback-only seller-comms ask (B4), fired ~10 sim-minutes after the
+ * rollback is decided. The seller-facing counterpart to her 9:26 customer-facing
+ * ask and the natural follow-up to her 9:42 payout flag (priya-seller-payout-flag):
+ * she flagged the seller cost before the call, and now that the rollback is in
+ * she needs wording to get ahead of the seller tickets. Grounded in the payout
+ * canon (PAYOUT_PIPELINE) so the count and delay agree with Marcus and Raj, and
+ * in her voice: warm, concrete numbers, one point per sentence, no dashes. Only
+ * ever rendered on the rollback path (the engine only fires this obligation when
+ * a rollback seeded it), so it can state the rollback as a settled fact.
+ */
+export function buildPriyaSellerCommsAsk(): string {
+  const sellers = PAYOUT_PIPELINE.fastTrackBatchSellers;
+  const days = PAYOUT_PIPELINE.rollbackPayoutDelayDays;
+  return `Okay, rollback's going in. That puts those roughly ${sellers} sellers from today's fast-track batch back on the old cadence, so they're waiting about ${days} extra days to get paid. I need to get ahead of the seller tickets before they start landing. Can you send me a seller-facing note explaining the payout delay? Doesn't need to be polished, just accurate enough that my team can hand it straight to sellers.`;
+}
+
+/**
  * Dispatches an obligation kind to its deterministic copy builder. The store
  * calls this per firing so the switch-on-kind lives here in the copy module,
  * next to the builders, rather than leaking into advanceClock. `timeline` is
@@ -407,6 +424,8 @@ export function buildObligationMessageContent(kind: ObligationKind, timeline: In
       return buildPriyaCsNudge();
     case "priya-cs-resolved-followup":
       return buildPriyaCsResolvedFollowUp();
+    case "priya-seller-comms-ask":
+      return buildPriyaSellerCommsAsk();
     default: {
       const _exhaustive: never = kind;
       return _exhaustive;

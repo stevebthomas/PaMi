@@ -48,6 +48,12 @@ import type {
  * the "still not attempted" state check (see the cancelWhen on the seed). */
 export const PRIYA_CS_NUDGE_DELAY_MINUTES = 45;
 
+/** How long after the rollback is DECIDED Priya turns to the seller-facing
+ * fallout. 10 sim-minutes: she reacts shortly after learning the rollback is
+ * happening, once she's absorbing the seller ticket load. Only the rollback
+ * path ever seeds this obligation (see seedPriyaSellerCommsAsk). */
+export const PRIYA_SELLER_COMMS_DELAY_MINUTES = 10;
+
 /** Stable, deterministic id for a seeded obligation. Each Day-1 obligation is a
  * singleton (one per day), so keying purely on kind is enough for the append to
  * dedupe by identity across re-entrant advanceClock / re-run applyEffect. */
@@ -146,6 +152,41 @@ export function seedPriyaCsResolvedFollowUp(obligations: ObligationEntry[], aske
     cancelWhen: { type: "player-delivered", deliverable: "cs-template" },
     status: "pending",
     createdAtSimMinutes: askedAtSimMinutes,
+  });
+}
+
+/**
+ * Priya's rollback-only seller-comms ask (B4). The seller-facing counterpart to
+ * the 9:26 customer-facing ask (priya-template-request): when the player accepts
+ * the rollback, ~60 sellers get pushed back to the old payout cadence (~2 extra
+ * days), and Priya absorbs that seller ticket load. So ~10 sim-minutes after the
+ * rollback is DECIDED she asks for a seller-facing note explaining the delay,
+ * the natural follow-up to her 9:42 payout flag (priya-seller-payout-flag). It
+ * participates in the A2 mechanism like any other ask: a plain
+ * `sim-minutes-elapsed-since` trigger, no cancelWhen — once the rollback is
+ * decided the sellers ARE affected and the note is genuinely owed, so unlike the
+ * CS nudge there is no state that makes the ask itself moot (delivery is tracked
+ * separately via sellerCommsAttemptedAtMinutes + the ledger, not by cancelling
+ * the ask). Seeded at BOTH decision sites but ONLY when choice === "rollback":
+ * the player-decision path (simStore Feature B) and the Raj-fallback path
+ * (day1-scenario's derek-tradeoff-escalation). Patch-forward never seeds it, so
+ * it can never fire there. Idempotent by stable id.
+ */
+export function seedPriyaSellerCommsAsk(obligations: ObligationEntry[], decidedAtSimMinutes: number): ObligationEntry[] {
+  return appendObligation(obligations, {
+    id: obligationId("priya-seller-comms-ask"),
+    kind: "priya-seller-comms-ask",
+    agentId: "priya",
+    summary:
+      "Priya will ask for a seller-facing note explaining the rollback's payout delay ~10 min after the rollback is decided.",
+    channel: "dm_priya",
+    trigger: {
+      type: "sim-minutes-elapsed-since",
+      sinceSimMinutes: decidedAtSimMinutes,
+      minutes: PRIYA_SELLER_COMMS_DELAY_MINUTES,
+    },
+    status: "pending",
+    createdAtSimMinutes: decidedAtSimMinutes,
   });
 }
 

@@ -10,7 +10,12 @@ import { PAYOUT_PIPELINE } from "../lib/sim/payoutCanon";
 import { recordFixDecisionAck, recordPlayerOwesCsTemplate } from "../lib/sim/commitments";
 // obligations.ts likewise imports ONLY from types.ts (same leaf discipline), so
 // seeding NPC-initiated follow-ups from these applyEffects is cycle-safe.
-import { seedRajAllClear, seedPriyaCsNudge, seedPriyaCsResolvedFollowUp } from "../lib/sim/obligations";
+import {
+  seedRajAllClear,
+  seedPriyaCsNudge,
+  seedPriyaCsResolvedFollowUp,
+  seedPriyaSellerCommsAsk,
+} from "../lib/sim/obligations";
 
 /** True when the player DMed Marcus about payouts BEFORE the fix decision was
  * made, i.e. in time to actually act on his warning (pause/reconcile the
@@ -339,7 +344,19 @@ export const day1ScenarioEvents: ScenarioEvent[] = [
             // block — once Raj made the call himself, he still follows through
             // with the all-clear once metrics recover (unless the 11:00
             // resolution beats him). Keyed to when the decision actually landed.
-            pendingObligations: seedRajAllClear(state.pendingObligations, state.rajFallbackDecision.decidedAtMinutes),
+            // B4: on the rollback path ONLY, also seed Priya's seller-comms ask
+            // (the rollback-only downstream obligation for the payout delay),
+            // the same one simStore's Feature B block seeds on the player path.
+            // Gated on the fallback choice being a rollback; patch-forward never
+            // seeds it, so it can never fire there. Keyed to the same minute the
+            // decision actually landed. Idempotent by stable id.
+            pendingObligations:
+              state.rajFallbackDecision.choice === "rollback"
+                ? seedPriyaSellerCommsAsk(
+                    seedRajAllClear(state.pendingObligations, state.rajFallbackDecision.decidedAtMinutes),
+                    state.rajFallbackDecision.decidedAtMinutes
+                  )
+                : seedRajAllClear(state.pendingObligations, state.rajFallbackDecision.decidedAtMinutes),
           }
         : {},
     facts: [

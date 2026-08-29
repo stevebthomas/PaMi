@@ -30,8 +30,10 @@ import {
   recordFixEngineerCommitments,
   settleFixEngineerCommitment,
   settlePlayerOwesCsTemplate,
+  recordPlayerOwesSellerComms,
+  settlePlayerOwesSellerComms,
 } from "@/lib/sim/commitments";
-import { evaluateObligations, seedRajAllClear } from "@/lib/sim/obligations";
+import { evaluateObligations, seedRajAllClear, seedPriyaSellerCommsAsk } from "@/lib/sim/obligations";
 import { getIncidentTimeline } from "@/lib/sim/incidentTimeline";
 import { formatSimClock } from "@/lib/sim/timeOfDay";
 import { satisfyingChannels } from "@/lib/sim/acknowledgment";
@@ -90,6 +92,14 @@ const MARCUS_PAYOUT_KEYWORDS =
 
 const CS_TEMPLATE_KEYWORDS =
   /template|script|tell (the )?customers|copy.?paste|here'?s what|customer.facing|customer message|for (support|cs)\b|hand (my|your|her|his|their) team|use this (with|for)|what to tell|wording (for|to)|draft.*customer|customer.*draft/i;
+
+/** B4: terms that mark a dm_priya reply as explicitly addressing the
+ * seller-facing payout fallout, so it counts as the seller-comms attempt even
+ * while the CS-template ask is still unhandled (the keyword only relaxes the
+ * CS-priority gate — the substance floor in the detection block still applies).
+ * Same plain-regex style as CS_TEMPLATE_KEYWORDS / MARCUS_PAYOUT_KEYWORDS:
+ * synchronous, deterministic, no model call. */
+const SELLER_COMMS_KEYWORDS = /seller|payout|pay ?out|cadence|delay/i;
 
 /** Sim-clock minute at/after which Raj kicks off his own reasoned fallback
  * decision on the fix tradeoff, once his offer has fired and the player still
@@ -696,6 +706,15 @@ export const useSimStore = create<SimState>((set, get) => ({
             sentAtSimMinutes: f.sentAtSimMinutes,
             createdAt: Date.now(),
           }));
+          // B4: fire-time ledger append. When Priya's seller-comms ask fires, a
+          // "player-owes-npc" entry must be appended so her later replies treat
+          // the seller note as an outstanding thing the player owes. Wired HERE,
+          // in the store block that renders firings, keyed on the firing's kind
+          // — NOT in obligations.ts, which stays a types-only leaf with no
+          // commitments dependency (the same purity split A2 established: the
+          // engine returns firing DESCRIPTORS, the store turns them into
+          // messages/ledger writes). Idempotent by the entry's stable id.
+          const sellerFiring = result.firings.find((f) => f.kind === "priya-seller-comms-ask");
           set((s) => {
             const unread = new Set(s.unreadChannels);
             firedMessages.forEach((m) => {
@@ -706,8 +725,16 @@ export const useSimStore = create<SimState>((set, get) => ({
               unreadChannels: unread,
               // Replace only pendingObligations; the engine computed it from the
               // snapshot taken at this block's start, and nothing else mutates
-              // it synchronously between that read and here.
-              stateBag: { ...s.stateBag, pendingObligations: result.nextObligations },
+              // it synchronously between that read and here. Append the seller
+              // owed-ledger entry in the same set() if the seller ask fired,
+              // stamped at the minute its condition became true.
+              stateBag: {
+                ...s.stateBag,
+                pendingObligations: result.nextObligations,
+                commitmentLedger: sellerFiring
+                  ? recordPlayerOwesSellerComms(s.stateBag.commitmentLedger, sellerFiring.sentAtSimMinutes)
+                  : s.stateBag.commitmentLedger,
+              },
             };
           });
         }
@@ -922,6 +949,16 @@ export const useSimStore = create<SimState>((set, get) => ({
       }));
     }
 
+    // B4: snapshot whether Priya's CS-template ask was already handled by a
+    // PRIOR message, taken BEFORE this message's CS-template block below can set
+    // csTemplateAttemptedAtMinutes for the CURRENT message. The seller-comms
+    // detection block (further below) reads this so one send can't count as both
+    // a CS attempt (via its length path) and a seller attempt: "once the CS
+    // template has been handled" means handled by an earlier message, not by this
+    // one. See the seller block's disambiguation note.
+    const csHandledBeforeThisMessage =
+      get().stateBag.csTemplateAttemptedAtMinutes !== null || get().stateBag.csTemplateProvided;
+
     // Feature A — CS template: csTemplateProvided means "provided AND
     // good," not just "attempted." Awaited (not fire-and-forget) because
     // this flag gates which of the two resolution messages fires, and that
@@ -991,6 +1028,57 @@ export const useSimStore = create<SimState>((set, get) => ({
             },
           }));
         }
+      }
+    }
+
+    // B4 — seller-facing comms detection + settlement. The seller counterpart
+    // to the CS-template block above, and deliberately additive/self-contained
+    // (the three documented bug-fix regions in this function stay untouched).
+    // Once Priya's rollback-only seller-comms ask has FIRED (the
+    // priya-seller-comms-ask obligation flips off "pending" the moment it
+    // fires), a substantive dm_priya reply is read as the player attempting the
+    // seller note: it sets sellerCommsAttemptedAtMinutes once (additively) and
+    // settles the "player owes a seller note" ledger entry. No nudge/resolved
+    // follow-up in this pass — the ask + owed-ledger + settlement is the scope.
+    //
+    // DISAMBIGUATION with the CS-template heuristic above (both watch dm_priya):
+    //  - Substance floor first: a real attempt is >= 40 chars, matching the CS
+    //    block's own dmPriyaAfterAsk floor. A bare "payouts?" never settles it.
+    //  - While the CS template is still unhandled, the CS heuristic keeps
+    //    priority (its ask came first at 9:26), so a plain substantive reply is
+    //    read as the CS attempt, not the seller one. csHandledBeforeThisMessage
+    //    (snapshotted above the CS block) is what enforces "handled by an EARLIER
+    //    message," so this same send can't be double-counted through both paths.
+    //  - Once the CS template has been handled by an earlier message, a
+    //    substantive reply after the seller ask is the seller attempt.
+    //  - A reply that explicitly names the seller/payout impact
+    //    (SELLER_COMMS_KEYWORDS) is the seller attempt even if the CS template is
+    //    still unhandled — the keyword only relaxes the CS-priority gate, never
+    //    the substance floor. (The untouched CS block may still ALSO grade such a
+    //    message as a CS attempt; that's pre-existing behavior and harmless here,
+    //    since the two settlements are independent.)
+    {
+      const sellerAskFired = (get().stateBag.pendingObligations ?? []).some(
+        (o) => o.kind === "priya-seller-comms-ask" && o.status !== "pending"
+      );
+      if (
+        channel === "dm_priya" &&
+        sellerAskFired &&
+        get().stateBag.sellerCommsAttemptedAtMinutes === null &&
+        trimmed.length >= 40 &&
+        (SELLER_COMMS_KEYWORDS.test(trimmed) || csHandledBeforeThisMessage)
+      ) {
+        set((s) => ({
+          stateBag: {
+            ...s.stateBag,
+            sellerCommsAttemptedAtMinutes:
+              s.stateBag.sellerCommsAttemptedAtMinutes ?? playerMsg.sentAtSimMinutes,
+            // Settle Priya's "player owes a seller note" entry. Idempotent and a
+            // no-op if the ask never fired (entry absent) — mirrors the
+            // CS-template settlement's own guarantees.
+            commitmentLedger: settlePlayerOwesSellerComms(s.stateBag.commitmentLedger),
+          },
+        }));
       }
     }
 
@@ -1080,9 +1168,18 @@ export const useSimStore = create<SimState>((set, get) => ({
             // recover, unless the 11:00 resolution beats him to it (the engine
             // handles that collision). The Raj-fallback path seeds the identical
             // obligation in day1-scenario's derek-tradeoff-escalation; idempotent
-            // by stable id. A future rollback-only obligation (B4's seller-comms
-            // ask) would seed here too, gated on `choice === "rollback"`.
-            const pendingObligations = seedRajAllClear(s.stateBag.pendingObligations, decidedAt);
+            // by stable id. B4's rollback-only obligation (Priya's seller-comms
+            // ask) seeds here too, gated on `choice === "rollback"`: the rollback
+            // is what pushes ~60 sellers back to the old payout cadence, so only
+            // that path creates the downstream seller-facing obligation.
+            // Patch-forward seeds only Raj's all-clear, so the seller ask can
+            // never fire there. The Raj-fallback path seeds the identical
+            // obligation in day1-scenario's derek-tradeoff-escalation; idempotent
+            // by stable id.
+            let pendingObligations = seedRajAllClear(s.stateBag.pendingObligations, decidedAt);
+            if (choice === "rollback") {
+              pendingObligations = seedPriyaSellerCommsAsk(pendingObligations, decidedAt);
+            }
             return {
               stateBag: { ...s.stateBag, tradeoffTicketId, commitmentLedger: ledger, pendingObligations },
             };

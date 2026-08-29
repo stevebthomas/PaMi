@@ -52,6 +52,7 @@ export function settleCommitment(ledger: CommitmentEntry[], id: string): Commitm
 const FIX_DECISION_TAG = "fix-decision";
 const FIX_LANDED_TAG = "fix-landed";
 const CS_TEMPLATE_TAG = "cs-template";
+const SELLER_COMMS_TAG = "seller-comms";
 
 /**
  * Raj's "decision-acknowledged" entry, born settled — a fix decision, once
@@ -140,4 +141,29 @@ export function recordPlayerOwesCsTemplate(ledger: CommitmentEntry[], atSimMinut
 /** Settle Priya's CS-template obligation (when a good template is delivered). */
 export function settlePlayerOwesCsTemplate(ledger: CommitmentEntry[]): CommitmentEntry[] {
   return settleCommitment(ledger, commitmentId("player-owes-npc", "priya", CS_TEMPLATE_TAG));
+}
+
+/** Priya's open "player owes me a seller-facing note" entry (B4), appended when
+ * her rollback-only seller-comms ask FIRES (see the "priya-seller-comms-ask"
+ * obligation). Follows the CS-template pattern exactly, with its own tag so the
+ * append and settle sites can never drift and it never collides with the
+ * CS-template entry (both are player-owes-npc / priya). Only ever reached on the
+ * rollback path, since that's the only path that fires the ask. */
+export function recordPlayerOwesSellerComms(ledger: CommitmentEntry[], atSimMinutes: number): CommitmentEntry[] {
+  return appendCommitment(ledger, {
+    id: commitmentId("player-owes-npc", "priya", SELLER_COMMS_TAG),
+    agentId: "priya",
+    summary:
+      "The player owes you a seller-facing message explaining the payout delay the rollback imposes on the fast-track batch sellers.",
+    channel: "dm_priya",
+    atSimMinutes,
+    kind: "player-owes-npc",
+    status: "open",
+  });
+}
+
+/** Settle Priya's seller-comms obligation (when the player attempts a
+ * seller-facing note — see sellerCommsAttemptedAtMinutes in the store). */
+export function settlePlayerOwesSellerComms(ledger: CommitmentEntry[]): CommitmentEntry[] {
+  return settleCommitment(ledger, commitmentId("player-owes-npc", "priya", SELLER_COMMS_TAG));
 }

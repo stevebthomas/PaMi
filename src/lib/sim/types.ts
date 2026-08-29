@@ -555,7 +555,12 @@ export type ObligationKind =
   | "priya-cs-nudge"
   /** Priya follows up once with changed context if the incident resolves while
    * the customer-facing draft is still not attempted. */
-  | "priya-cs-resolved-followup";
+  | "priya-cs-resolved-followup"
+  /** Priya asks, ONLY on the rollback path, for a seller-facing note explaining
+   * the payout delay the rollback imposes (~60 sellers pushed back to the old
+   * cadence). The rollback-only downstream obligation for the tradeoff the
+   * player accepted; never seeded on patch-forward. See B4. */
+  | "priya-seller-comms-ask";
 
 /**
  * One pending obligation (see StateBag.pendingObligations): a thing an NPC is
@@ -613,6 +618,13 @@ export interface StateBag {
    * on, so a delivered-but-mediocre draft never gets a cold "still waiting"
    * nudge. Plain number|null, so it round-trips through persistence untouched. */
   csTemplateAttemptedAtMinutes: number | null;
+  /** Sim-clock minute the player first ATTEMPTED a seller-facing note for Priya
+   * after her rollback-only seller-comms ask fired (see the "priya-seller-comms-ask"
+   * ObligationKind). Set once, additively, in sendPlayerMessage; settles Priya's
+   * "player owes me a seller-facing note" ledger entry. Null until then (and it
+   * stays null forever on the patch-forward path, where the ask never fires).
+   * Plain number|null, so it round-trips through persistence untouched. */
+  sellerCommsAttemptedAtMinutes: number | null;
   rajMood: "neutral" | "collaborative" | "frustrated";
   priyaMood: "neutral" | "reassured" | "overwhelmed";
   derekMood: "neutral" | "engaged" | "impatient";
@@ -686,6 +698,7 @@ export const initialStateBag: StateBag = {
   respondedAtMinutes: {},
   csTemplateProvided: false,
   csTemplateAttemptedAtMinutes: null,
+  sellerCommsAttemptedAtMinutes: null,
   rajMood: "neutral",
   priyaMood: "neutral",
   derekMood: "neutral",
