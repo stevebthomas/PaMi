@@ -8,6 +8,9 @@ import { PAYOUT_PIPELINE } from "../lib/sim/payoutCanon";
 // commitments.ts imports ONLY from types.ts, so this stays clear of the
 // worldCanon -> incidentTimeline -> day1-scenario init cycle documented above.
 import { recordFixDecisionAck, recordPlayerOwesCsTemplate } from "../lib/sim/commitments";
+// obligations.ts likewise imports ONLY from types.ts (same leaf discipline), so
+// seeding NPC-initiated follow-ups from these applyEffects is cycle-safe.
+import { seedRajAllClear, seedPriyaCsNudge, seedPriyaCsResolvedFollowUp } from "../lib/sim/obligations";
 
 /** True when the player DMed Marcus about payouts BEFORE the fix decision was
  * made, i.e. in time to actually act on his warning (pause/reconcile the
@@ -220,8 +223,15 @@ export const day1ScenarioEvents: ScenarioEvent[] = [
     // than re-asking cold. Settled in the store's CS-template block once a good
     // template is delivered. Idempotent by stable id (advanceClock is
     // re-entrant); 566 mirrors this event's own triggerTimeMinutes.
+    //
+    // A2: also seed Priya's two NPC-initiated follow-ups here, both keyed to
+    // this same ask time (566): a one-time light nudge if the draft is still not
+    // attempted ~45 min later, and an updated-context follow-up if the incident
+    // resolves while it's still not attempted. Both settle silently the moment
+    // the player attempts a draft (see obligations.ts). Idempotent by stable id.
     applyEffect: (state) => ({
       commitmentLedger: recordPlayerOwesCsTemplate(state.commitmentLedger, 566),
+      pendingObligations: seedPriyaCsResolvedFollowUp(seedPriyaCsNudge(state.pendingObligations, 566), 566),
     }),
   },
   {
@@ -307,6 +317,12 @@ export const day1ScenarioEvents: ScenarioEvent[] = [
               where: "the fix call",
               decidedByRaj: true,
             }),
+            // A2: seed Raj's all-clear obligation on the fallback path too, the
+            // same one the player-decision path seeds in simStore's Feature B
+            // block — once Raj made the call himself, he still follows through
+            // with the all-clear once metrics recover (unless the 11:00
+            // resolution beats him). Keyed to when the decision actually landed.
+            pendingObligations: seedRajAllClear(state.pendingObligations, state.rajFallbackDecision.decidedAtMinutes),
           }
         : {},
     facts: [

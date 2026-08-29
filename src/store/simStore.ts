@@ -18,13 +18,20 @@ import { logHelpQueryToSupabase, logDayOutcomeToSupabase } from "@/lib/supabase/
 import { saveDayOutcome } from "@/lib/sim/outcomeStore";
 import { pickReactingAgents, getRedirectLine } from "@/lib/sim/relevance";
 import { presentInChannel } from "@/lib/sim/roster";
-import { DM_CONTACTS, buildDmPersonaContext, buildFixLandedFollowUp, dmChannelId } from "@/lib/sim/dmContacts";
+import {
+  DM_CONTACTS,
+  buildDmPersonaContext,
+  buildFixLandedFollowUp,
+  buildObligationMessageContent,
+  dmChannelId,
+} from "@/lib/sim/dmContacts";
 import {
   recordFixDecisionAck,
   recordFixEngineerCommitments,
   settleFixEngineerCommitment,
   settlePlayerOwesCsTemplate,
 } from "@/lib/sim/commitments";
+import { evaluateObligations, seedRajAllClear } from "@/lib/sim/obligations";
 import { getIncidentTimeline } from "@/lib/sim/incidentTimeline";
 import { formatSimClock } from "@/lib/sim/timeOfDay";
 import { satisfyingChannels } from "@/lib/sim/acknowledgment";
@@ -654,6 +661,59 @@ export const useSimStore = create<SimState>((set, get) => ({
       }
     }
 
+    // NPC-initiated follow-up obligations (A2). After the scripted events and
+    // the fix-landed pings, evaluate every pending obligation against live
+    // state. Each fires ONLY when its declarative trigger's condition is
+    // actually true right now (state-conditional, never a fixed clock), and
+    // settles silently when its cancel condition beat it — see obligations.ts
+    // for the fire/cancel-by-sim-time semantics. Mirrors the fix-landed block:
+    // append the NPC messages (timestamped at the minute their condition became
+    // true, straight off the engine), mark unread if not the active channel,
+    // and flip obligation status in the SAME set(). Re-entrancy-safe — the
+    // engine only ever acts on "pending" entries, and firing flips them to
+    // fulfilled/cancelled in that same set(), so a re-entrant advanceClock (the
+    // Raj-fallback path re-runs advanceClock(0)) can't double-fire.
+    {
+      const { clockMinutes: nowMinutes, stateBag: sb, firedEventIds: fired } = get();
+      const pending = sb.pendingObligations ?? [];
+      if (pending.some((o) => o.status === "pending")) {
+        const timeline = getIncidentTimeline({ stateBag: sb, firedEventIds: fired, clockMinutes: nowMinutes });
+        const result = evaluateObligations(pending, {
+          clockMinutes: nowMinutes,
+          landedAtMinutes: timeline.landedAt,
+          fullyRecoveredAtMinutes: timeline.fullyRecoveredAt,
+          incidentDeclaredAtMinutes: timeline.incidentDeclaredAt,
+          decidedAtMinutes: timeline.decidedAt,
+          resolutionAnnouncedAtMinutes: timeline.resolutionAnnouncedAt,
+          csTemplateAttemptedAtMinutes: sb.csTemplateAttemptedAtMinutes ?? null,
+        });
+        if (result.changed) {
+          const firedMessages: Message[] = result.firings.map((f) => ({
+            id: makeId("msg"),
+            channel: f.channel,
+            senderId: f.agentId,
+            content: buildObligationMessageContent(f.kind, timeline),
+            sentAtSimMinutes: f.sentAtSimMinutes,
+            createdAt: Date.now(),
+          }));
+          set((s) => {
+            const unread = new Set(s.unreadChannels);
+            firedMessages.forEach((m) => {
+              if (m.channel !== s.activeChannel) unread.add(m.channel);
+            });
+            return {
+              messages: [...s.messages, ...firedMessages],
+              unreadChannels: unread,
+              // Replace only pendingObligations; the engine computed it from the
+              // snapshot taken at this block's start, and nothing else mutates
+              // it synchronously between that read and here.
+              stateBag: { ...s.stateBag, pendingObligations: result.nextObligations },
+            };
+          });
+        }
+      }
+    }
+
     // Raj's reasoned fallback decision. Once his tradeoff offer has fired and
     // the player has gone quiet past ~10:05 with no decision of their own, Raj
     // weighs the SAME established tradeoff himself via a real model call, so his
@@ -886,6 +946,16 @@ export const useSimStore = create<SimState>((set, get) => ({
       !get().stateBag.csTemplateProvided &&
       (dmPriyaAfterAsk || CS_TEMPLATE_KEYWORDS.test(trimmed))
     ) {
+      // A2: record that the player ATTEMPTED a customer-facing draft (any
+      // attempt, good or not, in either channel), before the async evaluation
+      // so a failed evaluator call still counts. This is what settles Priya's
+      // nudge/updated-context obligations silently — a mediocre draft must not
+      // still draw a cold "still waiting" nudge. Distinct from csTemplateProvided
+      // ("attempted AND good"); set once, additively. The next advanceClock tick
+      // (this function's trailing advanceClock(3)) lets the obligation engine act.
+      if (get().stateBag.csTemplateAttemptedAtMinutes === null) {
+        set((s) => ({ stateBag: { ...s.stateBag, csTemplateAttemptedAtMinutes: playerMsg.sentAtSimMinutes } }));
+      }
       const transcriptForTemplate = get().messages.map((m) => ({
         senderId: m.senderId,
         channel: m.channel,
@@ -1005,7 +1075,17 @@ export const useSimStore = create<SimState>((set, get) => ({
               channel,
               atSimMinutes: decidedAt,
             });
-            return { stateBag: { ...s.stateBag, tradeoffTicketId, commitmentLedger: ledger } };
+            // Seed Raj's all-clear obligation (A2): now that a fix path exists,
+            // Raj will post the incident all-clear in #incidents once metrics
+            // recover, unless the 11:00 resolution beats him to it (the engine
+            // handles that collision). The Raj-fallback path seeds the identical
+            // obligation in day1-scenario's derek-tradeoff-escalation; idempotent
+            // by stable id. A future rollback-only obligation (B4's seller-comms
+            // ask) would seed here too, gated on `choice === "rollback"`.
+            const pendingObligations = seedRajAllClear(s.stateBag.pendingObligations, decidedAt);
+            return {
+              stateBag: { ...s.stateBag, tradeoffTicketId, commitmentLedger: ledger, pendingObligations },
+            };
           });
         }
       }

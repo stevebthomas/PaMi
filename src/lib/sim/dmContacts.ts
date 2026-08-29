@@ -1,4 +1,4 @@
-import type { AgentId, ChannelId, DmContactId, StateBag, Ticket } from "./types";
+import type { AgentId, ChannelId, DmContactId, ObligationKind, StateBag, Ticket } from "./types";
 import { INCIDENT_START_MINUTES, dashboardReadingAt } from "./pulseMetrics";
 import { getIncidentTimeline, describeFixStatus, type IncidentTimeline } from "./incidentTimeline";
 import { formatSimClock } from "./timeOfDay";
@@ -327,4 +327,89 @@ export function buildFixLandedFollowUp(contact: DmContact, timeline: IncidentTim
   return isRollback
     ? `${whatsIn} as of ${at}, ran the checks with Jordan. Dashboard's heading back to normal. Will flag if anything looks off.`
     : `${whatsIn} as of ${at}, ran the checks with Jordan. Keeping an eye on the dashboard, will shout if it needs a second pass.`;
+}
+
+/* --------------------------------------------------------------------------
+ * NPC-INITIATED FOLLOW-UP COPY (A2). The deterministic message builders for the
+ * obligation engine (see obligations.ts). They live HERE, alongside
+ * buildFixLandedFollowUp, for the same reasons: advanceClock is a synchronous
+ * store action that also runs headless (no reachable /api/agents/reply), so an
+ * NPC-initiated follow-up has to be deterministic and self-contained; and every
+ * grounded timing/number word comes straight off the shared IncidentTimeline so
+ * it can't drift from what the persona says in conversation. The engine itself
+ * stays a ./types-only leaf and never imports the timeline — it returns firing
+ * DESCRIPTORS and the store renders them through buildObligationMessageContent
+ * below. A new obligation kind adds one more builder here plus its case.
+ * -------------------------------------------------------------------------- */
+
+/**
+ * Raj's incident all-clear in #incidents, fired once metrics fully recover (and
+ * before the 11:00 formal resolution — the engine guarantees that side of the
+ * collision). Grounded entirely in the timeline: the exact landing minute, the
+ * exact fully-recovered minute, and the same Pulse reading the evaluator and the
+ * engineer personas quote. Copy varies by fix path (a rollback is a clean
+ * known-good revert; a patch is confirmed to have held without a second pass).
+ * `timeline.fullyRecoveredAt` is expected non-null here (the caller only fires
+ * this once metrics have recovered); the fallbacks keep it safe if ever called
+ * earlier.
+ */
+export function buildRajAllClear(timeline: IncidentTimeline): string {
+  const isRollback = timeline.fixPath === "rollback";
+  const landed = timeline.landedAt !== null ? formatSimClock(timeline.landedAt) : "earlier";
+  const recovered = timeline.fullyRecoveredAt !== null ? formatSimClock(timeline.fullyRecoveredAt) : "now";
+  const pulse =
+    timeline.fullyRecoveredAt !== null && timeline.decidedAt !== null
+      ? dashboardReadingAt(timeline.fullyRecoveredAt, {
+          incidentStartMinutes: INCIDENT_START_MINUTES,
+          tradeoffChoice: timeline.fixPath,
+          tradeoffDecidedAtMinutes: timeline.decidedAt,
+        })
+      : null;
+  const pulseLine = pulse ? ` Dashboard's clean now: ${pulse}.` : "";
+  return isRollback
+    ? `All-clear from my side. Rollback went in at ${landed} and the checkout error rate was fully back to baseline by ${recovered}. It's stayed flat since, so I'm calling this stable and closing it out on eng.${pulseLine}`
+    : `All-clear from my side. Patch went in at ${landed}, held without needing a second pass, and the checkout error rate was fully back to baseline by ${recovered}. Calling this stable and closing it out on eng.${pulseLine}`;
+}
+
+/**
+ * Priya's single light nudge for the customer-facing draft after a stretch of
+ * silence. Deliberately low-pressure ("no rush," "even a couple rough lines") —
+ * a reminder, not a reprimand — since the engine only ever fires this when the
+ * draft is genuinely still unattempted.
+ */
+export function buildPriyaCsNudge(): string {
+  return "Hey, no rush at all, still hoping to grab that customer-facing note for my team whenever you get a sec. Even a couple rough lines works, I just want something accurate we can send out.";
+}
+
+/**
+ * Priya's updated-context follow-up when the incident resolved before she ever
+ * got a draft. Reflects the changed situation (it's resolved; her team has been
+ * covering it) instead of re-asking cold, and leaves the door open without
+ * nagging — so the thread closes honestly rather than dying silently.
+ */
+export function buildPriyaCsResolvedFollowUp(): string {
+  return "Looks like the incident's been called resolved. I never got a customer-facing note from you, so my team's been fielding the Apple Pay tickets with our own holding message. If you still want to send wording for any follow-ups I'll take it, otherwise we've got it covered from here.";
+}
+
+/**
+ * Dispatches an obligation kind to its deterministic copy builder. The store
+ * calls this per firing so the switch-on-kind lives here in the copy module,
+ * next to the builders, rather than leaking into advanceClock. `timeline` is
+ * passed for the grounded builders (Raj's all-clear); the Priya builders ignore
+ * it. Exhaustive over ObligationKind — a new kind won't compile until it has a
+ * case here.
+ */
+export function buildObligationMessageContent(kind: ObligationKind, timeline: IncidentTimeline): string {
+  switch (kind) {
+    case "raj-all-clear":
+      return buildRajAllClear(timeline);
+    case "priya-cs-nudge":
+      return buildPriyaCsNudge();
+    case "priya-cs-resolved-followup":
+      return buildPriyaCsResolvedFollowUp();
+    default: {
+      const _exhaustive: never = kind;
+      return _exhaustive;
+    }
+  }
 }

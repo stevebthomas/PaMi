@@ -539,6 +539,25 @@ export type ObligationTrigger =
   | { type: "incident-state-reached"; state: IncidentStateDescriptor };
 
 /**
+ * Which seeded obligation this is — the discriminator the A2 engine uses to
+ * pick the deterministic copy builder for the NPC message it fires (see
+ * buildObligationMessageContent in dmContacts.ts). The trigger/cancelWhen
+ * descriptors below carry the state condition; this carries the identity and
+ * wording. A new obligation (e.g. B4's seller-comms ask on the rollback path)
+ * is a new member here + a seed helper + a copy builder + one seed call.
+ */
+export type ObligationKind =
+  /** Raj posts the incident all-clear in #incidents once metrics recover,
+   * unless the 11:00 scripted resolution beats him to it. */
+  | "raj-all-clear"
+  /** Priya nudges once for the customer-facing draft after a stretch of
+   * silence, iff it's still not attempted. */
+  | "priya-cs-nudge"
+  /** Priya follows up once with changed context if the incident resolves while
+   * the customer-facing draft is still not attempted. */
+  | "priya-cs-resolved-followup";
+
+/**
  * One pending obligation (see StateBag.pendingObligations): a thing an NPC is
  * waiting on or owes, plus the declarative condition that should surface it.
  * A2 builds the state-conditional engine that evaluates `trigger` and acts;
@@ -546,16 +565,29 @@ export type ObligationTrigger =
  * plain descriptor object, so the array is fully JSON-serializable.
  */
 export interface ObligationEntry {
-  /** Stable unique id (e.g. makeId("oblig")). */
+  /** Stable unique id (e.g. `oblig-${kind}`) — the append is deduped by this,
+   * so a re-entrant advanceClock / re-run applyEffect can't double-seed. */
   id: string;
+  /** Which seeded obligation this is — selects the copy builder (see
+   * ObligationKind). Lets the engine act on obligations generically while the
+   * exact wording lives in one deterministic builder per kind. */
+  kind: ObligationKind;
   /** The NPC who holds / is waiting on this obligation. */
   agentId: AgentId;
   /** Short human-readable description of what's owed or awaited. */
   summary: string;
   /** The channel the follow-up would surface in. */
   channel: ChannelId;
-  /** Declarative, JSON-serializable condition A2 evaluates — NOT a callback. */
+  /** Declarative, JSON-serializable condition A2 evaluates — NOT a callback.
+   * The obligation FIRES (emits its NPC message) when this becomes true, as
+   * long as `cancelWhen` didn't become true first. */
   trigger: ObligationTrigger;
+  /** Optional declarative condition that CANCELS this obligation silently (no
+   * message) when it becomes true before `trigger` does. The engine compares
+   * the sim-minute each condition became true, so whichever happened FIRST wins
+   * deterministically, independent of evaluation/processing order. Absent = the
+   * obligation can only fire or stay pending, it never self-cancels. */
+  cancelWhen?: ObligationTrigger;
   /** Lifecycle: still waiting, fired/handled, or dropped. */
   status: "pending" | "fulfilled" | "cancelled";
   /** Sim-clock minute this obligation was created. */
@@ -573,6 +605,14 @@ export interface StateBag {
   /** "Provided AND judged good" — not just "attempted." See the CS-template
    * evaluator (/api/agents/evaluate-cs-template). */
   csTemplateProvided: boolean;
+  /** Sim-clock minute the player first ATTEMPTED a customer-facing draft for
+   * Priya — set the moment the CS-template evaluation block runs in
+   * sendPlayerMessage, regardless of whether the draft was judged good. Null
+   * until then. Distinct from csTemplateProvided ("attempted AND good"): this
+   * is "attempted at all," which is what Priya's follow-up obligations settle
+   * on, so a delivered-but-mediocre draft never gets a cold "still waiting"
+   * nudge. Plain number|null, so it round-trips through persistence untouched. */
+  csTemplateAttemptedAtMinutes: number | null;
   rajMood: "neutral" | "collaborative" | "frustrated";
   priyaMood: "neutral" | "reassured" | "overwhelmed";
   derekMood: "neutral" | "engaged" | "impatient";
@@ -645,6 +685,7 @@ export interface StateBag {
 export const initialStateBag: StateBag = {
   respondedAtMinutes: {},
   csTemplateProvided: false,
+  csTemplateAttemptedAtMinutes: null,
   rajMood: "neutral",
   priyaMood: "neutral",
   derekMood: "neutral",
