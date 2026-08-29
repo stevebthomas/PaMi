@@ -6,8 +6,18 @@ import type { AgentId, Message, StateBag } from "@/lib/sim/types";
 
 interface ReplyRequestBody {
   agentId: AgentId;
-  history: Pick<Message, "senderId" | "content">[];
+  /** Now carries each message's `sentAtSimMinutes` alongside sender/content.
+   * Consumed by an upcoming subtask (A3/A4) that makes NPC replies aware of
+   * how long ago things were said; the current prompt assembly ignores it. */
+  history: Pick<Message, "senderId" | "content" | "sentAtSimMinutes">[];
   state: StateBag;
+  /** Current sim-clock minute at send time. Threaded through for the upcoming
+   * elapsed-time-awareness subtask (A3/A4); unused by prompt assembly today. */
+  clockMinutes?: number;
+  /** Present participants (AgentIds) in the channel being replied in — see
+   * presentInChannel in src/lib/sim/roster.ts. For the upcoming channel-roster
+   * injection subtask (A3/A4); unused by prompt assembly today. */
+  channelRoster?: AgentId[];
   /** Set only for a triggered agent-to-agent reaction call — appends that
    * persona's "how I react to another agent" instruction on top of the
    * normal prompt. Absent (the common case) means the lean, ordinary
@@ -39,8 +49,27 @@ interface ReplyRequestBody {
  */
 export async function POST(request: Request) {
   const body: ReplyRequestBody = await request.json();
-  const { agentId, history, state, reactingTo, easterEggDiscovered, groundingChannelLabel, groundingTranscript, personaContext } =
-    body;
+  const {
+    agentId,
+    history,
+    state,
+    reactingTo,
+    easterEggDiscovered,
+    groundingChannelLabel,
+    groundingTranscript,
+    personaContext,
+    clockMinutes,
+    channelRoster,
+  } = body;
+
+  // clockMinutes, channelRoster, and each history entry's sentAtSimMinutes are
+  // now received and typed here, but deliberately NOT wired into prompt
+  // assembly in this subtask — an upcoming subtask (A3/A4) injects elapsed-time
+  // and channel-roster context into the persona prompts. Referenced via `void`
+  // so they're provably parsed/available now without changing any model-visible
+  // output. Do not fold them into the `system` string below.
+  void clockMinutes;
+  void channelRoster;
 
   const systemPrompt = AGENT_SYSTEM_PROMPTS[agentId];
   if (!systemPrompt) {

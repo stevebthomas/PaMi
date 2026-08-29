@@ -17,6 +17,7 @@ import { initialStateBag } from "@/lib/sim/types";
 import { logHelpQueryToSupabase, logDayOutcomeToSupabase } from "@/lib/supabase/persist";
 import { saveDayOutcome } from "@/lib/sim/outcomeStore";
 import { pickReactingAgents, getRedirectLine } from "@/lib/sim/relevance";
+import { presentInChannel } from "@/lib/sim/roster";
 import { DM_CONTACTS, buildDmPersonaContext, buildFixLandedFollowUp, dmChannelId } from "@/lib/sim/dmContacts";
 import { getIncidentTimeline } from "@/lib/sim/incidentTimeline";
 import { formatSimClock } from "@/lib/sim/timeOfDay";
@@ -192,6 +193,12 @@ async function requestAgentReply(
     /** Pre-built established-state block appended to the system prompt as-is
      * (e.g. an assigned engineer's live fix status). */
     personaContext?: string;
+    /** Current sim-clock minute, and the present participants in the channel
+     * being replied in (see presentInChannel). Threaded to the reply route for
+     * an upcoming subtask (A3/A4) that makes replies elapsed-time- and
+     * roster-aware; they don't affect the prompt or output today. */
+    clockMinutes?: number;
+    channelRoster?: AgentId[];
   }
 ): Promise<string | null> {
   try {
@@ -200,13 +207,22 @@ async function requestAgentReply(
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         agentId,
-        history: history.map((m) => ({ senderId: m.senderId, content: m.content })),
+        // sentAtSimMinutes now travels with each history entry (previously
+        // stripped here). Consumed by an upcoming subtask; harmless to the
+        // current route, which reads only senderId/content.
+        history: history.map((m) => ({
+          senderId: m.senderId,
+          content: m.content,
+          sentAtSimMinutes: m.sentAtSimMinutes,
+        })),
         state,
         reactingTo: opts?.reactingTo,
         easterEggDiscovered: opts?.easterEggDiscovered,
         groundingChannelLabel: opts?.groundingChannelLabel,
         groundingTranscript: opts?.groundingTranscript,
         personaContext: opts?.personaContext,
+        clockMinutes: opts?.clockMinutes,
+        channelRoster: opts?.channelRoster,
       }),
     });
     if (!res.ok) return null;
@@ -1078,6 +1094,8 @@ export const useSimStore = create<SimState>((set, get) => ({
 
       const replyText = await requestAgentReply(primary, history, stateForReply, {
         easterEggDiscovered: newlyDiscoveredEggs.length > 0,
+        clockMinutes: get().clockMinutes,
+        channelRoster: presentInChannel(channel),
         ...groundingOpts,
         ...personaContextOpt,
       });
@@ -1123,6 +1141,8 @@ export const useSimStore = create<SimState>((set, get) => ({
             const reactionText = await requestAgentReply(secondAgent, historyWithReaction, get().stateBag, {
               reactingTo: primary,
               callType: "reaction-reply",
+              clockMinutes: get().clockMinutes,
+              channelRoster: presentInChannel(channel),
             });
             set({ pendingReplyFrom: null, pendingReplyChannel: null });
 

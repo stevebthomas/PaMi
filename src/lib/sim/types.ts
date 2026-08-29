@@ -454,6 +454,114 @@ export interface RajFallbackDecision {
   decidedAtMinutes: number;
 }
 
+/** What kind of thing a commitment-ledger entry records. Kept as a small
+ * closed set of string literals (not free text) so A1 can populate and A2 can
+ * branch on it deterministically, and so it survives JSON round-tripping. */
+export type CommitmentKind =
+  /** The NPC committed to doing something themselves (e.g. Raj: "rollback's in
+   * as of 10:30, watching the error rate now"). */
+  | "npc-commitment"
+  /** A decision the NPC has acknowledged / is now operating under (e.g. Priya
+   * acknowledging the rollback path was chosen). Not the NPC's own promise —
+   * their awareness of a call that was made. */
+  | "decision-acknowledged"
+  /** Something the PLAYER owes this NPC (e.g. Priya waiting on a CS draft, Derek
+   * waiting on a blast-radius number). The obligation is on the player; this
+   * entry is the NPC-side memory of it. */
+  | "player-owes-npc";
+
+/**
+ * One entry in the per-NPC commitment ledger (see StateBag.commitmentLedger).
+ * Deliberately a flat, self-describing record (each entry names its own NPC via
+ * `agentId`) rather than a Map keyed by NPC, so it stays plain-JSON and A1 can
+ * append without touching a nested structure. It is DISTINCT from message
+ * history: history is what was literally said; this is the extracted,
+ * structured "who committed/owes what" that A2 reasons over.
+ *
+ * All fields are primitives, so the whole array is JSON-serializable for the
+ * persistence layer landing in a later subtask.
+ */
+export interface CommitmentEntry {
+  /** Stable unique id (e.g. makeId("commit")). */
+  id: string;
+  /** Which NPC this commitment concerns / is held by. */
+  agentId: AgentId;
+  /** Short human-readable description of what was committed, decided, or owed. */
+  summary: string;
+  /** Where it was made / recorded. */
+  channel: ChannelId;
+  /** Sim-clock minute it was made / recorded. */
+  atSimMinutes: number;
+  /** See CommitmentKind. */
+  kind: CommitmentKind;
+  /** Whether it's still outstanding ("open") or has been met/closed ("settled"). */
+  status: "open" | "settled";
+}
+
+/** A deliverable the player might owe (referenced by a "player-delivered"
+ * obligation trigger). Closed set so triggers stay declarative data A2 can
+ * switch on rather than free text. */
+export type ObligationDeliverable = "cs-template" | "postmortem" | "incident-recap" | "fix-decision";
+
+/** A named point in the incident's lifecycle an obligation can key off (for the
+ * "incident-state-reached" trigger). These mirror milestones the incident
+ * timeline already tracks (see incidentTimeline.ts) so A2 can map each to a
+ * real predicate without new bookkeeping. */
+export type IncidentStateDescriptor =
+  | "declared"
+  | "fix-decided"
+  | "fix-landed"
+  | "metrics-recovered"
+  | "resolution-announced";
+
+/**
+ * The condition under which a pending obligation should fire — a DECLARATIVE
+ * DATA DESCRIPTOR, never a function/closure, so the whole obligation survives
+ * JSON round-tripping for persistence. A2 owns the evaluation logic that turns
+ * one of these descriptors into an actual boolean against live state; this type
+ * only DESCRIBES the condition. Variants are chosen to cover the Day-1
+ * obligations A2 will need: Raj's all-clear once the fix lands and metrics
+ * recover, Priya nudging about an undelivered draft, and obligations that react
+ * to incident-state changes.
+ */
+export type ObligationTrigger =
+  /** Fire once the incident fix has actually landed (e.g. Raj's all-clear). */
+  | { type: "fix-landed" }
+  /** Fire once checkout metrics have recovered to baseline. */
+  | { type: "metrics-recovered" }
+  /** Fire once the player has (or has NOT, per A2's reading) delivered a
+   * specific artifact — e.g. Priya nudging about an undelivered CS draft. */
+  | { type: "player-delivered"; deliverable: ObligationDeliverable }
+  /** Fire once `minutes` sim-minutes have elapsed since `sinceSimMinutes` —
+   * e.g. a nudge that only lands after a stretch of silence. */
+  | { type: "sim-minutes-elapsed-since"; sinceSimMinutes: number; minutes: number }
+  /** Fire when the incident reaches a named lifecycle state. */
+  | { type: "incident-state-reached"; state: IncidentStateDescriptor };
+
+/**
+ * One pending obligation (see StateBag.pendingObligations): a thing an NPC is
+ * waiting on or owes, plus the declarative condition that should surface it.
+ * A2 builds the state-conditional engine that evaluates `trigger` and acts;
+ * this shape is only the data it operates on. Every field is a primitive or a
+ * plain descriptor object, so the array is fully JSON-serializable.
+ */
+export interface ObligationEntry {
+  /** Stable unique id (e.g. makeId("oblig")). */
+  id: string;
+  /** The NPC who holds / is waiting on this obligation. */
+  agentId: AgentId;
+  /** Short human-readable description of what's owed or awaited. */
+  summary: string;
+  /** The channel the follow-up would surface in. */
+  channel: ChannelId;
+  /** Declarative, JSON-serializable condition A2 evaluates — NOT a callback. */
+  trigger: ObligationTrigger;
+  /** Lifecycle: still waiting, fired/handled, or dropped. */
+  status: "pending" | "fulfilled" | "cancelled";
+  /** Sim-clock minute this obligation was created. */
+  createdAtSimMinutes: number;
+}
+
 export interface StateBag {
   /** Generic, event-id-keyed acknowledgment tracking: for every
    * requiresResponse event the player has satisfied (by replying in any
@@ -519,6 +627,18 @@ export interface StateBag {
    * false on patch-forward and on any rollback where the player consulted
    * Marcus in time. Read by the scorecard's diligence coaching note. */
   payoutInconsistencySurfaced: boolean;
+  /** Per-NPC ledger of commitments/decisions extracted from the conversation —
+   * distinct from raw message history (see CommitmentEntry). Populated by an
+   * upcoming subtask (A1); empty for now. Must stay plain-JSON (a flat array of
+   * primitive-valued entries, no Sets/Maps/functions) because a persistence
+   * layer lands next and this has to survive JSON round-tripping. */
+  commitmentLedger: CommitmentEntry[];
+  /** Obligations an NPC is waiting on/owes, each carrying a DECLARATIVE trigger
+   * descriptor (see ObligationEntry / ObligationTrigger) rather than a
+   * function — the state-conditional engine that evaluates them is a later
+   * subtask (A2); this is just the data. Empty for now. Must stay plain-JSON
+   * (no Sets/Maps/closures) so it survives JSON round-tripping for persistence. */
+  pendingObligations: ObligationEntry[];
   [key: string]: unknown;
 }
 
@@ -539,6 +659,8 @@ export const initialStateBag: StateBag = {
   fixLandedFollowUpsSent: [],
   marcusConsultedAtMinutes: null,
   payoutInconsistencySurfaced: false,
+  commitmentLedger: [],
+  pendingObligations: [],
 };
 
 export const AGENT_NAMES: Record<AgentId, string> = {
