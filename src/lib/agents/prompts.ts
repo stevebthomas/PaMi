@@ -842,6 +842,42 @@ ${COACHING_WRITING_STYLE}
 Return ONLY valid JSON matching this exact shape, no other text:
 {"score": <0-10 int>, "note": "<one sentence, second person, direct>"}`;
 
+/**
+ * Day-end score-explanation summarizer (subtask C1). Runs ONCE per completed
+ * day, over the whole transcript, and produces the short "why this score"
+ * paragraph shown under each of the five scorecard bars — replacing the old
+ * flat per-message coaching-notes dump. It does NOT score anything: the five
+ * scores are already final and handed to it as input; its only job is to
+ * explain them, grounded in what the player actually did, and to surface up to
+ * two supporting quotes per dimension.
+ *
+ * Deliberately kept separate from EVALUATOR_PROMPT (which grades individual
+ * messages and must stay byte-identical) — this is a summarization layer on
+ * top of the existing grading, not a change to it. Quotes it returns are only
+ * a REQUEST for verbatim text; the route independently validates every quote
+ * against the real transcript in code (see validateQuotes) and drops any that
+ * isn't a genuine substring of a player message, so this prompt's quote rules
+ * are belt-and-suspenders, not the only line of defense.
+ */
+export const SCORE_EXPLANATION_PROMPT = `You are writing the short "why this score" explanation shown under each of the five bars on a Product Manager's end-of-day scorecard, for a simulated live production incident. You are NOT scoring anything — the five scores are already final and given to you. Your only job is to explain, briefly and concretely, why each score landed where it did, grounded in what the player actually did and said that day.
+
+You will be given three things: (1) the player's full Slack transcript for the day — every channel and DM, with who said what and when; (2) the five final scores; and (3) internal grader notes captured during the day, each possibly carrying a short topic label hinting which dimension it bears on. Treat the transcript as the source of truth for what happened, and use the grader notes as extra signal you can lean on so no detail is lost.
+
+The five dimensions you must explain, in order:
+- responseTime: how quickly the player acknowledged and engaged the incident once it was escalated to them.
+- triageQuality: prioritization and judgment — investigating the real problem, assigning the right work to the right owner promptly, and foreseeing the downstream cost of a fix before committing to it.
+- commClarity: how clear, grounded, and appropriately-toned their communication was, including whether they closed the loop with a written postmortem.
+- stakeholderMgmt: keeping leadership and key people (e.g. the VP) in the loop, and owning decisions that were theirs to make instead of letting them escalate or default to someone else.
+- crossFunctional: looping in the right people and teams with specific, actionable, well-timed asks (e.g. handing support a usable customer message), not just vague FYIs.
+
+For EACH of the five dimensions, write:
+- explanation: 2 to 4 sentences, second person ("you..."), naming the concrete actions or omissions that drove THIS score. If it scored low, say plainly what was missing; if high, name what they actually did well. Refer to the real events of this day, never generic advice that could apply to anyone.
+- quotes: 0, 1, or 2 short quotes backing up the explanation. EACH quote MUST be copied EXACTLY, word for word, from one of the PLAYER's own messages in the transcript — a single contiguous run of the player's actual words. Never quote an NPC, the system, or a [pulse] DASHBOARD line. Never paraphrase, never invent, never stitch words from separate messages together. If the player said nothing worth quoting for a dimension (or barely spoke to it at all), return an empty array. A weak or invented quote is worse than none — when in doubt, leave it out.
+
+${COACHING_WRITING_STYLE}
+Return ONLY valid JSON matching this exact shape, no other text. Include all five entries, in the order above, using these exact category keys:
+{"explanations":[{"category":"responseTime","explanation":"...","quotes":["..."]},{"category":"triageQuality","explanation":"...","quotes":["...","..."]},{"category":"commClarity","explanation":"...","quotes":[]},{"category":"stakeholderMgmt","explanation":"...","quotes":["..."]},{"category":"crossFunctional","explanation":"...","quotes":[]}]}`;
+
 export const GUIDANCE_SYNTHESIS_PROMPT = `You are analyzing reasoning logs from an AI persona ("New to product") that played through a PM
 training simulation multiple times, blind, with zero training in incident response. At each
 decision point during each run, it recorded WHY it acted or didn't act.

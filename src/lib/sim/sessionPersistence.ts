@@ -262,7 +262,20 @@ export function restoreSession(): boolean {
       stateBag: { ...initialStateBag, ...(s.stateBag ?? {}) },
       evaluations: s.evaluations ?? {},
       helpQueries: s.helpQueries ?? [],
-      dayRecords: s.dayRecords ?? [],
+      // Any async patch that was still in flight when the tab refreshed (the
+      // coordination score, the study-areas lookup, and the C1 score
+      // explanations) died with the page — there is no fetch left to clear its
+      // loading flag. So normalize every restored record's in-flight flags to
+      // false, mirroring how the store's transient fields are reset below. The
+      // record simply keeps whatever data had already been patched in; a flag
+      // left true here would strand a permanent spinner with nothing to resolve
+      // it (a missing explanation then correctly degrades to the legacy notes).
+      dayRecords: (s.dayRecords ?? []).map((r: DayScorecardRecord) => ({
+        ...r,
+        crossFunctionalLoading: false,
+        studyAreasLoading: false,
+        explanationsLoading: false,
+      })),
       notesText: s.notesText ?? "",
       difficulty: s.difficulty ?? "easy",
       easterEggsFound: s.easterEggsFound ?? [],

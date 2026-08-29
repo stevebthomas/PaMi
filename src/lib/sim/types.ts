@@ -146,6 +146,31 @@ export interface ScorecardScores {
   crossFunctional: number;
 }
 
+/** The key of one of the five scored dimensions — used to key a per-category
+ * score explanation (see CategoryExplanation) back to the bar it belongs
+ * under. */
+export type ScorecardCategory = keyof ScorecardScores;
+
+/** One scored dimension's evidence-backed "why this score" explanation,
+ * shown beneath its bar on the scorecard (subtask C1). Produced by the
+ * day-end summarizer call (see /api/agents/explain-scores) and stored on the
+ * DayScorecardRecord, replacing the flat per-message coaching-notes dump in
+ * the UI.
+ *
+ * Integrity rule: every string in `quotes` is guaranteed to be a real,
+ * verbatim substring (whitespace-normalized) of an actual player message —
+ * the route validates each candidate quote against the transcript in code and
+ * drops any that fails (see validateQuotes in scorecard.ts), so a quote here
+ * is never fabricated or a paraphrase presented as a quote. `quotes` may be
+ * empty when nothing was quotable; the explanation then stands on its own. */
+export interface CategoryExplanation {
+  category: ScorecardCategory;
+  /** 2-4 sentence, second-person explanation of what drove this score. */
+  explanation: string;
+  /** 0-2 verbatim, code-validated quotes from the player's own messages. */
+  quotes: string[];
+}
+
 /** One coaching note, tied to the specific player message it's about —
  * not a loose paragraph of general advice. */
 export interface CoachingEntry {
@@ -248,6 +273,19 @@ export interface DayScorecardRecord {
   /** true while the whole-transcript coordination judgment is in flight —
    * scores.crossFunctional is a placeholder (5) until this resolves. */
   crossFunctionalLoading: boolean;
+  /** Five per-category, evidence-backed "why this score" explanations
+   * (subtask C1), one per scored dimension, that the UI shows beneath each
+   * bar in place of the flat coachingNotes dump. Optional: absent on
+   * zero-engagement days (which keep a single presence note in coachingNotes),
+   * on records produced before this field existed, and on playtests/*.json —
+   * the scorecard UI degrades to the flat coachingNotes list whenever it's
+   * missing. Every quote inside is code-validated verbatim against the
+   * transcript before it lands here. */
+  categoryExplanations?: CategoryExplanation[];
+  /** true while the day-end score-explanation summarizer call is in flight.
+   * Optional (mirrors crossFunctionalLoading) so old/headless producers that
+   * never run the call still compile and render via the fallback. */
+  explanationsLoading?: boolean;
   /** Purely-for-fun discoveries logged on this day — see EasterEggDiscovery.
    * Optional (not every producer of a DayScorecardRecord-shaped object needs
    * to populate this, e.g. scripts/playtest.ts doesn't track it) and always

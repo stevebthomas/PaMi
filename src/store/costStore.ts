@@ -15,6 +15,7 @@ export type ApiCallType =
   | "gate"
   | "cs-template"
   | "tradeoff"
+  | "explain-scores"
   | "suggest-followup";
 
 export interface ApiCallLogEntry {
@@ -103,6 +104,7 @@ export function getSessionCostSummary(): SessionCostSummary {
       gate: 0,
       "cs-template": 0,
       tradeoff: 0,
+      "explain-scores": 0,
       "suggest-followup": 0,
     } as Record<ApiCallType, number>
   );

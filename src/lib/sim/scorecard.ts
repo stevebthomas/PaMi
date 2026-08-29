@@ -1,4 +1,4 @@
-import type { CoachingEntry, Evaluation, Message, ScorecardScores, StateBag, StudyAreaEntry, Ticket } from "./types";
+import type { CoachingEntry, Evaluation, Message, ScorecardCategory, ScorecardScores, StateBag, StudyAreaEntry, Ticket } from "./types";
 import { PAYMENTS_DOMAIN_ASSIGNEES, rosterName } from "./types";
 import { STUDY_RESOURCES } from "../../data/study-resources";
 import { INCIDENT_DECLARED_AT } from "./incidentTimeline";
@@ -385,6 +385,61 @@ export function mergeCoordinationScore(
 ): { scores: ScorecardScores; overall: number } {
   const next: ScorecardScores = { ...scores, crossFunctional: Math.max(0, Math.min(10, crossFunctional)) };
   return { scores: next, overall: average(Object.values(next)) };
+}
+
+/** The five scored dimensions in scorecard/bar display order, with the
+ * human labels shown on the bars. The single source of truth the day-end
+ * score-explanation summarizer (see /api/agents/explain-scores) uses to key
+ * and order its five explanations, so the categories can never silently drift
+ * from ScorecardScores. */
+export const SCORECARD_CATEGORIES: { category: ScorecardCategory; label: string }[] = [
+  { category: "responseTime", label: "Response time" },
+  { category: "triageQuality", label: "Triage quality" },
+  { category: "commClarity", label: "Communication clarity" },
+  { category: "stakeholderMgmt", label: "Stakeholder management" },
+  { category: "crossFunctional", label: "Cross-functional coordination" },
+];
+
+/** Collapses every run of whitespace (spaces, tabs, newlines) to a single
+ * space and trims the ends. The ONLY normalization applied before a quote is
+ * checked against the transcript — content is otherwise compared
+ * character-for-character, so a paraphrase can never pass as a verbatim
+ * quote. */
+export function normalizeQuoteWhitespace(text: string): string {
+  return text.replace(/\s+/g, " ").trim();
+}
+
+/**
+ * The code-side integrity gate for C1's score explanations: given the raw
+ * quotes a summarizer model returned for one category and the player's own
+ * messages, returns only those quotes that are a real, verbatim substring
+ * (whitespace-normalized) of some actual player message. Anything the model
+ * fabricated, paraphrased, stitched together across messages, or lifted from
+ * an NPC/system line fails the substring check and is dropped — never shown
+ * as a quote. This is enforcement in code, not just prompt instruction: a
+ * fabricated quote cannot reach the UI even if the model ignores its
+ * instructions.
+ *
+ * Also caps the result at two quotes, drops empties, and de-duplicates, so a
+ * category shows at most two distinct, real quotes. The returned strings are
+ * the normalized form (safe to display — only whitespace was collapsed).
+ */
+export function validateQuotes(rawQuotes: unknown, playerMessages: string[]): string[] {
+  if (!Array.isArray(rawQuotes)) return [];
+  const haystacks = playerMessages.map(normalizeQuoteWhitespace).filter((h) => h.length > 0);
+  const seen = new Set<string>();
+  const valid: string[] = [];
+  for (const raw of rawQuotes) {
+    if (valid.length >= 2) break;
+    if (typeof raw !== "string") continue;
+    const candidate = normalizeQuoteWhitespace(raw);
+    if (candidate.length === 0 || seen.has(candidate)) continue;
+    if (haystacks.some((h) => h.includes(candidate))) {
+      valid.push(candidate);
+      seen.add(candidate);
+    }
+  }
+  return valid;
 }
 
 /** Turns AI-returned topic keys/labels into the actual curated bullets —

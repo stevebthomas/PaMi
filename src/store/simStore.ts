@@ -3,6 +3,7 @@ import { day1ScenarioEvents, SCENARIO_LABELS, DAY_END_MINUTES } from "@/data/day
 import type {
   AgentId,
   AskClaudeMessage,
+  CategoryExplanation,
   ChannelId,
   CoachingEntry,
   DayScorecardRecord,
@@ -11,6 +12,7 @@ import type {
   Evaluation,
   HelpQuery,
   Message,
+  ScorecardScores,
   StateBag,
 } from "@/lib/sim/types";
 import { initialStateBag } from "@/lib/sim/types";
@@ -422,17 +424,46 @@ async function fetchStudyAreaMatches(
 
 async function fetchCoordinationScore(
   transcript: { senderId: string; channel: string; content: string; sentAtSimMinutes: number }[]
-): Promise<number | null> {
+): Promise<{ score: number | null; note: string }> {
   try {
     const res = await fetch("/api/agents/evaluate-coordination", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ transcript }),
     });
-    if (!res.ok) return null;
+    if (!res.ok) return { score: null, note: "" };
     const data = await res.json();
     recordUsage("coordination", data.usage);
-    return typeof data.score === "number" ? data.score : null;
+    return {
+      score: typeof data.score === "number" ? data.score : null,
+      note: typeof data.note === "string" ? data.note : "",
+    };
+  } catch {
+    return { score: null, note: "" };
+  }
+}
+
+/** Day-end score-explanation summarizer (subtask C1) — turns the five final
+ * scores + the internal grader notes + the full transcript into five
+ * per-category, evidence-backed explanations with code-validated verbatim
+ * quotes. Fired after the coordination score resolves so crossFunctional is
+ * already its final value, and patched into dayRecords the same race-tolerant
+ * way as the coordination and study-area merges. */
+async function fetchScoreExplanations(
+  transcript: { senderId: string; channel: string; content: string; sentAtSimMinutes: number }[],
+  scores: ScorecardScores,
+  graderNotes: { label?: string; feedback: string }[]
+): Promise<CategoryExplanation[] | null> {
+  try {
+    const res = await fetch("/api/agents/explain-scores", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ transcript, scores, graderNotes }),
+    });
+    if (!res.ok) return null;
+    const data = await res.json();
+    recordUsage("explain-scores", data.usage);
+    return Array.isArray(data.explanations) ? data.explanations : null;
   } catch {
     return null;
   }
@@ -1492,6 +1523,12 @@ export const useSimStore = create<SimState>((set, get) => ({
     const nothingToStudy = noEngagement && helpQueries.length === 0;
     const needsStudyLookup = !nothingToStudy && (helpQueries.length > 0 || coachingNotes.length > 0);
 
+    // C1: a zero-engagement day has nothing to explain or quote, so it skips
+    // the five-category summarizer entirely and keeps its single presence note
+    // (shown via the coachingNotes fallback in ScorecardDetail). Every other
+    // day gets the five per-category explanations.
+    const shouldExplain = !noEngagement;
+
     const record: DayScorecardRecord = {
       day,
       scenarioLabel: SCENARIO_LABELS[day] ?? `Day ${day}`,
@@ -1507,6 +1544,9 @@ export const useSimStore = create<SimState>((set, get) => ({
       studyAreas: [],
       studyAreasLoading: needsStudyLookup,
       crossFunctionalLoading: true,
+      // Filled in async once the summarizer resolves (fired after the
+      // coordination score lands, below, so crossFunctional is already final).
+      explanationsLoading: shouldExplain,
       // Snapshot only — never fed into scores/overall above, this section
       // exists purely so Reviews/the end-of-day popup can show it, entirely
       // separate from computeScorecard's math.
@@ -1531,12 +1571,20 @@ export const useSimStore = create<SimState>((set, get) => ({
       content: m.content,
       sentAtSimMinutes: m.sentAtSimMinutes,
     }));
-    fetchCoordinationScore(fullTranscript).then((score) => {
+    fetchCoordinationScore(fullTranscript).then(({ score, note }) => {
+      // Captured out of the (synchronous) set updater so the chained
+      // score-explanation call below sees the FINAL five scores, not the
+      // placeholder crossFunctional of 5.
+      let finalScores: ScorecardScores = scores;
       set((s) => ({
         dayRecords: s.dayRecords.map((r) => {
           if (r.day !== day) return r;
-          if (score === null) return { ...r, crossFunctionalLoading: false };
+          if (score === null) {
+            finalScores = r.scores;
+            return { ...r, crossFunctionalLoading: false };
+          }
           const merged = mergeCoordinationScore(r.scores, score);
+          finalScores = merged.scores;
           // Keep outcome.scores/overall in lockstep with the record's own —
           // outcome is a snapshot of the SAME scores, not an independent copy
           // that's allowed to go stale once the async coordination score lands.
@@ -1548,6 +1596,28 @@ export const useSimStore = create<SimState>((set, get) => ({
           return { ...r, scores: merged.scores, overall: merged.overall, crossFunctionalLoading: false, outcome };
         }),
       }));
+
+      // C1: with crossFunctional now final, explain all five scores in one
+      // whole-transcript call. Chained here (rather than fired in parallel)
+      // purely so the crossFunctional explanation describes the real number.
+      // The grader notes (per-message + synthetic coaching signal) are folded
+      // in so their substance isn't lost when the flat notes dump is removed
+      // from the UI; the coordination note rides along as a crossFunctional
+      // signal. Patches the same race-tolerant way as the merges above —
+      // spreads the latest record and only sets its own two fields, so it
+      // never clobbers the coordination/study-area/follow-up patches.
+      if (!shouldExplain) return;
+      const graderNotes = coachingNotes.map((c) => ({ label: c.label, feedback: c.feedback }));
+      if (note) graderNotes.push({ label: "Cross-functional coordination", feedback: note });
+      fetchScoreExplanations(fullTranscript, finalScores, graderNotes).then((explanations) => {
+        set((s) => ({
+          dayRecords: s.dayRecords.map((r) =>
+            r.day === day
+              ? { ...r, categoryExplanations: explanations ?? [], explanationsLoading: false }
+              : r
+          ),
+        }));
+      });
     });
 
     if (needsStudyLookup) {
