@@ -19,6 +19,7 @@ import { useSimStore } from "@/store/simStore";
 import { useWindowStore } from "@/store/windowStore";
 import { getSessionCostSummary } from "@/store/costStore";
 import { getAmbientTint, getDayProgress } from "@/lib/sim/timeOfDay";
+import { restoreSession, startSessionPersistence, resetSession } from "@/lib/sim/sessionPersistence";
 
 export type AppId = "chattr" | "pulse" | "taskflow" | "askClaude" | "reviews" | "notes" | "office";
 
@@ -33,7 +34,16 @@ const APP_DEFAULT_SIZE: Record<AppId, { width: number; height: number }> = {
 };
 
 export function Desktop() {
-  const [onboarded, setOnboarded] = useState(false);
+  // "loading" until the mount effect has run the client-only restore. The
+  // resume decision depends on restoreSession(), which reads localStorage —
+  // unavailable during server prerender. Deciding it in a useState initializer
+  // would run on the server (returns false -> onboarding HTML) AND on the
+  // resuming client (returns true -> desktop), a structural hydration
+  // mismatch. So server and first client render both produce the SAME neutral
+  // frame ("loading"), and the resume decision is made client-side in the
+  // effect below. A brief neutral first frame is the accepted cost; a resuming
+  // player never sees the onboarding screen flash (loading -> desktop directly).
+  const [phase, setPhase] = useState<"loading" | "onboarding" | "desktop">("loading");
   const [scorecardDismissed, setScorecardDismissed] = useState(false);
   const startDay = useSimStore((s) => s.startDay);
   const dayComplete = useSimStore((s) => s.dayComplete);
@@ -45,25 +55,65 @@ export function Desktop() {
 
   const openApps = useMemo(() => new Set(Object.keys(windows) as AppId[]), [windows]);
 
-  // Dev-only console hook so the API call/cost tracker is inspectable
-  // without a debug panel — call getSessionCostSummary() in devtools.
+  // Client-only restore + persistence startup, on mount. restoreSession()
+  // hydrates both stores SYNCHRONOUSLY here — before the desktop can render
+  // (so before any user-triggered advanceClock is reachable) and before the
+  // desktop-entry effect below can call startDay (effects run in definition
+  // order, and the entry effect no-ops while phase is still "loading" this
+  // pass). A resumed started session goes straight to "desktop"; otherwise
+  // "onboarding". startSessionPersistence runs after restore so the fresh
+  // snapshot isn't clobbered, and is idempotent under StrictMode.
+  useEffect(() => {
+    const resumed = restoreSession();
+    startSessionPersistence();
+    // Deliberate setState-in-effect: this is the sanctioned mount-flag pattern
+    // for a client-only decision that must not run during SSR. Deriving phase
+    // from store state instead would risk an intermediate render showing the
+    // onboarding screen before restore completes (an onboarding flash the spec
+    // forbids); setting phase here in the same synchronous block as the restore
+    // keeps the transition loading -> desktop atomic for a resuming player.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setPhase(resumed ? "desktop" : "onboarding");
+  }, []);
+
+  // Dev-only console hooks so the API call/cost tracker is inspectable and the
+  // saved session can be wiped without a debug panel — call
+  // getSessionCostSummary() in devtools. resetSimSession() clears the saved
+  // session and reloads a fresh one; it exists because refreshing no longer
+  // wipes state (dev iteration used to rely on that), so this is the explicit
+  // "start over" affordance.
   useEffect(() => {
     if (process.env.NODE_ENV !== "production") {
       (window as unknown as { getSessionCostSummary: typeof getSessionCostSummary }).getSessionCostSummary = getSessionCostSummary;
+      (window as unknown as { resetSimSession: () => void }).resetSimSession = resetSession;
     }
   }, []);
 
+  // Entry into the desktop — fires both for a fresh onboarding->start and for
+  // a resume. startDay()'s own `if (started) return` guard makes it a no-op on
+  // resume (the initial scripted beat never re-fires); it only does real work
+  // on a genuinely fresh session. Guaranteed to run AFTER restore: on the
+  // mount pass phase is still "loading" so this returns early, then the restore
+  // effect sets phase to "desktop" and this re-runs.
   useEffect(() => {
-    if (!onboarded) return;
+    if (phase !== "desktop") return;
     startDay();
     // Open Chattr by default so the player isn't dropped on an empty desktop.
     const bounds = containerRef.current;
     openWindow("chattr", APP_DEFAULT_SIZE.chattr, bounds?.clientWidth ?? 1024, bounds?.clientHeight ?? 640);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [onboarded]);
+  }, [phase]);
 
-  if (!onboarded) {
-    return <OnboardingScreen onStart={() => setOnboarded(true)} />;
+  // Neutral frame shown on the server and the first client render (identical on
+  // both, so no hydration mismatch) until the mount effect decides resume vs.
+  // onboarding. Uses the same background as the real screens so it reads as a
+  // brief load, not a white flash.
+  if (phase === "loading") {
+    return <div className="pixel-desktop-bg h-dvh w-full" />;
+  }
+
+  if (phase === "onboarding") {
+    return <OnboardingScreen onStart={() => setPhase("desktop")} />;
   }
 
   function handleSelectApp(id: AppId) {
