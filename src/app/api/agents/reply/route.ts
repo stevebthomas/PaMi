@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { getAnthropicClient, getPersonaModel, extractText, extractUsage, stripEmDashes } from "@/lib/agents/anthropic";
-import { AGENT_SYSTEM_PROMPTS, moodContextLine, reactionContextLine, easterEggReactionLine, groundingContextLine } from "@/lib/agents/prompts";
+import { AGENT_SYSTEM_PROMPTS, moodContextLine, commitmentContextLine, reactionContextLine, easterEggReactionLine, groundingContextLine } from "@/lib/agents/prompts";
 import type { AgentId, Message, StateBag } from "@/lib/sim/types";
 
 interface ReplyRequestBody {
@@ -102,7 +102,14 @@ export async function POST(request: Request) {
     const response = await client.messages.create({
       model: getPersonaModel(agentId),
       max_tokens: 900,
-      system: systemPrompt + moodContextLine(agentId, state) + reactionLine + eggLine + groundingLine + personaLine,
+      system:
+        systemPrompt +
+        moodContextLine(agentId, state) +
+        commitmentContextLine(agentId, state) +
+        reactionLine +
+        eggLine +
+        groundingLine +
+        personaLine,
       messages,
     });
 

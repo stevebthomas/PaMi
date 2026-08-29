@@ -432,6 +432,51 @@ export function moodContextLine(agentId: AgentId, state: StateBag): string {
   return line;
 }
 
+/**
+ * Per-NPC commitment/decision context — the fix for the "re-acknowledges an
+ * already-settled decision as if hearing it fresh" bug. For the REPLYING agent
+ * only, lists the ledger entries (see StateBag.commitmentLedger) that concern
+ * them: decisions they're already operating under, their own open promises, and
+ * anything the player still owes them. Framed as already-known context so the
+ * NPC references a settled thing as in-motion ("yeah, already on that") instead
+ * of re-acknowledging it.
+ *
+ * Empty ledger (the common case, and every flow before A1 populates it) => "",
+ * so the assembled system prompt is byte-for-byte unchanged. Entries are
+ * filtered to agentId === this agent, so an NPC never sees another NPC's
+ * commitments.
+ */
+export function commitmentContextLine(agentId: AgentId, state: StateBag): string {
+  const ledger = state.commitmentLedger;
+  if (!ledger || ledger.length === 0) return "";
+  const mine = ledger.filter((e) => e.agentId === agentId);
+  if (mine.length === 0) return "";
+
+  const line = (label: string, summary: string) => `- [${label}] ${summary}`;
+  const items = mine.map((e) => {
+    if (e.kind === "decision-acknowledged") {
+      return line(e.status === "settled" ? "already settled" : "in motion", e.summary);
+    }
+    if (e.kind === "npc-commitment") {
+      return line(e.status === "settled" ? "done" : "you're on it", e.summary);
+    }
+    // player-owes-npc
+    return line(e.status === "settled" ? "delivered" : "still owed to you", e.summary);
+  });
+
+  const hasOpenPlayerOwes = mine.some((e) => e.kind === "player-owes-npc" && e.status !== "settled");
+  const playerOwesNote = hasOpenPlayerOwes
+    ? ` If something below is still owed to you by the player and it's genuinely relevant, you can reference it naturally (a light "still need that draft when you get a sec"), but don't nag.`
+    : "";
+
+  return (
+    `\n\nWhat's already established between you and the player (do NOT re-acknowledge any of these as new information, they're settled context you already know, so reference them as things already known or in motion, e.g. "yeah, already moving on that" or "Jordan's on it", never as if you're hearing them for the first time):\n` +
+    items.join("\n") +
+    `\nIf the player is genuinely telling you one of these for the very first time in their latest message, just respond to that naturally, this note only exists so you don't act surprised by something that's already been settled.` +
+    playerOwesNote
+  );
+}
+
 /** One example line per persona for how they react when shown another
  * agent's message (tagged `[agentId]:` in their context) — only appended to
  * the system prompt for a triggered agent-to-agent reaction call, never for

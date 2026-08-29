@@ -5,6 +5,9 @@ import { useTaskflowStore } from "../store/taskflowStore";
 // importing worldCanon here would close it. payoutCanon has no imports, so this
 // is safe. worldCanon re-exports these same names for everyone else.
 import { PAYOUT_PIPELINE } from "../lib/sim/payoutCanon";
+// commitments.ts imports ONLY from types.ts, so this stays clear of the
+// worldCanon -> incidentTimeline -> day1-scenario init cycle documented above.
+import { recordFixDecisionAck, recordPlayerOwesCsTemplate } from "../lib/sim/commitments";
 
 /** True when the player DMed Marcus about payouts BEFORE the fix decision was
  * made, i.e. in time to actually act on his warning (pause/reconcile the
@@ -212,6 +215,14 @@ export const day1ScenarioEvents: ScenarioEvent[] = [
     agentId: "priya",
     channel: "dm_priya",
     content: "Whenever you get a sec, can you send me something I can hand my team to tell customers? Doesn't need to be polished, just accurate.",
+    // Record the player-owes-Priya obligation the moment she asks, so her later
+    // replies can reference it as already-known ("still need that draft") rather
+    // than re-asking cold. Settled in the store's CS-template block once a good
+    // template is delivered. Idempotent by stable id (advanceClock is
+    // re-entrant); 566 mirrors this event's own triggerTimeMinutes.
+    applyEffect: (state) => ({
+      commitmentLedger: recordPlayerOwesCsTemplate(state.commitmentLedger, 566),
+    }),
   },
   {
     id: "raj-nudge",
@@ -282,6 +293,20 @@ export const day1ScenarioEvents: ScenarioEvent[] = [
             tradeoffChoice: state.rajFallbackDecision.choice,
             tradeoffDecidedAtMinutes: state.rajFallbackDecision.decidedAtMinutes,
             tradeoffEscalatedToDerek: true,
+            // Same decision-acknowledged ledger entry as the player-decision
+            // path, but marked as Raj's own fallback call, so his later replies
+            // treat the fix he chose as settled context rather than re-deciding
+            // it. Born settled; idempotent by stable id (advanceClock is
+            // re-entrant). The engineers' fix-landed commitment is recorded on
+            // the player-decision path (where the fix ticket is registered), not
+            // here — see commitments.ts and the store's Feature B block.
+            commitmentLedger: recordFixDecisionAck(state.commitmentLedger, {
+              choice: state.rajFallbackDecision.choice,
+              channel: "incidents",
+              atSimMinutes: state.rajFallbackDecision.decidedAtMinutes,
+              where: "the fix call",
+              decidedByRaj: true,
+            }),
           }
         : {},
     facts: [

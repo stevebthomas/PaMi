@@ -19,6 +19,12 @@ import { saveDayOutcome } from "@/lib/sim/outcomeStore";
 import { pickReactingAgents, getRedirectLine } from "@/lib/sim/relevance";
 import { presentInChannel } from "@/lib/sim/roster";
 import { DM_CONTACTS, buildDmPersonaContext, buildFixLandedFollowUp, dmChannelId } from "@/lib/sim/dmContacts";
+import {
+  recordFixDecisionAck,
+  recordFixEngineerCommitments,
+  settleFixEngineerCommitment,
+  settlePlayerOwesCsTemplate,
+} from "@/lib/sim/commitments";
 import { getIncidentTimeline } from "@/lib/sim/incidentTimeline";
 import { formatSimClock } from "@/lib/sim/timeOfDay";
 import { satisfyingChannels } from "@/lib/sim/acknowledgment";
@@ -102,6 +108,12 @@ const SCRIPTED_RAJ_FALLBACK: { choice: "rollback"; reasoning: string; derekLine:
 
 export const ASK_CLAUDE_OPENER =
   "Ask me about any term or concept from today (HTTP codes, webhooks, business metrics, whatever's unfamiliar). I can't tell you what to say or do in the scenario, that part's yours to practice. But I'm happy to explain the vocabulary.";
+
+/** The fix engineers who ping when the fix lands — the non-adjacent registry
+ * DM contacts (Jordan lead, Chen support). Derived from DM_CONTACTS so a future
+ * fix engineer needs no change here, and so it can't drift from the follow-up
+ * block's own `role !== "adjacent"` filter. */
+const FIX_ENGINEER_AGENT_IDS = DM_CONTACTS.filter((c) => c.role !== "adjacent").map((c) => c.agentId);
 
 let idCounter = 0;
 function makeId(prefix: string): string {
@@ -620,12 +632,21 @@ export const useSimStore = create<SimState>((set, get) => ({
             followUps.forEach((m) => {
               if (m.channel !== s.activeChannel) unread.add(m.channel);
             });
+            // Settle each pinging engineer's "will report when the fix lands"
+            // commitment now that the ping has actually gone out — the promise
+            // is kept. Idempotent; a no-op for any contact that never had one
+            // (e.g. a fallback/auto-resolve path where the append site didn't run).
+            const settledLedger = due.reduce(
+              (ledger, c) => settleFixEngineerCommitment(ledger, c.agentId),
+              s.stateBag.commitmentLedger
+            );
             return {
               messages: [...s.messages, ...followUps],
               unreadChannels: unread,
               stateBag: {
                 ...s.stateBag,
                 fixLandedFollowUpsSent: [...(s.stateBag.fixLandedFollowUpsSent ?? []), ...due.map((c) => c.id)],
+                commitmentLedger: settledLedger,
               },
             };
           });
@@ -873,7 +894,19 @@ export const useSimStore = create<SimState>((set, get) => ({
       }));
       const templateResult = await requestCsTemplateEvaluation(trimmed, transcriptForTemplate);
       if (templateResult) {
-        set((s) => ({ stateBag: { ...s.stateBag, csTemplateProvided: templateResult.good } }));
+        set((s) => ({
+          stateBag: {
+            ...s.stateBag,
+            csTemplateProvided: templateResult.good,
+            // Settle Priya's "player owes me a CS message" obligation only when
+            // the delivered template actually passed (good), mirroring
+            // csTemplateProvided's own "provided AND good" meaning. Idempotent
+            // and a no-op if she never asked (entry absent).
+            commitmentLedger: templateResult.good
+              ? settlePlayerOwesCsTemplate(s.stateBag.commitmentLedger)
+              : s.stateBag.commitmentLedger,
+          },
+        }));
         if (templateResult.note) {
           set((s) => ({
             evaluations: {
@@ -895,7 +928,19 @@ export const useSimStore = create<SimState>((set, get) => ({
     // reason as the CS-template check above: tradeoffChoice/decidedAtMinutes
     // feed Pulse's recovery curve and the seeded Taskflow ticket, both of
     // which need this settled, not resolved after the fact.
-    if (channel === "incidents" && get().firedEventIds.has("raj-tradeoff-offer") && get().stateBag.tradeoffChoice === null) {
+    //
+    // dm_raj is recognized alongside #incidents (A1 root-cause fix): a decision
+    // stated privately to Raj now registers in state exactly as an #incidents
+    // one does, instead of Raj roleplaying commitment in DM while state never
+    // records it — which was why his #incidents persona later re-acknowledged
+    // the same decision as brand new. A single message is only ever in one
+    // channel, so this can't double-evaluate; tradeoffChoice === null stays the
+    // master guard regardless.
+    if (
+      (channel === "incidents" || channel === "dm_raj") &&
+      get().firedEventIds.has("raj-tradeoff-offer") &&
+      get().stateBag.tradeoffChoice === null
+    ) {
       const offerEvent = day1ScenarioEvents.find((e) => e.id === "raj-tradeoff-offer");
       if (offerEvent) {
         const tradeoffResult = await requestTradeoffEvaluation(offerEvent.content, trimmed);
@@ -939,7 +984,29 @@ export const useSimStore = create<SimState>((set, get) => ({
           // Captured so the resolution event below can move THIS specific
           // ticket by id — see tradeoffTicketId's own doc comment for why
           // the old "whichever ticket is in-progress" heuristic was wrong.
-          set((s) => ({ stateBag: { ...s.stateBag, tradeoffTicketId } }));
+          // Same set records the commitment ledger for this decision: Raj's
+          // decision-acknowledged entry (born settled — a made decision is
+          // settled context, not something to re-acknowledge later) and the
+          // fix engineers' open "will ping when it lands" commitments. Both
+          // appends are idempotent by stable id, so this is safe under the
+          // tradeoffChoice === null guard above.
+          set((s) => {
+            let ledger = s.stateBag.commitmentLedger;
+            ledger = recordFixDecisionAck(ledger, {
+              choice,
+              channel,
+              atSimMinutes: decidedAt,
+              where: channel === "dm_raj" ? "your DM with Raj" : "#incidents",
+              decidedByRaj: false,
+            });
+            ledger = recordFixEngineerCommitments(ledger, {
+              engineerIds: FIX_ENGINEER_AGENT_IDS,
+              choice,
+              channel,
+              atSimMinutes: decidedAt,
+            });
+            return { stateBag: { ...s.stateBag, tradeoffTicketId, commitmentLedger: ledger } };
+          });
         }
       }
     }
