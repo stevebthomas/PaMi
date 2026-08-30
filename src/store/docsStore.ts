@@ -39,6 +39,14 @@ interface DocsStoreState {
   openDocRequest: (docId: string) => void;
   /** Desktop clears the open signal once it has actually opened the window. */
   clearPendingOpen: () => void;
+  /** Clears the active doc back to the library view. Does not touch window
+   * state — the Docs window itself stays open. */
+  closeDoc: () => void;
+  /** Library-tile entry point: the Docs window is already open (this is
+   * called from inside it), so just switch the active doc directly — no
+   * bounce, no window-open signal. Contrast with openDocRequest, the
+   * chattr-chip entry point that has to first ensure the window exists. */
+  setActiveDoc: (docId: string) => void;
 }
 
 /** Toggle the busy-pointer class on <body>. Guarded for SSR (no document) and
@@ -78,4 +86,8 @@ export const useDocsStore = create<DocsStoreState>((set, get) => ({
   },
 
   clearPendingOpen: () => set({ pendingOpen: false }),
+
+  closeDoc: () => set({ activeDocId: null }),
+
+  setActiveDoc: (docId) => set({ activeDocId: docId }),
 }));

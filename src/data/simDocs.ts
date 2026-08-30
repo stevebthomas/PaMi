@@ -16,6 +16,8 @@ export interface SimDoc {
   /** Markdown source, rendered by DocsApp's scoped subset renderer (headings,
    * hr, bullet lists, bold/italic, blank-line paragraphs). */
   markdown: string;
+  /** Display filename for library tiles (e.g. "Welcome to BazaarLoop.md"). */
+  filename: string;
 }
 
 /** Derek's new-hire intro doc, previously a real file download
@@ -60,11 +62,44 @@ There's no script for a day like this. Nothing on your calendar is guaranteed to
 Good luck. Start your day whenever you're ready.
 `;
 
+/** Maya's mockup A — the "saved!" animation option for Theo's wishlist
+ * save-for-later tap. */
+const MAYA_MOCKUP_SAVED_ANIMATION = `# Mockup A — "saved!" animation
+
+A small "saved!" animation plays when you tap save-for-later on Theo's
+wishlist ticket.
+
+- **Gives you:** a visible confirmation moment — the tap clearly registered
+- **Costs you:** a beat of delay and motion before the interaction feels done
+`;
+
+/** Maya's mockup B — the silent, instant option for the same tap. */
+const MAYA_MOCKUP_SILENT_INSTANT = `# Mockup B — silent + instant
+
+No animation — the item just saves the moment you tap save-for-later.
+
+- **Gives you:** an instant feel, nothing standing between the tap and done
+- **Costs you:** no explicit confirmation moment for the user to notice
+`;
+
 export const SIM_DOCS: Record<string, SimDoc> = {
   "derek-welcome-doc": {
     id: "derek-welcome-doc",
     title: "Welcome to BazaarLoop",
     markdown: WELCOME_TO_BAZAARLOOP,
+    filename: "Welcome to BazaarLoop.md",
+  },
+  "maya-mockup-saved-animation": {
+    id: "maya-mockup-saved-animation",
+    title: "Mockup A — 'saved!' animation",
+    markdown: MAYA_MOCKUP_SAVED_ANIMATION,
+    filename: "Saved Animation Mockup.md",
+  },
+  "maya-mockup-silent-instant": {
+    id: "maya-mockup-silent-instant",
+    title: "Mockup B — silent + instant",
+    markdown: MAYA_MOCKUP_SILENT_INSTANT,
+    filename: "Silent Instant Mockup.md",
   },
 };
 

@@ -15,6 +15,7 @@ export function MessageList() {
   // would show "X is typing" somewhere X isn't actually replying.
   const pendingReplyChannel = useSimStore((s) => s.pendingReplyChannel);
   const openDocRequest = useDocsStore((s) => s.openDocRequest);
+  const recordDocOpened = useSimStore((s) => s.recordDocOpened);
   const showTyping = pendingReplyFrom !== null && pendingReplyChannel === activeChannel;
   const bottomRef = useRef<HTMLDivElement>(null);
 
@@ -59,21 +60,29 @@ export function MessageList() {
               ) : (
                 <p className="whitespace-pre-wrap text-sm leading-snug text-ink">{m.content}</p>
               )}
-              {/* Doc chip — opens in the in-sim Docs app, never a real
-                  download. Rendered ONLY when the attachment's docId resolves
-                  in SIM_DOCS, so a legacy persisted attachment carrying the old
-                  {label, href} shape (no docId) silently renders nothing rather
-                  than crashing. */}
-              {m.attachment && getSimDoc(m.attachment.docId) && (
-                <button
-                  type="button"
-                  onClick={() => openDocRequest(m.attachment!.docId)}
-                  className="pixel-border mt-1.5 inline-flex items-center gap-1 bg-white px-2 py-1 text-[11px] text-ink hover:-translate-y-0.5"
-                >
-                  <span>📄</span>
-                  {m.attachment.label}
-                </button>
-              )}
+              {/* Doc chip(s) — open in the in-sim Docs app, never a real
+                  download. Covers both the singular `attachment` field and
+                  the plural `attachments` field (merged into one list here),
+                  rendered ONLY when a chip's docId resolves in SIM_DOCS, so a
+                  legacy persisted attachment carrying the old {label, href}
+                  shape (no docId) silently renders nothing rather than
+                  crashing. */}
+              {[...(m.attachment ? [m.attachment] : []), ...(m.attachments ?? [])]
+                .filter((a) => getSimDoc(a.docId))
+                .map((a) => (
+                  <button
+                    key={a.docId}
+                    type="button"
+                    onClick={() => {
+                      recordDocOpened(a.docId);
+                      openDocRequest(a.docId);
+                    }}
+                    className="pixel-border mt-1.5 inline-flex items-center gap-1 bg-white px-2 py-1 text-[11px] text-ink hover:-translate-y-0.5"
+                  >
+                    <span>📄</span>
+                    {a.label}
+                  </button>
+                ))}
             </div>
           </div>
         );

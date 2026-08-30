@@ -309,6 +309,7 @@ interface SimState {
   setNotesText: (text: string) => void;
   setDifficulty: (difficulty: Difficulty) => void;
   setPlayerName: (name: string) => void;
+  recordDocOpened: (docId: string) => void;
   dismissScorecard: () => void;
 }
 
@@ -654,6 +655,7 @@ export const useSimStore = create<SimState>((set, get) => ({
           sentAtSimMinutes: e.triggerTimeMinutes,
           createdAt: Date.now(),
           attachment: e.attachment,
+          attachments: e.attachments,
         }));
 
         const fired = new Set(s.firedEventIds);
@@ -1891,6 +1893,12 @@ export const useSimStore = create<SimState>((set, get) => ({
   setNotesText: (text) => set({ notesText: text }),
   setDifficulty: (difficulty) => set({ difficulty }),
   setPlayerName: (name) => set((s) => ({ stateBag: { ...s.stateBag, playerName: name.trim() } })),
+  recordDocOpened: (docId) =>
+    set((s) =>
+      s.stateBag.openedDocIds.includes(docId)
+        ? {}
+        : { stateBag: { ...s.stateBag, openedDocIds: [...s.stateBag.openedDocIds, docId] } }
+    ),
   dismissScorecard: () => set({ scorecardDismissed: true }),
 }));
 

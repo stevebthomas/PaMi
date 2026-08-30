@@ -504,9 +504,13 @@ export const day1ScenarioEvents: ScenarioEvent[] = [
     agentId: "maya",
     channel: "design-review",
     content:
-      "Hey, whenever you get a sec, need a quick call on Theo's wishlist ticket. Deciding between a small 'saved!' animation when you tap save-for-later, or keeping it silent and instant. Not urgent, just want to lock it before we ship Thursday. Which do you prefer?",
+      "Hey, whenever you get a sec, need a quick call on Theo's wishlist ticket. Deciding between a small 'saved!' animation when you tap save-for-later, or keeping it silent and instant. Not urgent, just want to lock it before we ship Thursday. Which do you prefer? Attaching both mockups so you can compare.",
     requiresResponse: true,
     responseDeadlineMinutes: 120,
+    attachments: [
+      { label: "Saved Animation Mockup.md", docId: "maya-mockup-saved-animation" },
+      { label: "Silent Instant Mockup.md", docId: "maya-mockup-silent-instant" },
+    ],
   },
   {
     id: "derek-notification",

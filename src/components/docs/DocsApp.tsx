@@ -2,27 +2,74 @@
 
 import { Fragment, type ReactNode } from "react";
 import { useDocsStore } from "@/store/docsStore";
+import { useSimStore } from "@/store/simStore";
 import { getSimDoc } from "@/data/simDocs";
+import { AppIcon } from "@/components/shared/AppIcon";
 
 /**
- * Generic in-sim document viewer. Reads the active doc id from docsStore and
- * renders SIM_DOCS[id]. Nothing here is doc-specific — a new SIM_DOCS entry
- * shows up with zero changes to this file.
+ * Generic in-sim document viewer/library. Reads the active doc id from
+ * docsStore: null (or an id that doesn't resolve in SIM_DOCS) shows the
+ * library — a grid of tiles for every doc the player has opened so far
+ * (stateBag.openedDocIds) — otherwise it renders the doc itself. Nothing
+ * here is doc-specific — a new SIM_DOCS entry shows up with zero changes to
+ * this file.
  */
 export function DocsApp() {
   const activeDocId = useDocsStore((s) => s.activeDocId);
+  const setActiveDoc = useDocsStore((s) => s.setActiveDoc);
+  const closeDoc = useDocsStore((s) => s.closeDoc);
+  const openedDocIds = useSimStore((s) => s.stateBag.openedDocIds);
+  const recordDocOpened = useSimStore((s) => s.recordDocOpened);
   const doc = getSimDoc(activeDocId);
 
   if (!doc) {
+    const tiles = openedDocIds
+      .map((id) => getSimDoc(id))
+      .filter((d): d is NonNullable<typeof d> => Boolean(d));
+
+    if (tiles.length === 0) {
+      return (
+        <div className="flex h-full min-h-0 w-full items-center justify-center p-6">
+          <p className="text-sm text-ink-soft">
+            No documents yet. Files people send you will show up here.
+          </p>
+        </div>
+      );
+    }
+
     return (
-      <div className="flex h-full min-h-0 w-full items-center justify-center p-6">
-        <p className="text-sm text-ink-soft">No document open.</p>
+      <div className="pixel-scrollbar h-full min-h-0 w-full overflow-y-auto p-4">
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+          {tiles.map((d) => (
+            <button
+              key={d.id}
+              type="button"
+              onClick={() => {
+                setActiveDoc(d.id);
+                recordDocOpened(d.id);
+              }}
+              className="pixel-border flex flex-col items-center gap-2 bg-white px-2 py-3 text-center hover:-translate-y-0.5"
+            >
+              <AppIcon id="docs" sizeClassName="h-8 w-8" />
+              <span className="text-[11px] text-ink">{d.filename}</span>
+            </button>
+          ))}
+        </div>
       </div>
     );
   }
 
   return (
     <div className="flex h-full min-h-0 w-full flex-col">
+      <div className="flex shrink-0 items-center border-b border-ink/10 px-3 py-2">
+        <button
+          type="button"
+          onClick={closeDoc}
+          className="pixel-border bg-white px-2 py-1 text-[11px] text-ink hover:-translate-y-0.5"
+        >
+          ← Library
+        </button>
+      </div>
       <div className="pixel-scrollbar min-h-0 flex-1 overflow-y-auto px-5 py-4 text-sm leading-relaxed text-ink">
         {renderMarkdown(doc.markdown)}
       </div>

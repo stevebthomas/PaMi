@@ -107,6 +107,11 @@ export interface Message {
    * (SIM_DOCS[docId]), never a real browser download. Optional: absent on
    * almost all messages. */
   attachment?: { label: string; docId: string };
+  /** Multiple document chips rendered under the message content, for beats
+   * that hand over more than one doc at once (e.g. Maya's two mockups).
+   * Rendered alongside (not instead of) `attachment` — see MessageList's
+   * merged-list rendering. Optional: absent on almost all messages. */
+  attachments?: { label: string; docId: string }[];
 }
 
 export interface EvaluationScores {
@@ -522,6 +527,11 @@ export interface ScenarioEvent {
    * almost every event; carried onto the created Message unchanged by
    * advanceClock. */
   attachment?: { label: string; docId: string };
+  /** Multiple document chips to render under this event's Message once it
+   * fires — same idea as `attachment` but plural, for beats that hand over
+   * more than one doc at once. Carried onto the created Message unchanged by
+   * advanceClock. Optional: absent on almost every event. */
+  attachments?: { label: string; docId: string }[];
 }
 
 /** Difficulty tier for player-facing ambient-help features (not for scoring
@@ -820,6 +830,13 @@ export interface StateBag {
    * every subsequent message. Lives here (not a Set) so it round-trips through
    * session persistence as plain JSON, exactly like fixLandedFollowUpsSent. */
   redirectsFiredToday: string[];
+  /** SIM_DOCS ids the player has opened, in first-open order — drives the
+   * Docs app's library view (see DocsApp.tsx). Populated by
+   * simStore.recordDocOpened, which appends an id once (deduped) the first
+   * time it's opened via a chattr chip or a library tile. Plain string[], so
+   * it round-trips through session persistence untouched, same as
+   * redirectsFiredToday. */
+  openedDocIds: string[];
   /** The player's own name, captured on the orientation screen before Day 1
    * starts (see setPlayerName / WelcomeScreen). Empty string until entered —
    * which is also the state old persisted sessions and the HR orientation chat
@@ -854,6 +871,7 @@ export const initialStateBag: StateBag = {
   commitmentLedger: [],
   pendingObligations: [],
   redirectsFiredToday: [],
+  openedDocIds: [],
   playerName: "",
 };
 
