@@ -1475,21 +1475,28 @@ export const useSimStore = create<SimState>((set, get) => ({
         .messages.filter((m) => m.channel === channel)
         .slice(-12);
 
-      // Derek's DM is otherwise scoped to just that DM's own history, same
-      // as every other channel — but he separately watches #incidents (his
-      // own scripted opener says so), and what he relays out of this DM
-      // goes toward the CEO, the highest-stakes accuracy point in the
-      // scenario. Giving him that channel's real transcript here is what
-      // lets his own live reply push back on / ask the source of a specific
-      // claim that isn't actually backed up, instead of accepting and
-      // relaying it — see groundingContextLine in prompts.ts. Not wired to
-      // any other persona right now, but the mechanism itself is generic.
+      // Cross-channel #incidents grounding. A reply is otherwise scoped to
+      // just its own channel's history — but any persona who is actually
+      // present in the #incidents war room carries what they've seen there
+      // into a reply they give elsewhere (a DM, or any non-incidents
+      // channel). That real transcript is what lets their own live reply
+      // push back on / ask the source of a specific claim that isn't backed
+      // up, instead of accepting and relaying it — see groundingContextLine
+      // in prompts.ts. Presence is roster-driven (CHANNEL_PRESENCE in
+      // roster.ts, presence semantics — deliberately distinct from
+      // relevance.ts's routing shortlist), so every #incidents member
+      // (Derek, Raj, Priya, Marcus) gets the same grounding and none of them
+      // can deny visibility into a channel they're actually in. Was formerly
+      // hardcoded to Derek. Capped at the last 20 messages to bound token
+      // cost now that the transcript reaches more NPC calls (this also caps
+      // Derek, who previously got the full unbounded history).
       const groundingOpts =
-        primary === "derek"
+        channel !== "incidents" && presentInChannel("incidents").includes(primary)
           ? {
               groundingChannelLabel: "#incidents",
               groundingTranscript: get()
                 .messages.filter((m) => m.channel === "incidents")
+                .slice(-20)
                 .map((m) => ({ senderId: m.senderId, content: m.content })),
             }
           : {};
