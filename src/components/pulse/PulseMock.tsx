@@ -484,7 +484,7 @@ export function PulseMock() {
   const cartToCheckout = `${cartToCompletedCheckoutRateAt(clockMinutes, inputs).toFixed(1)}%`;
 
   return (
-    <div className="pixel-scrollbar h-full w-full overflow-y-auto bg-[#f4f1e6] p-4 text-ink">
+    <div className="@container pixel-scrollbar h-full w-full overflow-y-auto bg-[#f4f1e6] p-4 text-ink">
       <div className="mb-3 flex items-center gap-2 font-pixel text-label text-ink-soft">
         <span className="relative flex h-2 w-2">
           <span className="absolute inline-flex h-full w-full animate-ping bg-accent-pulse opacity-75" />
@@ -493,7 +493,10 @@ export function PulseMock() {
         Checkout success rate updates live as the incident unfolds
       </div>
 
-      <div className="mb-4 grid grid-cols-3 gap-3">
+      {/* Stat cards: 2-up until the pulse window is wide enough (@lg = 32rem)
+          for three without crushing the labels; keyed to the window via the
+          @container on the scroll root, not the viewport. */}
+      <div className="mb-4 grid grid-cols-2 gap-3 @lg:grid-cols-3">
         {[
           { label: "Checkout success rate", value: successRate, tone, caption: freshness },
           {

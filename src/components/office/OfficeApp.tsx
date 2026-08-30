@@ -3,15 +3,10 @@
 import { formatSimTime, useSimStore } from "@/store/simStore";
 import { useWindowStore } from "@/store/windowStore";
 import { useTaskflowStore } from "@/store/taskflowStore";
+import { APP_DEFAULT_SIZE } from "@/components/desktop/Desktop";
 import { availableDmContacts, dmChannelId } from "@/lib/sim/dmContacts";
 import type { DmContactId } from "@/lib/sim/types";
 import { ENGINEERS, type Engineer } from "@/lib/sim/worldCanon";
-
-/** Chattr's default window size. Mirrors APP_DEFAULT_SIZE.chattr in Desktop.tsx
- * — duplicated (not imported) to avoid a circular import, since Desktop already
- * imports OfficeApp. Only used when Chattr isn't already open; if it is, the
- * card click just brings the existing window to front and switches its DM. */
-const CHATTR_WINDOW_SIZE = { width: 760, height: 600 };
 
 /** Raj's actual squad of 5 (his prompt establishes "You manage a squad of 5
  * engineers") and each engineer's established work now live in worldCanon.ts,
@@ -198,7 +193,7 @@ function EngineeringRoom() {
     // its DM; if it isn't, it opens centered at the default size.
     openWindow(
       "chattr",
-      CHATTR_WINDOW_SIZE,
+      APP_DEFAULT_SIZE.chattr,
       typeof window !== "undefined" ? window.innerWidth : 1024,
       typeof window !== "undefined" ? window.innerHeight : 640
     );
@@ -206,7 +201,7 @@ function EngineeringRoom() {
   }
 
   return (
-    <div className="flex h-full min-h-0 flex-col">
+    <div className="@container flex h-full min-h-0 flex-col">
       <div className="shrink-0 border-b-2 border-ink bg-white px-3 py-2">
         <div className="font-pixel text-label text-ink">ENGINEERING</div>
         <div className="text-label text-ink-soft">
@@ -215,7 +210,11 @@ function EngineeringRoom() {
             : "Raj's squad of 5, each on their own work."}
         </div>
       </div>
-      <div className="pixel-scrollbar grid min-h-0 flex-1 grid-cols-2 gap-2 overflow-y-auto bg-[#dfd6bd] p-2 content-start">
+      {/* 1-up until the room itself is wide enough for two readable cards
+          (@xs = 20rem/320px) — so when the office window is in its 2-column
+          layout and each room is only ~220px, desk cards stack instead of
+          crushing side by side. */}
+      <div className="pixel-scrollbar grid min-h-0 flex-1 grid-cols-1 gap-2 overflow-y-auto bg-[#dfd6bd] p-2 content-start @xs:grid-cols-2">
         {ENGINEERS.map((eng) => {
           // availableIds holds DmContactIds; an engineer is available only if
           // their id is one, so the cast in onOpen is sound.
@@ -267,7 +266,7 @@ function DesignRoom() {
   function openDesignReview() {
     openWindow(
       "chattr",
-      CHATTR_WINDOW_SIZE,
+      APP_DEFAULT_SIZE.chattr,
       typeof window !== "undefined" ? window.innerWidth : 1024,
       typeof window !== "undefined" ? window.innerHeight : 640
     );
@@ -275,12 +274,12 @@ function DesignRoom() {
   }
 
   return (
-    <div className="flex h-full min-h-0 flex-col">
+    <div className="@container flex h-full min-h-0 flex-col">
       <div className="shrink-0 border-b-2 border-ink bg-white px-3 py-2">
         <div className="font-pixel text-label text-ink">DESIGN</div>
         <div className="text-label text-ink-soft">Maya, on the redesign.</div>
       </div>
-      <div className="pixel-scrollbar grid min-h-0 flex-1 grid-cols-2 gap-2 overflow-y-auto bg-[#dfd6bd] p-2 content-start">
+      <div className="pixel-scrollbar grid min-h-0 flex-1 grid-cols-1 gap-2 overflow-y-auto bg-[#dfd6bd] p-2 content-start @xs:grid-cols-2">
         <DeskCard
           avatar={<GenericAvatar hair="#3a2e28" skin="#c98a5e" accent="#c46fa1" />}
           name="Maya"
@@ -317,19 +316,27 @@ const PLACEHOLDER_ROOMS = ["SALES", "OPS / SUPPORT", "LEGAL"];
  * interactivity, not a place to direct background engineers, not wired to
  * cost/resourcing tradeoffs). */
 export function OfficeApp() {
+  // @container wrapper (not the grid itself): container-query variants read the
+  // nearest ANCESTOR query container, so the responsive grid must live one level
+  // below the element that declares @container. This makes the room columns
+  // track the OFFICE WINDOW width rather than the browser viewport — the whole
+  // point of the resize work (the old `md:grid-cols-2` keyed off the viewport,
+  // so a narrow office window still tried to show two columns).
   return (
-    <div className="pixel-scrollbar grid h-full min-h-0 w-full grid-cols-1 gap-2 overflow-y-auto p-2 md:grid-cols-2">
-      <div className="pixel-border min-h-[300px] overflow-hidden">
-        <EngineeringRoom />
-      </div>
-      <div className="pixel-border min-h-[140px] overflow-hidden">
-        <DesignRoom />
-      </div>
-      {PLACEHOLDER_ROOMS.map((label) => (
-        <div key={label} className="pixel-border min-h-[140px] overflow-hidden">
-          <PlaceholderRoom label={label} />
+    <div className="@container h-full min-h-0 w-full overflow-hidden">
+      <div className="pixel-scrollbar grid h-full min-h-0 w-full grid-cols-1 gap-2 overflow-y-auto p-2 @md:grid-cols-2">
+        <div className="pixel-border min-h-[300px] overflow-hidden">
+          <EngineeringRoom />
         </div>
-      ))}
+        <div className="pixel-border min-h-[140px] overflow-hidden">
+          <DesignRoom />
+        </div>
+        {PLACEHOLDER_ROOMS.map((label) => (
+          <div key={label} className="pixel-border min-h-[140px] overflow-hidden">
+            <PlaceholderRoom label={label} />
+          </div>
+        ))}
+      </div>
     </div>
   );
 }

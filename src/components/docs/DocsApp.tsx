@@ -38,8 +38,10 @@ export function DocsApp() {
     }
 
     return (
-      <div className="pixel-scrollbar h-full min-h-0 w-full overflow-y-auto p-4">
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+      <div className="@container pixel-scrollbar h-full min-h-0 w-full overflow-y-auto p-4">
+        {/* Tile columns track the DOCS WINDOW width, not the viewport: 1-up when
+            very narrow, 2-up past @2xs (18rem), 3-up past @lg (32rem). */}
+        <div className="grid grid-cols-1 gap-3 @2xs:grid-cols-2 @lg:grid-cols-3">
           {tiles.map((d) => (
             <button
               key={d.id}
@@ -71,7 +73,9 @@ export function DocsApp() {
         </button>
       </div>
       <div className="pixel-scrollbar min-h-0 flex-1 overflow-y-auto px-5 py-4 text-body leading-relaxed text-ink">
-        {renderMarkdown(doc.markdown)}
+        {/* Cap line length so a wide docs window doesn't stretch prose to an
+            unreadable measure; centered within the wider column. */}
+        <div className="mx-auto max-w-[65ch]">{renderMarkdown(doc.markdown)}</div>
       </div>
     </div>
   );

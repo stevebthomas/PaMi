@@ -25,7 +25,7 @@ import { restoreSession, startSessionPersistence, resetSession } from "@/lib/sim
 
 export type AppId = "chattr" | "pulse" | "taskflow" | "askClaude" | "reviews" | "notes" | "office" | "docs";
 
-const APP_DEFAULT_SIZE: Record<AppId, { width: number; height: number }> = {
+export const APP_DEFAULT_SIZE: Record<AppId, { width: number; height: number }> = {
   chattr: { width: 760, height: 600 },
   pulse: { width: 700, height: 560 },
   taskflow: { width: 700, height: 560 },
@@ -34,6 +34,22 @@ const APP_DEFAULT_SIZE: Record<AppId, { width: number; height: number }> = {
   notes: { width: 480, height: 520 },
   office: { width: 860, height: 660 },
   docs: { width: 640, height: 600 },
+};
+
+/** Smallest each window may be resized to (see DesktopWindow's resize handle).
+ * Derived from each app's internal reflow: Chattr needs both fixed rails plus a
+ * usable thread; Pulse/Taskflow need their card grids to survive a 2-up
+ * collapse; Office/Docs go single-column at their floor; the simpler apps share
+ * a generic 360x360 minimum. */
+export const APP_MIN_SIZE: Record<AppId, { width: number; height: number }> = {
+  chattr: { width: 540, height: 420 },
+  pulse: { width: 460, height: 400 },
+  taskflow: { width: 480, height: 400 },
+  askClaude: { width: 360, height: 360 },
+  reviews: { width: 360, height: 360 },
+  notes: { width: 360, height: 360 },
+  office: { width: 400, height: 400 },
+  docs: { width: 380, height: 360 },
 };
 
 export function Desktop() {
@@ -171,12 +187,13 @@ export function Desktop() {
             accentClassName="bg-accent-chattr/40"
             headerRight={<DmHeaderBadge />}
             containerRef={containerRef}
+            minSize={APP_MIN_SIZE.chattr}
           >
             <ChattrApp />
           </DesktopWindow>
         )}
         {windows.pulse && (
-          <DesktopWindow id="pulse" title="PULSE" accentClassName="bg-accent-pulse/40" containerRef={containerRef}>
+          <DesktopWindow id="pulse" title="PULSE" accentClassName="bg-accent-pulse/40" containerRef={containerRef} minSize={APP_MIN_SIZE.pulse}>
             <PulseMock />
           </DesktopWindow>
         )}
@@ -186,6 +203,7 @@ export function Desktop() {
             title="ASK CLAUDE"
             accentClassName="bg-accent-help/40"
             containerRef={containerRef}
+            minSize={APP_MIN_SIZE.askClaude}
           >
             <AskClaudeApp />
           </DesktopWindow>
@@ -196,27 +214,28 @@ export function Desktop() {
             title="REVIEWS"
             accentClassName="bg-accent-reviews/40"
             containerRef={containerRef}
+            minSize={APP_MIN_SIZE.reviews}
           >
             <ReviewsApp />
           </DesktopWindow>
         )}
         {windows.notes && (
-          <DesktopWindow id="notes" title="NOTES" accentClassName="bg-accent-notes/40" containerRef={containerRef}>
+          <DesktopWindow id="notes" title="NOTES" accentClassName="bg-accent-notes/40" containerRef={containerRef} minSize={APP_MIN_SIZE.notes}>
             <NotesApp />
           </DesktopWindow>
         )}
         {windows.taskflow && (
-          <DesktopWindow id="taskflow" title="TASKFLOW" accentClassName="bg-accent-taskflow/40" containerRef={containerRef}>
+          <DesktopWindow id="taskflow" title="TASKFLOW" accentClassName="bg-accent-taskflow/40" containerRef={containerRef} minSize={APP_MIN_SIZE.taskflow}>
             <TaskflowApp />
           </DesktopWindow>
         )}
         {windows.office && (
-          <DesktopWindow id="office" title="OFFICE" accentClassName="bg-accent-office/40" containerRef={containerRef}>
+          <DesktopWindow id="office" title="OFFICE" accentClassName="bg-accent-office/40" containerRef={containerRef} minSize={APP_MIN_SIZE.office}>
             <OfficeApp />
           </DesktopWindow>
         )}
         {windows.docs && (
-          <DesktopWindow id="docs" title="DOCS" accentClassName="bg-accent-docs/40" containerRef={containerRef}>
+          <DesktopWindow id="docs" title="DOCS" accentClassName="bg-accent-docs/40" containerRef={containerRef} minSize={APP_MIN_SIZE.docs}>
             <DocsApp />
           </DesktopWindow>
         )}

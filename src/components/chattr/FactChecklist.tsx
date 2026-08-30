@@ -38,7 +38,7 @@ export function FactChecklist() {
   });
 
   return (
-    <div className="pixel-scrollbar flex h-full w-56 shrink-0 flex-col overflow-y-auto border-l-2 border-ink bg-[#dfd6bd] p-3">
+    <div className="pixel-scrollbar hidden h-full w-56 shrink-0 flex-col overflow-y-auto border-l-2 border-ink bg-[#dfd6bd] p-3 @2xl:flex">
       <div className="mb-2 font-pixel text-caption text-ink-soft">WHAT YOU&apos;VE BEEN TOLD</div>
       {groups.length === 0 && <div className="text-label italic text-ink-soft">Nothing yet.</div>}
       {groups.map((group) => (
