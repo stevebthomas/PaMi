@@ -747,6 +747,30 @@ export interface StateBag {
    * himself (see day1-scenario.ts's derek-tradeoff-escalation). Drives a
    * stakeholder-management coaching note/penalty in scorecard.ts. */
   tradeoffEscalatedToDerek: boolean;
+  /** Sim-clock minute the player first engaged Raj substantively on the
+   * incident/tradeoff while it was still undecided — a message in #incidents or
+   * Raj's DM that names an incident/tradeoff noun (see the keyword gate in
+   * sendPlayerMessage) while tradeoffChoice is still null. Gated only on the
+   * incident being knowable (priya-heads-up-dm fired, 8:45), NOT on Raj's 9:38
+   * #incidents tradeoff-offer beat — Raj's live persona routinely surfaces the
+   * rollback/patch options in dm_raj well before that scripted beat, so gating
+   * on it would miss a whole early DM thread. Set once, additively. Null until
+   * then (and forever if the player never engaged). This is what lets Raj's and
+   * Derek's fallback-escalation beats tell "the PM went quiet mid-conversation"
+   * apart from "we never reached the PM at all" — a live DM thread with Raj
+   * makes the flat "couldn't reach you" line false. Plain number|null, so it
+   * round-trips through persistence untouched. */
+  tradeoffEngagedWithRajAtMinutes: number | null;
+  /** Sim-clock minute the player first briefed Derek on the incident — a
+   * substantive message in Derek's DM or the incident thread that actually
+   * recaps what happened / the blast radius (see DEREK_BRIEF_KEYWORDS in
+   * simStore.ts), sent BEFORE his 1:30 recap ask (derek-escalation) fired. Set
+   * once, additively, in sendPlayerMessage. Null until then. Lets Derek's 1:30
+   * ask acknowledge an earlier rundown and just ask to confirm the final
+   * numbers, instead of cold re-asking for a blast radius the player already
+   * delivered. Plain number|null, so it round-trips through persistence
+   * untouched. */
+  derekBriefedOnIncidentAtMinutes: number | null;
   /** Raj's reasoned fallback call (see RajFallbackDecision) when the player
    * never engaged the tradeoff — null until the model call resolves. Drives
    * Derek's relayed escalation text and Raj's #incidents follow-up, and is
@@ -813,6 +837,8 @@ export const initialStateBag: StateBag = {
   tradeoffDecidedAtMinutes: null,
   tradeoffTicketId: null,
   tradeoffEscalatedToDerek: false,
+  tradeoffEngagedWithRajAtMinutes: null,
+  derekBriefedOnIncidentAtMinutes: null,
   rajFallbackDecision: null,
   lateResponseTo: {},
   fixLandedFollowUpsSent: [],

@@ -310,10 +310,18 @@ export const day1ScenarioEvents: ScenarioEvent[] = [
     content:
       "Raj looped me in since he couldn't reach you on the fix call. He made the call himself, we couldn't sit on it. Loop back with me when you're around.",
     contentFor: (state) => {
+      // Only assert "couldn't reach you" when the player genuinely never
+      // engaged Raj on the tradeoff. If they were in an active thread with him
+      // after the offer (tradeoffEngagedWithRajAtMinutes set) but never landed
+      // a decision, the truthful framing is "you went quiet," not "unreachable."
+      const engaged = state.tradeoffEngagedWithRajAtMinutes !== null;
+      const prefix = engaged
+        ? "Raj looped me in on the fix call. You'd gone quiet after you two were talking it through and he couldn't sit on it, so he made the call himself."
+        : "Raj looped me in since he couldn't reach you on the fix call. He made the call himself, we couldn't sit on it.";
       const d = state.rajFallbackDecision;
-      if (!d) return "Raj looped me in since he couldn't reach you on the fix call. He made the call himself, we couldn't sit on it. Loop back with me when you're around.";
+      if (!d) return `${prefix} Loop back with me when you're around.`;
       const label = d.choice === "rollback" ? "the rollback" : "the patch-forward fix";
-      return `Raj looped me in since he couldn't reach you on the fix call. He went with ${label}: ${d.reasoning} Loop back with me when you're around.`;
+      return `${prefix} He went with ${label}: ${d.reasoning} Loop back with me when you're around.`;
     },
     condition: (state) => state.tradeoffChoice === null && state.rajFallbackDecision !== null,
     // Read the choice and timing straight off Raj's decision — no longer a
@@ -361,7 +369,10 @@ export const day1ScenarioEvents: ScenarioEvent[] = [
           }
         : {},
     facts: [
-      "Raj couldn't reach you on the fix call, so he made the call himself and looped Derek in",
+      // Neutral wording, true whether the player went quiet mid-thread or was
+      // never reachable — the contested "couldn't reach you" claim lives only
+      // in contentFor's not-engaged branch, never in this static checklist fact.
+      "Raj made the fix call himself and looped Derek in",
       "Derek relayed which fix Raj chose and why",
     ],
   },
@@ -378,10 +389,18 @@ export const day1ScenarioEvents: ScenarioEvent[] = [
     agentId: "raj",
     channel: "incidents",
     content: "Couldn't reach the PM on the fix call, so I made the call. Starting now.",
-    contentFor: (state) =>
-      state.rajFallbackDecision
-        ? `Couldn't reach the PM on the fix call, so I made the call. ${state.rajFallbackDecision.derekLine}`
-        : "Couldn't reach the PM on the fix call, so I made the call. Starting now.",
+    contentFor: (state) => {
+      // Same truthfulness split as Derek's DM above: "couldn't reach the PM"
+      // only when the player never engaged Raj on this call. If they were in an
+      // active thread with him after his offer but never decided, he says the
+      // PM went quiet, not that he couldn't reach them.
+      const lead =
+        state.tradeoffEngagedWithRajAtMinutes !== null
+          ? "PM went quiet on the fix call and we couldn't wait any longer, so I made the call."
+          : "Couldn't reach the PM on the fix call, so I made the call.";
+      const tail = state.rajFallbackDecision ? state.rajFallbackDecision.derekLine : "Starting now.";
+      return `${lead} ${tail}`;
+    },
     condition: (state) => state.tradeoffChoice === null || state.tradeoffEscalatedToDerek === true,
     facts: ["Raj made the fix call himself and it's underway"],
   },
@@ -454,6 +473,15 @@ export const day1ScenarioEvents: ScenarioEvent[] = [
     // real time.
     content:
       "Saw the incident thread, looks like it's resolved. Can you get me the blast radius and what actually happened? Need it before our afternoon sync with the CEO.",
+    // If the player already briefed Derek on the incident earlier
+    // (derekBriefedOnIncidentAtMinutes set), don't cold re-ask for a blast
+    // radius he already has — acknowledge the earlier rundown and ask only to
+    // confirm the final numbers before the sync. Still requiresResponse either
+    // way, so the deliverable mechanic is unchanged; only the false re-ask goes.
+    contentFor: (state) =>
+      state.derekBriefedOnIncidentAtMinutes !== null
+        ? "Thanks for the earlier rundown on the Apple Pay incident, that's what I needed. Before our afternoon sync with the CEO, can you just confirm the final blast radius numbers so I've got them exact?"
+        : "Saw the incident thread, looks like it's resolved. Can you get me the blast radius and what actually happened? Need it before our afternoon sync with the CEO.",
     requiresResponse: true,
     responseDeadlineMinutes: 20,
     // Derek references the #incidents thread directly, so a summary
@@ -469,6 +497,14 @@ export const day1ScenarioEvents: ScenarioEvent[] = [
     agentId: "derek",
     channel: "dm_derek",
     content: "Still need that recap before the afternoon sync. What happened?",
+    // Keep the chase consistent with whichever version of the ask Derek sent:
+    // if he already had the earlier rundown, he's chasing the number
+    // confirmation, not the whole recap — so it doesn't contradict his own
+    // "thanks for the earlier rundown" line above.
+    contentFor: (state) =>
+      state.derekBriefedOnIncidentAtMinutes !== null
+        ? "Still need those final blast radius numbers confirmed before the afternoon sync."
+        : "Still need that recap before the afternoon sync. What happened?",
     condition: (state) => !("derek-escalation" in state.respondedAtMinutes),
   },
   {
@@ -561,8 +597,20 @@ export const day1ScenarioEvents: ScenarioEvent[] = [
   {
     // Used to fire unconditionally, so total inaction and a well-handled
     // incident produced the identical "CS has the latest guidance" line —
-    // untrue for a player who never gave CS anything. Split into two
-    // mutually-exclusive variants instead of one event with a static string.
+    // untrue for a player who never gave CS anything. Now split into THREE
+    // mutually-exclusive, exhaustive variants keyed purely on the delivered
+    // CS-note state, so the fired narrative can never contradict what the
+    // player actually handed Priya (the bug in scenario-audit-day1.md §11):
+    //   good    → csTemplateProvided                                    (this)
+    //   partial → !csTemplateProvided && attempted (a note, judged weak)
+    //   cold    → !csTemplateProvided && never attempted (no note at all)
+    // The earlier `"priya-incidents-escalation" in respondedAtMinutes`
+    // coupling was dropped from `good`: a genuinely good customer-facing note
+    // is a good note whether or not the player also acked the #incidents
+    // escalation, and none of these three texts asserts anything about that
+    // ack — so keying purely on CS-note state is both simpler and strictly
+    // more truthful. The three conditions below partition every state (good
+    // implies attempted, so it can never overlap partial/cold).
     id: "resolution-good",
     day: 1,
     triggerTimeMinutes: 660, // 11:00 AM
@@ -572,9 +620,43 @@ export const day1ScenarioEvents: ScenarioEvent[] = [
     content:
       "**Resolution update.** Engineering shipped a fix for the Apple Pay webhook. Checkout success rate is back at baseline. CS has the latest guidance. Total incident duration: ~2 hours.",
     facts: ["Fix shipped, checkout success rate back at baseline", "Total incident duration ~2 hours"],
-    condition: (state) => "priya-incidents-escalation" in state.respondedAtMinutes && state.csTemplateProvided,
+    condition: (state) => state.csTemplateProvided,
   },
   {
+    // PARTIAL variant: the player DID send a customer-facing note (attempted),
+    // but the CS-template evaluator judged it weak (not grounded / thin /
+    // overpromising — csTemplateProvided stayed false). Firing the cold
+    // "CS didn't get one from product" line here would flatly contradict a
+    // note the player delivered and Priya's own thread acknowledged, so this
+    // middle beat states what actually happened: a note arrived but needed
+    // cleanup before CS could use it. Attempt-level, matching the obligation
+    // engine's own csTemplateAttemptedAtMinutes gate (dmContacts.ts /
+    // obligations.ts), so system voice and Priya's thread agree. No mood
+    // penalty: the player engaged and delivered something usable-with-work —
+    // milder than the cold path's overwhelmed/frustrated, and there is no
+    // "mildly strained" Priya mood to set truthfully.
+    id: "resolution-partial",
+    day: 1,
+    triggerTimeMinutes: 660, // 11:00 AM
+    eventType: "chattr_message",
+    agentId: "system",
+    channel: "general",
+    content:
+      "**Resolution update.** Engineering shipped a fix for the Apple Pay webhook. Checkout success rate is back at baseline. The customer-facing note you sent needed some cleanup before it was usable, so CS tightened it up on their end to keep the queue moving. Total incident duration: ~2 hours.",
+    facts: [
+      "Fix shipped, checkout success rate back at baseline",
+      "The customer-facing note you sent needed cleanup, so CS tightened it before using it",
+      "Total incident duration ~2 hours",
+    ],
+    condition: (state) => !state.csTemplateProvided && state.csTemplateAttemptedAtMinutes !== null,
+  },
+  {
+    // COLD variant: the player never attempted a customer-facing note at all
+    // (csTemplateAttemptedAtMinutes still null). Only here is "CS wrote their
+    // own holding message since they didn't get one from product" actually
+    // true. Gated on the attempt-level flag (NOT merely !csTemplateProvided)
+    // so a delivered-but-weak note routes to the partial beat above instead of
+    // being falsely narrated as "no note from product."
     id: "resolution-cold",
     day: 1,
     triggerTimeMinutes: 660, // 11:00 AM
@@ -582,9 +664,9 @@ export const day1ScenarioEvents: ScenarioEvent[] = [
     agentId: "system",
     channel: "general",
     content:
-      "**Resolution update.** Raj shipped a fix for the Apple Pay webhook. Checkout success rate is back at baseline. CS wrote their own holding message for customers since they didn't get one from product. Total incident duration: ~2 hours.",
+      "**Resolution update.** Engineering shipped a fix for the Apple Pay webhook. Checkout success rate is back at baseline. CS wrote their own holding message for customers since they didn't get one from product. Total incident duration: ~2 hours.",
     facts: ["Fix shipped, checkout success rate back at baseline", "CS had to write their own customer-facing message", "Total incident duration ~2 hours"],
-    condition: (state) => !("priya-incidents-escalation" in state.respondedAtMinutes) || !state.csTemplateProvided,
+    condition: (state) => !state.csTemplateProvided && state.csTemplateAttemptedAtMinutes === null,
     applyEffect: () => ({ priyaMood: "overwhelmed", rajMood: "frustrated" }),
   },
   {

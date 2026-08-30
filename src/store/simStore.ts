@@ -103,6 +103,28 @@ const CS_TEMPLATE_KEYWORDS =
  * synchronous, deterministic, no model call. */
 const SELLER_COMMS_KEYWORDS = /seller|payout|pay ?out|cadence|delay/i;
 
+/** Terms that mark a message to Derek (his DM) or the incident thread as an
+ * actual incident briefing — a recap of what happened / the blast radius —
+ * rather than off-topic chatter. Used to record derekBriefedOnIncidentAtMinutes
+ * so Derek's 1:30 recap ask can acknowledge an earlier rundown instead of cold
+ * re-asking for something the player already gave him. Deliberately anchored on
+ * the incident's own nouns (Apple Pay / webhook / checkout / the ticket count /
+ * root cause / resolution) so a bare "crazy morning, huh" doesn't count as a
+ * briefing. Same plain-regex style as the matchers above: synchronous,
+ * deterministic, no model call. */
+const DEREK_BRIEF_KEYWORDS =
+  /stripe|apple ?pay|webhook|checkout|blast ?radius|root ?cause|what happened|incident|tickets?|failed payment|success rate|resolved|recap|postmortem|impact|affected/i;
+
+/** Terms that mark a message to Raj (his DM or #incidents) as substantively
+ * about the incident or the rollback-vs-patch-forward fix, so it counts as
+ * engaging him on the call rather than morning small talk. Used to set
+ * tradeoffEngagedWithRajAtMinutes so Raj's and Derek's fallback-escalation
+ * beats don't assert "couldn't reach the PM" when the player was in an active
+ * thread with Raj. Same plain-regex style as the matchers above: synchronous,
+ * deterministic, no model call. */
+const TRADEOFF_ENGAGEMENT_KEYWORDS =
+  /stripe|apple ?pay|checkout|webhook|roll ?back|rollback|patch|payout|fix|tickets?|incident/i;
+
 /** Sim-clock minute at/after which Raj kicks off his own reasoned fallback
  * decision on the fix tradeoff, once his offer has fired and the player still
  * hasn't decided. 605 = 10:05 AM: a point where the player has clearly gone
@@ -888,6 +910,55 @@ export const useSimStore = create<SimState>((set, get) => ({
       MARCUS_PAYOUT_KEYWORDS.test(trimmed)
     ) {
       set((s) => ({ stateBag: { ...s.stateBag, marcusConsultedAtMinutes: playerMsg.sentAtSimMinutes } }));
+    }
+
+    // Tradeoff-engagement signal: the first substantive message the player
+    // sends Raj (his DM or #incidents) about the incident/tradeoff BEFORE any
+    // decision has landed. This is what tells "the PM went quiet
+    // mid-conversation" apart from "we never reached the PM at all" — so Raj's
+    // and Derek's fallback-escalation beats don't assert a flat "couldn't reach
+    // you" when the player was in an active DM thread with Raj about the very
+    // same call. Gated on the incident being knowable (priya-heads-up-dm fired,
+    // 8:45), NOT on Raj's 9:38 scripted tradeoff-offer beat: his live persona
+    // routinely presents the rollback/patch options in dm_raj well before that
+    // beat, and gating on it would miss that whole early thread. A keyword test
+    // over incident/tradeoff nouns (plus the length floor) keeps morning small
+    // talk from counting. Set once, additively — same shape as the Marcus
+    // diligence signal above. Harmless if THIS message turns out to be the
+    // decision itself: the tradeoff evaluator then sets tradeoffChoice non-null
+    // and the escalation beats (gated on tradeoffChoice === null) never fire, so
+    // the flag is moot.
+    if (
+      (channel === "dm_raj" || channel === "incidents") &&
+      get().firedEventIds.has("priya-heads-up-dm") &&
+      get().stateBag.tradeoffChoice === null &&
+      get().stateBag.tradeoffEngagedWithRajAtMinutes === null &&
+      trimmed.length >= 15 &&
+      TRADEOFF_ENGAGEMENT_KEYWORDS.test(trimmed)
+    ) {
+      set((s) => ({ stateBag: { ...s.stateBag, tradeoffEngagedWithRajAtMinutes: playerMsg.sentAtSimMinutes } }));
+    }
+
+    // Derek-briefing signal: the player proactively recaps the incident to
+    // Derek (his DM or the incident thread he later says he read) BEFORE his
+    // 1:30 recap ask fires. This is what lets that ask acknowledge an earlier
+    // rundown ("confirm the final numbers") instead of cold re-asking for a
+    // blast radius the player already delivered and Derek already saw.
+    // Deterministic: a substantive message (same 40-char floor as the CS/seller
+    // detectors) in dm_derek or #incidents, after the incident was declared,
+    // that actually names the incident's own nouns (DEREK_BRIEF_KEYWORDS) so
+    // off-topic chatter doesn't count. Set once, additively; only meaningful
+    // while derek-escalation hasn't fired yet (a briefing after the ask is just
+    // the normal response path, tracked by respondedAtMinutes).
+    if (
+      (channel === "dm_derek" || channel === "incidents") &&
+      get().firedEventIds.has("priya-incidents-escalation") &&
+      !get().firedEventIds.has("derek-escalation") &&
+      get().stateBag.derekBriefedOnIncidentAtMinutes === null &&
+      trimmed.length >= 40 &&
+      DEREK_BRIEF_KEYWORDS.test(trimmed)
+    ) {
+      set((s) => ({ stateBag: { ...s.stateBag, derekBriefedOnIncidentAtMinutes: playerMsg.sentAtSimMinutes } }));
     }
 
     // The postmortem is the player's own closing narrative beat, not a live
