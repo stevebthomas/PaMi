@@ -1247,9 +1247,25 @@ export const useSimStore = create<SimState>((set, get) => ({
     // the same decision as brand new. A single message is only ever in one
     // channel, so this can't double-evaluate; tradeoffChoice === null stays the
     // master guard regardless.
+    //
+    // The readiness gate is raj-diagnosis (9:20 #incidents), NOT the 9:38
+    // raj-tradeoff-offer beat (fix 1c). Raj's live persona routinely surfaces
+    // the rollback/patch options in dm_raj well before the scripted 9:38 offer,
+    // and readily ACCEPTS an explicit early call ("go patch-forward, ping me
+    // when it's live" -> "Got it, pulling Jordan in, will ping you"). Gating on
+    // the 9:38 beat dropped that decision on the floor: tradeoffChoice stayed
+    // null, Raj's 10:05 fallback fired, and the escalation beats announced "PM
+    // went quiet, so I made the call" — flatly contradicting Raj's own on-record
+    // acceptance 50 min earlier. raj-diagnosis is the right threshold: before
+    // 9:20 there's no fix framing at all, so a "decision" would be meaningless;
+    // once Raj has diagnosed, an explicit choice is real and must register.
+    // requestTradeoffEvaluation is still handed the 9:38 offer beat's static
+    // `content` as the classifier's reference framing — that scenario text lays
+    // out both options and is usable for classification whether or not the beat
+    // has fired yet, so an early decision is classified against the same rubric.
     if (
       (channel === "incidents" || channel === "dm_raj") &&
-      get().firedEventIds.has("raj-tradeoff-offer") &&
+      get().firedEventIds.has("raj-diagnosis") &&
       get().stateBag.tradeoffChoice === null
     ) {
       const offerEvent = day1ScenarioEvents.find((e) => e.id === "raj-tradeoff-offer");

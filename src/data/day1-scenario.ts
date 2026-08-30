@@ -32,6 +32,22 @@ function consultedMarcusInTime(state: StateBag): boolean {
   );
 }
 
+/** Raj's 9:38 rollback-vs-patch offer text. Extracted to a const so it stays the
+ * single source of truth for BOTH the scripted beat's static `content` (also the
+ * reference framing handed to the tradeoff classifier in simStore) and the
+ * undecided fallback branch of that beat's contentFor — the two can't drift. */
+const RAJ_TRADEOFF_OFFER_CONTENT =
+  "Ok, two ways to fix this and honestly neither is clean. (1) Roll back payment-service to before last week's payout-speed update. That reverts to the old webhook retry logic, which we know doesn't hit this Stripe flakiness, so it's the sure thing, maybe 10 min. Catch is it pulls last week's faster seller payouts, and I don't have the numbers on who's mid-cycle right now. That's Priya's read, not mine. (2) Patch the retry/idempotency handling in place and keep payout speed. More like 30 min. My honest catch here: I haven't been able to reproduce the exact Stripe failure, so I can't promise the patch fully covers it on the first ship. Might hold, might need a second pass. Which way do you want to go?";
+
+/** Priya's 9:42 seller-payout heads-up, undecided-state text. Extracted to a
+ * const so the priya-seller-payout-flag beat's static `content` and the still-
+ * undecided fallback branch of its contentFor stay the single same source (same
+ * anti-drift reason as RAJ_TRADEOFF_OFFER_CONTENT above). The "...if that'd help
+ * you decide" tail only makes sense while the call is still open; once a decision
+ * is on the record, contentFor recasts her flag as reacting to the made call. */
+const PRIYA_SELLER_PAYOUT_FLAG_CONTENT =
+  "Saw Raj's rollback option. Flagging early so it's not a surprise: that faster-payout change is something my sellers actually noticed. I've got people who moved their own cash flow around it. A rollback puts them back on the old cadence. Not telling you which way to go, just want a heads up before it happens so I can get ahead of the seller tickets. I can pull the exact count of who's affected if that'd help you decide.";
+
 /**
  * Day 1 (Monday) scripted timeline: the payment gateway incident.
  * These are the fixed, system-authored beats. On top of this, any player
@@ -200,8 +216,28 @@ export const day1ScenarioEvents: ScenarioEvent[] = [
     // still resolves at 11:00 either way. The uncertainty here is
     // decision-TIME uncertainty, which is what makes the call hard without
     // changing the graded-handling-not-choice contract.
-    content:
-      "Ok, two ways to fix this and honestly neither is clean. (1) Roll back payment-service to before last week's payout-speed update. That reverts to the old webhook retry logic, which we know doesn't hit this Stripe flakiness, so it's the sure thing, maybe 10 min. Catch is it pulls last week's faster seller payouts, and I don't have the numbers on who's mid-cycle right now. That's Priya's read, not mine. (2) Patch the retry/idempotency handling in place and keep payout speed. More like 30 min. My honest catch here: I haven't been able to reproduce the exact Stripe failure, so I can't promise the patch fully covers it on the first ship. Might hold, might need a second pass. Which way do you want to go?",
+    content: RAJ_TRADEOFF_OFFER_CONTENT,
+    // If the player already made the call before this 9:38 beat lands (Raj's
+    // live persona surfaces and accepts the rollback/patch choice well before
+    // the scripted offer — see the raj-diagnosis-gated tradeoff evaluator in
+    // simStore), re-asking "which way do you want to go?" would be a false
+    // re-ask that contradicts a decision already on the record (same class as
+    // fix 1a's derek re-ask). So render Raj CONFIRMING the already-made call
+    // in-channel for the record instead. The beat still fires (its facts[]
+    // carry the rollback/patch options into the UI checklist either way), and
+    // the static `content` above stays the classifier's reference framing. Only
+    // the player-decision path can reach this branch at 9:38: the Raj-fallback
+    // decision doesn't land until ~10:05-10:20, so tradeoffChoice is still null
+    // here on that path and the normal offer renders.
+    contentFor: (state) => {
+      if (state.tradeoffChoice === "rollback") {
+        return "Logging this in the channel for the record: we're rolling back payment-service to before last week's payout-speed update. Known-good fix, about 10 min, Jordan and Chen are on it. It does pull last week's faster seller payouts, so that's a seller-comms thing for Priya to get ahead of.";
+      }
+      if (state.tradeoffChoice === "patch-forward") {
+        return "Logging this in the channel for the record: we're going patch-forward and keeping payout speed. Jordan and Chen are on the retry/idempotency fix now, roughly 30 min. Same honest caveat I gave you: I couldn't reproduce the exact Stripe failure, so it might need a second pass. I'll flag fast if it does.";
+      }
+      return RAJ_TRADEOFF_OFFER_CONTENT;
+    },
     facts: [
       "Rollback: ~10 min, known-good fix (old retry logic doesn't hit the Stripe flakiness), but reverts last week's faster seller payouts",
       "Patch-forward: ~30 min, keeps seller payout speed, but Raj can't confirm it fully covers the failure on the first ship (he hasn't reproduced the exact Stripe failure)",
@@ -225,8 +261,25 @@ export const day1ScenarioEvents: ScenarioEvent[] = [
     eventType: "chattr_message",
     agentId: "priya",
     channel: "incidents",
-    content:
-      "Saw Raj's rollback option. Flagging early so it's not a surprise: that faster-payout change is something my sellers actually noticed. I've got people who moved their own cash flow around it. A rollback puts them back on the old cadence. Not telling you which way to go, just want a heads up before it happens so I can get ahead of the seller tickets. I can pull the exact count of who's affected if that'd help you decide.",
+    content: PRIYA_SELLER_PAYOUT_FLAG_CONTENT,
+    // Fix 1c-follow-up (same false-re-ask class as raj-tradeoff-offer). This
+    // beat is unconditional at 9:42, so when the player made the fix call early
+    // (Raj's raj-diagnosis-gated evaluator registers it before 9:38), Priya's
+    // "...if that'd help you decide" would land AFTER the decision is on the
+    // record — offering to size a choice already made. So recast her flag to
+    // react to the made call. facts[] stay as-is: the rollback-consequence facts
+    // are true background either way (they describe what a rollback WOULD do).
+    // The Raj-fallback decision doesn't land until ~10:05-10:20, so on that path
+    // tradeoffChoice is still null here at 9:42 and the undecided flag renders.
+    contentFor: (state) => {
+      if (state.tradeoffChoice === "patch-forward") {
+        return "Saw the call land, patch-forward it is. That keeps payout speed live for my sellers, so they stay on the faster cadence and I don't need anything from you on the seller side. One thing: if this turns into a rollback after all, flag me first so I can get ahead of the seller tickets before they start landing.";
+      }
+      if (state.tradeoffChoice === "rollback") {
+        return "Saw the call, we're rolling back. That puts my fast-track sellers back on the old, slower cadence, and some of them planned their cash flow around last week's faster payouts. I'm getting ahead of the seller tickets now so it doesn't blindside them. I can pull the exact count of who's affected so we know how big the seller comms need to be, want me to grab it?";
+      }
+      return PRIYA_SELLER_PAYOUT_FLAG_CONTENT;
+    },
     facts: [
       "A rollback pushes affected sellers back to the old, slower payout cadence",
       "Some sellers have already planned their cash flow around last week's faster payouts",
