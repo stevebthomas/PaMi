@@ -406,11 +406,18 @@ function PaymentMethodBreakdown({ rows, freshness }: { rows: PaymentMethodBreakd
         {rows.map((r) => {
           const attempts = Math.round(r.share * totalToday);
           const degraded = r.successRate < BASELINE_RATE - 0.05;
+          // No attempts yet today means the rate curve's number isn't backed
+          // by any real volume — show a neutral dash instead of asserting a
+          // rate over zero data (QA finding #13: "Apple Pay · 0 attempts ·
+          // 98.8%" read as a fabricated stat).
+          const hasAttempts = attempts > 0;
           return (
             <div key={r.method} className="flex items-center gap-2 text-[11px]">
               <div className="w-20 text-ink-soft">{r.method}</div>
               <div className="flex-1 text-ink-soft">{formatAttemptCount(attempts)} attempts</div>
-              <div className={`font-pixel ${degraded ? "text-accent-danger" : "text-accent-pulse"}`}>{r.successRate.toFixed(1)}%</div>
+              <div className={`font-pixel ${hasAttempts && degraded ? "text-accent-danger" : "text-accent-pulse"}`}>
+                {hasAttempts ? `${r.successRate.toFixed(1)}%` : "—"}
+              </div>
             </div>
           );
         })}

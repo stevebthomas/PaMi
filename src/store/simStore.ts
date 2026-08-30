@@ -246,6 +246,12 @@ interface SimState {
   clockMinutes: number;
   started: boolean;
   dayComplete: boolean;
+  /** Whether the player has dismissed the full-screen DayScorecard overlay
+   * for the current dayComplete. Persisted alongside dayComplete (see
+   * sessionPersistence.ts) so reloading a completed day doesn't re-show the
+   * overlay and eat StatusBar clicks (QA finding #12b) — it was previously
+   * component-local state in Desktop.tsx that reset to false on every mount. */
+  scorecardDismissed: boolean;
   messages: Message[];
   stateBag: StateBag;
   firedEventIds: Set<string>;
@@ -303,6 +309,7 @@ interface SimState {
   setNotesText: (text: string) => void;
   setDifficulty: (difficulty: Difficulty) => void;
   setPlayerName: (name: string) => void;
+  dismissScorecard: () => void;
 }
 
 // Alias, not a reimplementation: formatSimClock in timeOfDay.ts is the
@@ -580,6 +587,7 @@ export const useSimStore = create<SimState>((set, get) => ({
   clockMinutes: 510,
   started: false,
   dayComplete: false,
+  scorecardDismissed: false,
   messages: [],
   stateBag: { ...initialStateBag },
   firedEventIds: new Set(),
@@ -1883,6 +1891,7 @@ export const useSimStore = create<SimState>((set, get) => ({
   setNotesText: (text) => set({ notesText: text }),
   setDifficulty: (difficulty) => set({ difficulty }),
   setPlayerName: (name) => set((s) => ({ stateBag: { ...s.stateBag, playerName: name.trim() } })),
+  dismissScorecard: () => set({ scorecardDismissed: true }),
 }));
 
 export { formatSimTime };

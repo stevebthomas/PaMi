@@ -47,9 +47,13 @@ export function Desktop() {
   // effect below. A brief neutral first frame is the accepted cost; a resuming
   // player never sees the onboarding screen flash (loading -> desktop directly).
   const [phase, setPhase] = useState<"loading" | "onboarding" | "desktop">("loading");
-  const [scorecardDismissed, setScorecardDismissed] = useState(false);
   const startDay = useSimStore((s) => s.startDay);
   const dayComplete = useSimStore((s) => s.dayComplete);
+  // Persisted (not component-local) so reloading a completed day doesn't
+  // re-render the full-screen DayScorecard overlay and eat StatusBar clicks
+  // (QA finding #12b) — see scorecardDismissed in simStore.ts.
+  const scorecardDismissed = useSimStore((s) => s.scorecardDismissed);
+  const dismissScorecard = useSimStore((s) => s.dismissScorecard);
   const day = useSimStore((s) => s.day);
   const clockMinutes = useSimStore((s) => s.clockMinutes);
   const windows = useWindowStore((s) => s.windows);
@@ -220,7 +224,7 @@ export function Desktop() {
 
       <Taskbar openApps={openApps} onSelectApp={handleSelectApp} />
 
-      {dayComplete && !scorecardDismissed && <DayScorecard onClose={() => setScorecardDismissed(true)} />}
+      {dayComplete && !scorecardDismissed && <DayScorecard onClose={dismissScorecard} />}
     </div>
   );
 }

@@ -1,20 +1,40 @@
 import { useState, type KeyboardEvent } from "react";
-import { CHANNELS } from "@/lib/sim/types";
+import { CHANNELS, type ChannelId } from "@/lib/sim/types";
 import { useSimStore } from "@/store/simStore";
+import { dmContactForChannel } from "@/lib/sim/dmContacts";
 
 export function MessageInput() {
-  const [value, setValue] = useState("");
+  // Per-channel drafts: keyed by ChannelId so switching channels shows that
+  // channel's own in-progress text instead of one draft shared across every
+  // channel/DM (see QA finding #10). Deliberately component state, NOT added
+  // to persisted session state — a draft dying on refresh is accepted.
+  const [drafts, setDrafts] = useState<Partial<Record<ChannelId, string>>>({});
   const activeChannel = useSimStore((s) => s.activeChannel);
   const sendPlayerMessage = useSimStore((s) => s.sendPlayerMessage);
   const pendingReplyFrom = useSimStore((s) => s.pendingReplyFrom);
 
-  const channelLabel = CHANNELS.find((c) => c.id === activeChannel)?.label ?? activeChannel;
+  const value = drafts[activeChannel] ?? "";
+
+  function setValue(next: string) {
+    setDrafts((prev) => ({ ...prev, [activeChannel]: next }));
+  }
+
+  // Resolve the placeholder the same way ChannelList/DmHeaderBadge do:
+  // static CHANNELS first, then the registry DM contact (Jordan/Chen/Marcus),
+  // then the raw channel id only as a last resort (see QA finding #11).
+  // dmContactForChannel is a plain id lookup (not availability-gated), so no
+  // extra store subscription is needed to keep this reactive.
+  const channelLabel =
+    CHANNELS.find((c) => c.id === activeChannel)?.label ??
+    dmContactForChannel(activeChannel)?.name ??
+    activeChannel;
 
   async function handleSend() {
     if (!value.trim() || pendingReplyFrom) return;
     const toSend = value;
-    setValue("");
-    await sendPlayerMessage(activeChannel, toSend);
+    const sendChannel = activeChannel;
+    setDrafts((prev) => ({ ...prev, [sendChannel]: "" }));
+    await sendPlayerMessage(sendChannel, toSend);
   }
 
   function handleKeyDown(e: KeyboardEvent<HTMLTextAreaElement>) {

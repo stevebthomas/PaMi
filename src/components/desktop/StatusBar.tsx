@@ -31,6 +31,12 @@ export function StatusBar() {
   // it's true either from a real postmortem submission or the hard
   // end-of-day cutoff in advanceClock, and "+15m" should stop either way.
   const dayComplete = useSimStore((s) => s.dayComplete);
+  // While an NPC reply is in flight, +15m can race sendPlayerMessage's own
+  // awaits (see the pendingReplyFrom/pendingReplyChannel comment in
+  // simStore.ts) — disable it the same way MessageInput's Send button
+  // already does (QA finding #12c).
+  const pendingReplyFrom = useSimStore((s) => s.pendingReplyFrom);
+  const skipDisabled = dayComplete || Boolean(pendingReplyFrom);
 
   return (
     <div className="flex h-9 shrink-0 items-center justify-between border-b-2 border-ink bg-bg-taskbar px-3">
@@ -44,12 +50,18 @@ export function StatusBar() {
           {difficulty === "easy" ? "EASY" : "STANDARD"}
         </button>
         <button
-          onClick={() => !dayComplete && advanceClock(15)}
-          disabled={dayComplete}
+          onClick={() => !skipDisabled && advanceClock(15)}
+          disabled={skipDisabled}
           className={`pixel-border bg-bg-window px-2 py-1 text-[9px] font-pixel text-ink ${
-            dayComplete ? "cursor-not-allowed opacity-40" : "hover:-translate-y-0.5"
+            skipDisabled ? "cursor-not-allowed opacity-40" : "hover:-translate-y-0.5"
           }`}
-          title={dayComplete ? "Day 1 is over." : "Nothing to do right now? Skip ahead 15 simulated minutes."}
+          title={
+            dayComplete
+              ? "Day 1 is over."
+              : pendingReplyFrom
+                ? "Waiting on a reply…"
+                : "Nothing to do right now? Skip ahead 15 simulated minutes."
+          }
         >
           ⏭ +15m
         </button>

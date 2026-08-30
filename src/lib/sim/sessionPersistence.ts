@@ -70,6 +70,7 @@ interface SessionSnapshot {
     clockMinutes: number;
     started: boolean;
     dayComplete: boolean;
+    scorecardDismissed: boolean;
     messages: Message[];
     stateBag: StateBag;
     evaluations: Record<string, Evaluation>;
@@ -110,6 +111,7 @@ function buildSnapshot(): SessionSnapshot {
       clockMinutes: sim.clockMinutes,
       started: sim.started,
       dayComplete: sim.dayComplete,
+      scorecardDismissed: sim.scorecardDismissed,
       messages: sim.messages,
       stateBag: sim.stateBag,
       evaluations: sim.evaluations,
@@ -255,6 +257,7 @@ export function restoreSession(): boolean {
       clockMinutes: s.clockMinutes,
       started: s.started,
       dayComplete: s.dayComplete,
+      scorecardDismissed: s.scorecardDismissed ?? false,
       messages: s.messages ?? [],
       // Merge over initialStateBag so an older snapshot missing a
       // later-added StateBag field still gets that field's default rather than
