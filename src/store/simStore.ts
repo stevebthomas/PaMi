@@ -26,6 +26,7 @@ import {
   buildFixLandedFollowUp,
   buildObligationMessageContent,
   dmChannelId,
+  type DmContact,
 } from "@/lib/sim/dmContacts";
 import {
   recordFixDecisionAck,
@@ -155,6 +156,29 @@ export const ASK_CLAUDE_OPENER =
  * fix engineer needs no change here, and so it can't drift from the follow-up
  * block's own `role !== "adjacent"` filter. */
 const FIX_ENGINEER_AGENT_IDS = DM_CONTACTS.filter((c) => c.role !== "adjacent").map((c) => c.agentId);
+
+/**
+ * The single fix engineer responsible for the guaranteed "fix landed" ping when
+ * the player never DMed a fix engineer directly — i.e. the promise was made
+ * through Raj ("I'll have Jordan ping you"), or Raj made the fix call himself on
+ * the fallback path. Prefers the Taskflow fix-ticket assignee IF the player put
+ * a real fix engineer (jordan/chen) on the ticket; otherwise the engineer the
+ * narrative put on the fix (the registry lead, Jordan). Returns a registry DM
+ * contact so the ping reuses buildFixLandedFollowUp + the follow-up block's own
+ * delivery / fixLandedFollowUpsSent / commitment-settle machinery unchanged, and
+ * lands in that engineer's own DM (whose availability is already open once a fix
+ * path exists). Returns null only if no fix engineer is registered at all (can't
+ * happen with the current DM_CONTACTS) — the caller then sends nothing rather
+ * than inventing a sender, since Raj is not a registry DM contact. */
+function resolveResponsibleFixEngineer(tradeoffTicketId: string | null): DmContact | null {
+  const engineers = DM_CONTACTS.filter((c) => c.role !== "adjacent");
+  const assigneeId = tradeoffTicketId
+    ? (useTaskflowStore.getState().tickets.find((t) => t.id === tradeoffTicketId)?.assigneeId ?? null)
+    : null;
+  const assigned = assigneeId ? engineers.find((c) => c.agentId === assigneeId) : undefined;
+  if (assigned) return assigned;
+  return engineers.find((c) => c.role === "lead") ?? engineers[0] ?? null;
+}
 
 let idCounter = 0;
 function makeId(prefix: string): string {
@@ -683,7 +707,7 @@ export const useSimStore = create<SimState>((set, get) => ({
         // A contact is due iff the player DMed them at or before the real
         // landing minute (so a contact first DMed AFTER landing gets no
         // retroactive ping) and hasn't already been sent one.
-        const due = DM_CONTACTS.filter(
+        let due = DM_CONTACTS.filter(
           (c) =>
             // Only the incident-fix engineers ping when the fix lands. Marcus
             // (role "adjacent") is on the payout pipeline, never the fix, so he
@@ -694,6 +718,27 @@ export const useSimStore = create<SimState>((set, get) => ({
               (m) => m.senderId === "player" && m.channel === dmChannelId(c.id) && m.sentAtSimMinutes <= landedAt
             )
         );
+        // Guaranteed delivery (QA #3). The filter above only pings a fix
+        // engineer the player DMed DIRECTLY before landing. But the promised
+        // ping is very often made THROUGH Raj ("go patch-forward, ping me the
+        // moment it's live" -> "Got it, I'll have Jordan ping you") entirely in
+        // Raj's DM, with Jordan/Chen's own DMs never opened — and on the
+        // Raj-fallback path the player was absent for the decision altogether.
+        // In both cases the direct-DM filter is empty and the promise would drop
+        // silently (the live repro: Jordan's DM stayed empty, no ping ever
+        // arrived). So when nothing is due directly, fall back to a single ping
+        // from the engineer actually on the fix (the Taskflow assignee if the
+        // player put a real fix engineer on the ticket, else the narrative lead
+        // Jordan), delivered in that engineer's own DM. Still one-time (the
+        // alreadySent guard) and still only after real landing (the whole block
+        // is gated on timeline.landedAt !== null), and additive to Raj's
+        // #incidents all-clear, never a replacement for it.
+        if (due.length === 0) {
+          const responsible = resolveResponsibleFixEngineer(sb.tradeoffTicketId);
+          if (responsible && !alreadySent.includes(responsible.id)) {
+            due = [responsible];
+          }
+        }
         if (due.length > 0) {
           const followUps: Message[] = due.map((c) => ({
             id: makeId("msg"),
