@@ -12,14 +12,14 @@ export function NotesApp() {
 
   return (
     <div className="flex h-full min-h-0 w-full flex-col">
-      <div className="shrink-0 border-b-2 border-ink bg-accent-notes/40 px-3 py-1.5 text-[10px] text-ink-soft">
+      <div className="shrink-0 border-b-2 border-ink bg-accent-notes/40 px-3 py-1.5 text-label text-ink-soft">
         Private. Only you see this
       </div>
       <textarea
         value={notesText}
         onChange={(e) => setNotesText(e.target.value)}
         placeholder="Jot down whatever you want to remember as the day unfolds…"
-        className="pixel-notes-paper pixel-scrollbar h-full min-h-0 w-full flex-1 resize-none px-3 py-2 text-sm leading-6 text-ink outline-none"
+        className="pixel-notes-paper pixel-scrollbar h-full min-h-0 w-full flex-1 resize-none px-3 py-2 text-body leading-6 text-ink outline-none"
       />
     </div>
   );

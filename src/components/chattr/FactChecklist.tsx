@@ -39,14 +39,14 @@ export function FactChecklist() {
 
   return (
     <div className="pixel-scrollbar flex h-full w-56 shrink-0 flex-col overflow-y-auto border-l-2 border-ink bg-[#dfd6bd] p-3">
-      <div className="mb-2 font-pixel text-[9px] text-ink-soft">WHAT YOU&apos;VE BEEN TOLD</div>
-      {groups.length === 0 && <div className="text-[11px] italic text-ink-soft">Nothing yet.</div>}
+      <div className="mb-2 font-pixel text-caption text-ink-soft">WHAT YOU&apos;VE BEEN TOLD</div>
+      {groups.length === 0 && <div className="text-label italic text-ink-soft">Nothing yet.</div>}
       {groups.map((group) => (
         <div key={group.agentId} className="mb-3">
-          <div className="mb-1 text-[11px] font-semibold text-ink">{AGENT_NAMES[group.agentId]}</div>
+          <div className="mb-1 text-label font-semibold text-ink">{AGENT_NAMES[group.agentId]}</div>
           <ul className="space-y-1">
             {group.rows.map((row, i) => (
-              <li key={i} className="flex items-start gap-1.5 text-[11px] leading-snug text-ink">
+              <li key={i} className="flex items-start gap-1.5 text-label leading-snug text-ink">
                 <span className="mt-0.5">{row.checked ? "☑" : "☐"}</span>
                 <span className={row.checked ? "text-ink-soft line-through" : ""}>{row.text}</span>
               </li>

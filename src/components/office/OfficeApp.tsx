@@ -57,7 +57,7 @@ function GenericAvatar({ hair, skin, accent }: { hair: string; skin: string; acc
 function AvailabilityBadge({ available }: { available: boolean }) {
   return (
     <span
-      className={`shrink-0 rounded px-1.5 py-0.5 text-[9px] font-pixel leading-none ${
+      className={`shrink-0 rounded px-1.5 py-0.5 text-caption font-pixel leading-none ${
         available ? "bg-[#5fae6f] text-white" : "bg-black/10 text-ink-soft"
       }`}
     >
@@ -117,7 +117,7 @@ function DeskCard({
             : undefined
         }
         title={titleOverride ?? (available ? `Message ${name} in Chattr` : `${name} is heads down`)}
-        className={`pixel-border flex items-start gap-2 bg-white p-2 text-xs text-ink ${
+        className={`pixel-border flex items-start gap-2 bg-white p-2 text-label text-ink ${
           available ? "cursor-pointer hover:bg-[#f4f0e4]" : "cursor-default"
         }`}
       >
@@ -133,7 +133,7 @@ function DeskCard({
 
       {/* Hover overlay — full text + timestamp, no clamp, no reflow. */}
       <div className="pointer-events-none absolute left-0 top-0 z-30 hidden w-full group-hover:block">
-        <div className="pixel-border flex items-start gap-2 bg-white p-2 text-xs text-ink shadow-[6px_6px_0_rgba(0,0,0,0.35)]">
+        <div className="pixel-border flex items-start gap-2 bg-white p-2 text-label text-ink shadow-[6px_6px_0_rgba(0,0,0,0.35)]">
           {avatar}
           <div className="min-w-0 flex-1">
             <div className="font-semibold leading-snug">{name}</div>
@@ -141,7 +141,7 @@ function DeskCard({
               <AvailabilityBadge available={available} />
             </div>
             <div className="leading-snug text-ink-soft">{task}</div>
-            <div className="mt-1 font-pixel text-[9px] text-ink-soft">{timestamp}</div>
+            <div className="mt-1 font-pixel text-caption text-ink-soft">{timestamp}</div>
           </div>
         </div>
       </div>
@@ -208,8 +208,8 @@ function EngineeringRoom() {
   return (
     <div className="flex h-full min-h-0 flex-col">
       <div className="shrink-0 border-b-2 border-ink bg-white px-3 py-2">
-        <div className="font-pixel text-[10px] text-ink">ENGINEERING</div>
-        <div className="text-[10px] text-ink-soft">
+        <div className="font-pixel text-label text-ink">ENGINEERING</div>
+        <div className="text-label text-ink-soft">
           {incidentResolved
             ? "Raj's squad. Jordan and Chen pulled onto the incident fix, the rest untouched."
             : "Raj's squad of 5, each on their own work."}
@@ -277,8 +277,8 @@ function DesignRoom() {
   return (
     <div className="flex h-full min-h-0 flex-col">
       <div className="shrink-0 border-b-2 border-ink bg-white px-3 py-2">
-        <div className="font-pixel text-[10px] text-ink">DESIGN</div>
-        <div className="text-[10px] text-ink-soft">Maya, on the redesign.</div>
+        <div className="font-pixel text-label text-ink">DESIGN</div>
+        <div className="text-label text-ink-soft">Maya, on the redesign.</div>
       </div>
       <div className="pixel-scrollbar grid min-h-0 flex-1 grid-cols-2 gap-2 overflow-y-auto bg-[#dfd6bd] p-2 content-start">
         <DeskCard
@@ -302,8 +302,8 @@ function DesignRoom() {
 function PlaceholderRoom({ label }: { label: string }) {
   return (
     <div className="flex h-full min-h-0 flex-col items-center justify-center gap-2 bg-[#dfd6bd] p-4 text-center">
-      <div className="font-pixel text-[10px] text-ink-soft">{label}</div>
-      <div className="pixel-border bg-white px-3 py-1.5 text-[10px] text-ink-soft">Work in progress</div>
+      <div className="font-pixel text-label text-ink-soft">{label}</div>
+      <div className="pixel-border bg-white px-3 py-1.5 text-label text-ink-soft">Work in progress</div>
     </div>
   );
 }

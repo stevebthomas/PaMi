@@ -84,8 +84,8 @@ export function HROrientationChat() {
       <div className="flex items-center gap-2 border-b-2 border-ink bg-accent-chattr/40 px-3 py-2">
         <PixelAvatar agentId="sam" sizeClassName="h-7 w-7" />
         <div>
-          <div className="font-pixel text-[10px] text-ink">SAM</div>
-          <div className="text-[10px] text-ink-soft">{AGENT_TITLES.sam}</div>
+          <div className="font-pixel text-label text-ink">SAM</div>
+          <div className="text-label text-ink-soft">{AGENT_TITLES.sam}</div>
         </div>
       </div>
 
@@ -94,15 +94,15 @@ export function HROrientationChat() {
           <div key={m.id} className="mb-3 flex gap-2">
             <PixelAvatar agentId={m.senderId} sizeClassName="h-8 w-8" />
             <div className="min-w-0">
-              <div className="text-sm font-semibold text-ink">
+              <div className="text-body font-semibold text-ink">
                 {m.senderId === "sam" ? "Sam" : "You"}
               </div>
-              <p className="whitespace-pre-wrap text-sm leading-snug text-ink">{m.content}</p>
+              <p className="whitespace-pre-wrap text-body leading-snug text-ink">{m.content}</p>
             </div>
           </div>
         ))}
         {pending && (
-          <div className="mb-3 flex items-center gap-2 text-xs italic text-ink-soft">
+          <div className="mb-3 flex items-center gap-2 text-label italic text-ink-soft">
             <PixelAvatar agentId="sam" sizeClassName="h-6 w-6" />
             <div className="pixel-border flex items-center bg-white px-2 py-1.5">
               <TypingDots />
@@ -119,12 +119,12 @@ export function HROrientationChat() {
           onKeyDown={handleKeyDown}
           rows={2}
           placeholder="Ask Sam anything…"
-          className="pixel-border flex-1 resize-none bg-white px-2 py-1.5 text-sm text-ink outline-none"
+          className="pixel-border flex-1 resize-none bg-white px-2 py-1.5 text-body text-ink outline-none"
         />
         <button
           onClick={handleSend}
           disabled={!value.trim() || pending}
-          className="pixel-border bg-accent-chattr px-3 py-2 text-xs font-pixel text-white disabled:cursor-not-allowed disabled:opacity-40"
+          className="pixel-border bg-accent-chattr px-3 py-2 text-label font-pixel text-white disabled:cursor-not-allowed disabled:opacity-40"
         >
           Send
         </button>

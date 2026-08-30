@@ -30,7 +30,7 @@ export function DocsApp() {
     if (tiles.length === 0) {
       return (
         <div className="flex h-full min-h-0 w-full items-center justify-center p-6">
-          <p className="text-sm text-ink-soft">
+          <p className="text-body text-ink-soft">
             No documents yet. Files people send you will show up here.
           </p>
         </div>
@@ -51,7 +51,7 @@ export function DocsApp() {
               className="pixel-border flex flex-col items-center gap-2 bg-white px-2 py-3 text-center hover:-translate-y-0.5"
             >
               <AppIcon id="docs" sizeClassName="h-8 w-8" />
-              <span className="text-[11px] text-ink">{d.filename}</span>
+              <span className="text-label text-ink">{d.filename}</span>
             </button>
           ))}
         </div>
@@ -65,12 +65,12 @@ export function DocsApp() {
         <button
           type="button"
           onClick={closeDoc}
-          className="pixel-border bg-white px-2 py-1 text-[11px] text-ink hover:-translate-y-0.5"
+          className="pixel-border bg-white px-2 py-1 text-label text-ink hover:-translate-y-0.5"
         >
           ← Library
         </button>
       </div>
-      <div className="pixel-scrollbar min-h-0 flex-1 overflow-y-auto px-5 py-4 text-sm leading-relaxed text-ink">
+      <div className="pixel-scrollbar min-h-0 flex-1 overflow-y-auto px-5 py-4 text-body leading-relaxed text-ink">
         {renderMarkdown(doc.markdown)}
       </div>
     </div>
@@ -146,7 +146,7 @@ function renderMarkdown(markdown: string): ReactNode {
     if (line.startsWith("## ")) {
       flushParagraph();
       blocks.push(
-        <h2 key={`b${blocks.length}`} className="mb-2 mt-4 font-pixel text-sm text-ink">
+        <h2 key={`b${blocks.length}`} className="mb-2 mt-4 font-pixel text-body text-ink">
           {renderInline(line.slice(3))}
         </h2>
       );
@@ -156,7 +156,7 @@ function renderMarkdown(markdown: string): ReactNode {
     if (line.startsWith("# ")) {
       flushParagraph();
       blocks.push(
-        <h1 key={`b${blocks.length}`} className="mb-3 font-pixel text-base text-ink">
+        <h1 key={`b${blocks.length}`} className="mb-3 font-pixel text-subheading text-ink">
           {renderInline(line.slice(2))}
         </h1>
       );

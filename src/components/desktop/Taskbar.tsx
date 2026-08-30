@@ -47,13 +47,13 @@ export function Taskbar({
             <div className={`relative ${app.id === "docs" && docsLaunching ? "animate-dock-bounce" : ""}`}>
               <AppIcon id={app.id} sizeClassName="h-9 w-9" />
               {app.id === "chattr" && pendingCount > 0 && (
-                <span className="absolute -right-1.5 -top-1.5 flex h-4 min-w-4 items-center justify-center border-2 border-ink bg-accent-danger px-1 text-[9px] leading-none text-white">
+                <span className="absolute -right-1.5 -top-1.5 flex h-4 min-w-4 items-center justify-center border-2 border-ink bg-accent-danger px-1 text-caption leading-none text-white">
                   {pendingCount}
                 </span>
               )}
             </div>
             <div className={`h-1 w-1 rounded-none ${openApps.has(app.id) ? "bg-ink-soft" : "bg-transparent"}`} />
-            <span className="pointer-events-none absolute -top-7 hidden whitespace-nowrap border-2 border-ink bg-bg-window px-1.5 py-0.5 text-[9px] font-pixel text-ink group-hover:block">
+            <span className="pointer-events-none absolute -top-7 hidden whitespace-nowrap border-2 border-ink bg-bg-window px-1.5 py-0.5 text-caption font-pixel text-ink group-hover:block">
               {app.label}
             </span>
           </button>

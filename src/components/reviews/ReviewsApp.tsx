@@ -23,7 +23,7 @@ interface ScorecardEntry {
 
 function ScoreRow({ scores }: { scores: DayScorecardRecord["scores"] }) {
   return (
-    <div className="grid grid-cols-5 gap-1 text-center text-[9px] text-ink-soft">
+    <div className="grid grid-cols-5 gap-1 text-center text-caption text-ink-soft">
       {DIMENSION_LABELS.map((d) => (
         <div key={d.key}>
           {d.label}
@@ -43,10 +43,10 @@ function EntryCard({ entry, onClick }: { entry: ScorecardEntry; onClick: () => v
       style={entry.highlight ? { borderColor: "var(--accent-reviews)" } : undefined}
     >
       <div className="mb-1 flex items-center justify-between">
-        <span className={`font-pixel text-[10px] ${entry.highlight ? "text-accent-reviews" : "text-ink"}`}>{entry.title}</span>
-        <span className="font-pixel text-sm text-ink">{entry.record.overall.toFixed(1)}/10</span>
+        <span className={`font-pixel text-label ${entry.highlight ? "text-accent-reviews" : "text-ink"}`}>{entry.title}</span>
+        <span className="font-pixel text-body text-ink">{entry.record.overall.toFixed(1)}/10</span>
       </div>
-      <div className="mb-2 text-xs text-ink-soft">{entry.subtitle}</div>
+      <div className="mb-2 text-label text-ink-soft">{entry.subtitle}</div>
       <ScoreRow scores={entry.record.scores} />
     </button>
   );
@@ -106,22 +106,22 @@ export function ReviewsApp() {
     return (
       <div className="flex h-full min-h-0 w-full flex-col">
         <div className="flex shrink-0 items-center gap-2 border-b-2 border-ink bg-white px-3 py-2">
-          <button onClick={() => setSelectedKey(null)} className="pixel-border bg-bg-window px-2 py-1 text-[9px] font-pixel text-ink hover:-translate-y-0.5">
+          <button onClick={() => setSelectedKey(null)} className="pixel-border bg-bg-window px-2 py-1 text-caption font-pixel text-ink hover:-translate-y-0.5">
             ← BACK
           </button>
-          <div className="text-xs font-semibold text-ink">Guidance opportunities</div>
+          <div className="text-label font-semibold text-ink">Guidance opportunities</div>
         </div>
         <div className="pixel-scrollbar min-h-0 flex-1 overflow-y-auto p-4">
-          <p className="mb-4 text-xs italic text-ink-soft">
+          <p className="mb-4 text-label italic text-ink-soft">
             Pulled from the &quot;New to product&quot; persona&apos;s reasoning logs across all its runs. Real moments where it
             struggled, hesitated, or hit a knowledge gap, with a suggestion for what kind of ambient signal might help a real
             player in that spot.
           </p>
-          {guidance.length === 0 && <p className="text-sm text-ink-soft">No findings surfaced.</p>}
+          {guidance.length === 0 && <p className="text-body text-ink-soft">No findings surfaced.</p>}
           <div className="space-y-3">
             {guidance.map((g, i) => (
-              <div key={i} className="pixel-border bg-white p-3 text-xs text-ink" style={{ borderColor: "var(--accent-reviews)" }}>
-                <div className="mb-1 font-pixel text-[9px] text-accent-reviews">{g.moment}</div>
+              <div key={i} className="pixel-border bg-white p-3 text-label text-ink" style={{ borderColor: "var(--accent-reviews)" }}>
+                <div className="mb-1 font-pixel text-caption text-accent-reviews">{g.moment}</div>
                 <p className="mb-2 leading-snug">{g.whatHappened}</p>
                 <p className="leading-snug text-ink-soft">
                   <span className="font-semibold text-ink">Suggestion: </span>
@@ -139,10 +139,10 @@ export function ReviewsApp() {
     return (
       <div className="flex h-full min-h-0 w-full flex-col">
         <div className="flex shrink-0 items-center gap-2 border-b-2 border-ink bg-white px-3 py-2">
-          <button onClick={() => setSelectedKey(null)} className="pixel-border bg-bg-window px-2 py-1 text-[9px] font-pixel text-ink hover:-translate-y-0.5">
+          <button onClick={() => setSelectedKey(null)} className="pixel-border bg-bg-window px-2 py-1 text-caption font-pixel text-ink hover:-translate-y-0.5">
             ← BACK
           </button>
-          <div className="text-xs font-semibold text-ink">
+          <div className="text-label font-semibold text-ink">
             {selectedScorecard.title} · {selectedScorecard.subtitle}
           </div>
         </div>
@@ -155,7 +155,7 @@ export function ReviewsApp() {
 
   if (yourEntries.length === 0 && aggregateEntries.length === 0 && runEntries.length === 0) {
     return (
-      <div className="flex h-full flex-1 items-center justify-center p-6 text-center text-sm text-ink-soft">
+      <div className="flex h-full flex-1 items-center justify-center p-6 text-center text-body text-ink-soft">
         No completed days yet. Finish Day 1 to see your first scorecard here.
       </div>
     );
@@ -165,7 +165,7 @@ export function ReviewsApp() {
     <div className="pixel-scrollbar min-h-0 flex-1 overflow-y-auto p-3">
       {yourEntries.length > 0 && (
         <>
-          <div className="mb-2 font-pixel text-[9px] text-ink-soft">YOUR SESSIONS</div>
+          <div className="mb-2 font-pixel text-caption text-ink-soft">YOUR SESSIONS</div>
           {yourEntries.map((e) => (
             <EntryCard key={e.key} entry={e} onClick={() => setSelectedKey(e.key)} />
           ))}
@@ -178,14 +178,14 @@ export function ReviewsApp() {
           className="pixel-border mb-3 mt-4 block w-full bg-accent-reviews/20 p-3 text-left hover:-translate-y-0.5"
           style={{ borderColor: "var(--accent-reviews)" }}
         >
-          <div className="font-pixel text-[10px] text-accent-reviews">★ GUIDANCE OPPORTUNITIES</div>
-          <div className="mt-1 text-xs text-ink">{guidance.length} finding(s) from novice playtesting. Click to view</div>
+          <div className="font-pixel text-label text-accent-reviews">★ GUIDANCE OPPORTUNITIES</div>
+          <div className="mt-1 text-label text-ink">{guidance.length} finding(s) from novice playtesting. Click to view</div>
         </button>
       )}
 
       {aggregateEntries.length > 0 && (
         <>
-          <div className="mb-2 mt-4 font-pixel text-[9px] text-accent-reviews">AI PLAYTEST AGGREGATES</div>
+          <div className="mb-2 mt-4 font-pixel text-caption text-accent-reviews">AI PLAYTEST AGGREGATES</div>
           {aggregateEntries.map((e) => (
             <EntryCard key={e.key} entry={e} onClick={() => setSelectedKey(e.key)} />
           ))}
@@ -194,7 +194,7 @@ export function ReviewsApp() {
 
       {runEntries.length > 0 && (
         <>
-          <div className="mb-2 mt-4 font-pixel text-[9px] text-ink-soft">INDIVIDUAL PLAYTEST RUNS</div>
+          <div className="mb-2 mt-4 font-pixel text-caption text-ink-soft">INDIVIDUAL PLAYTEST RUNS</div>
           {runEntries.map((e) => (
             <EntryCard key={e.key} entry={e} onClick={() => setSelectedKey(e.key)} />
           ))}

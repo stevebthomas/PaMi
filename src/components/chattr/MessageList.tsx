@@ -26,7 +26,7 @@ export function MessageList() {
   return (
     <div className="pixel-scrollbar flex-1 overflow-y-auto p-3">
       {messages.length === 0 && (
-        <p className="mt-6 text-center text-sm text-ink-soft">Nothing here yet.</p>
+        <p className="mt-6 text-center text-body text-ink-soft">Nothing here yet.</p>
       )}
       {messages.map((m) => {
         // System-voice messages (the 8:30 welcome, the 9:00 standup digest,
@@ -45,20 +45,20 @@ export function MessageList() {
                 <span
                   className={
                     isSystem
-                      ? "text-sm font-semibold font-pixel text-ink-soft"
-                      : "text-sm font-semibold text-ink"
+                      ? "text-body font-semibold font-pixel text-ink-soft"
+                      : "text-body font-semibold text-ink"
                   }
                 >
                   {AGENT_NAMES[m.senderId]}
                 </span>
-                <span className="text-[11px] text-ink-soft">{formatSimTime(m.sentAtSimMinutes)}</span>
+                <span className="text-label text-ink-soft">{formatSimTime(m.sentAtSimMinutes)}</span>
               </div>
               {isSystem ? (
-                <p className="whitespace-pre-wrap border-l-2 border-[#5b5470] bg-[#5b5470]/10 py-0.5 pl-2 text-sm italic leading-snug text-ink-soft">
+                <p className="whitespace-pre-wrap border-l-2 border-[#5b5470] bg-[#5b5470]/10 py-0.5 pl-2 text-body italic leading-snug text-ink-soft">
                   {m.content}
                 </p>
               ) : (
-                <p className="whitespace-pre-wrap text-sm leading-snug text-ink">{m.content}</p>
+                <p className="whitespace-pre-wrap text-body leading-snug text-ink">{m.content}</p>
               )}
               {/* Doc chip(s) — open in the in-sim Docs app, never a real
                   download. Covers both the singular `attachment` field and
@@ -77,7 +77,7 @@ export function MessageList() {
                       recordDocOpened(a.docId);
                       openDocRequest(a.docId);
                     }}
-                    className="pixel-border mt-1.5 inline-flex items-center gap-1 bg-white px-2 py-1 text-[11px] text-ink hover:-translate-y-0.5"
+                    className="pixel-border mt-1.5 inline-flex items-center gap-1 bg-white px-2 py-1 text-label text-ink hover:-translate-y-0.5"
                   >
                     <span>📄</span>
                     {a.label}
@@ -88,7 +88,7 @@ export function MessageList() {
         );
       })}
       {showTyping && pendingReplyFrom && (
-        <div className="mb-3 flex items-center gap-2 text-xs italic text-ink-soft">
+        <div className="mb-3 flex items-center gap-2 text-label italic text-ink-soft">
           <PixelAvatar agentId={pendingReplyFrom} sizeClassName="h-6 w-6" />
           <div className="pixel-border flex items-center bg-white px-2 py-1.5">
             <TypingDots />

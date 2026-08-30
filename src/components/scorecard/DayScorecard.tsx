@@ -60,9 +60,9 @@ function FollowUpTicketPrompt({ day, postmortemText, completedAtSimMinutes }: { 
 
   if (added) {
     return (
-      <div className="mt-4 pixel-border bg-white p-3 text-xs text-ink-soft">
+      <div className="mt-4 pixel-border bg-white p-3 text-label text-ink-soft">
         Added to Taskflow.{" "}
-        <span className="font-pixel text-[9px] text-accent-pulse">LOGGED, +{TIME_ADVANCE_MINUTES} MIN</span>
+        <span className="font-pixel text-caption text-accent-pulse">LOGGED, +{TIME_ADVANCE_MINUTES} MIN</span>
       </div>
     );
   }
@@ -85,7 +85,7 @@ function FollowUpTicketPrompt({ day, postmortemText, completedAtSimMinutes }: { 
     <div className="mt-4 pixel-border bg-white p-3">
       <div className="mb-2 flex items-center gap-2">
         <AppIcon id="taskflow" sizeClassName="h-5 w-5" />
-        <div className="font-pixel text-[9px] text-ink-soft">TURN A &ldquo;WHAT I&apos;D DO DIFFERENTLY&rdquo; INTO A TICKET?</div>
+        <div className="font-pixel text-caption text-ink-soft">TURN A &ldquo;WHAT I&apos;D DO DIFFERENTLY&rdquo; INTO A TICKET?</div>
       </div>
       <div className="flex gap-2">
         <input
@@ -93,11 +93,11 @@ function FollowUpTicketPrompt({ day, postmortemText, completedAtSimMinutes }: { 
           onChange={(e) => setTitle(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && handleAdd()}
           placeholder={suggesting ? "Pulling a suggestion from your postmortem…" : "e.g. Set up Stripe webhook monitoring"}
-          className="pixel-border flex-1 bg-white px-2 py-1 text-xs text-ink outline-none"
+          className="pixel-border flex-1 bg-white px-2 py-1 text-label text-ink outline-none"
         />
         <button
           onClick={handleAdd}
-          className="pixel-border bg-accent-taskflow px-3 py-1 text-[10px] font-pixel text-white hover:-translate-y-0.5"
+          className="pixel-border bg-accent-taskflow px-3 py-1 text-label font-pixel text-white hover:-translate-y-0.5"
         >
           + ADD
         </button>
@@ -116,14 +116,14 @@ export function DayScorecard({ onClose }: { onClose: () => void }) {
       <div className="pixel-border flex max-h-[85vh] w-full max-w-md flex-col overflow-hidden bg-bg-window">
         <div className="flex shrink-0 items-center justify-between border-b-2 border-ink px-5 py-3">
           <div>
-            <div className="font-pixel text-sm text-ink">DAY {record.day} COMPLETE</div>
-            <div className="text-xs text-ink-soft">Scorecard: {record.scenarioLabel}</div>
+            <div className="font-pixel text-body text-ink">DAY {record.day} COMPLETE</div>
+            <div className="text-label text-ink-soft">Scorecard: {record.scenarioLabel}</div>
           </div>
           <button
             type="button"
             onClick={onClose}
             aria-label="Close scorecard"
-            className="flex h-5 w-5 shrink-0 items-center justify-center border-2 border-ink bg-bg-window text-xs leading-none text-ink hover:bg-accent-danger hover:text-white"
+            className="flex h-5 w-5 shrink-0 items-center justify-center border-2 border-ink bg-bg-window text-label leading-none text-ink hover:bg-accent-danger hover:text-white"
           >
             ×
           </button>
@@ -136,7 +136,7 @@ export function DayScorecard({ onClose }: { onClose: () => void }) {
             <FollowUpTicketPrompt day={record.day} postmortemText={record.postmortemText} completedAtSimMinutes={record.completedAtSimMinutes} />
           )}
 
-          <div className="mt-4 text-center text-[11px] text-ink-soft">
+          <div className="mt-4 text-center text-label text-ink-soft">
             Days 2-5 aren&apos;t built yet, this is the Day 1 proof of concept. Find this scorecard
             again anytime in Reviews.
           </div>

@@ -35,23 +35,23 @@ export function AskClaudeApp() {
         {messages.map((m) => (
           <div key={m.id} className="mb-3 flex gap-2">
             <div
-              className={`pixel-border flex h-8 w-8 shrink-0 items-center justify-center text-xs font-pixel text-white ${
+              className={`pixel-border flex h-8 w-8 shrink-0 items-center justify-center text-label font-pixel text-white ${
                 m.senderId === "assistant" ? "bg-[#5b5470]" : "bg-[#34c3a3]"
               }`}
             >
               {m.senderId === "assistant" ? "?" : "Y"}
             </div>
             <div className="min-w-0">
-              <div className="text-sm font-semibold text-ink">
+              <div className="text-body font-semibold text-ink">
                 {m.senderId === "assistant" ? "Ask Claude" : "You"}
               </div>
-              <p className="whitespace-pre-wrap text-sm leading-snug text-ink">{m.content}</p>
+              <p className="whitespace-pre-wrap text-body leading-snug text-ink">{m.content}</p>
             </div>
           </div>
         ))}
         {pending && (
-          <div className="mb-3 flex items-center gap-2 text-xs italic text-ink-soft">
-            <div className="pixel-border flex h-6 w-6 shrink-0 items-center justify-center bg-[#5b5470] text-[9px] font-pixel text-white">
+          <div className="mb-3 flex items-center gap-2 text-label italic text-ink-soft">
+            <div className="pixel-border flex h-6 w-6 shrink-0 items-center justify-center bg-[#5b5470] text-caption font-pixel text-white">
               ?
             </div>
             <div className="pixel-border flex items-center bg-white px-2 py-1.5">
@@ -69,12 +69,12 @@ export function AskClaudeApp() {
           onKeyDown={handleKeyDown}
           rows={2}
           placeholder="What does this term mean?"
-          className="pixel-border flex-1 resize-none bg-white px-2 py-1.5 text-sm text-ink outline-none"
+          className="pixel-border flex-1 resize-none bg-white px-2 py-1.5 text-body text-ink outline-none"
         />
         <button
           onClick={handleSend}
           disabled={!value.trim() || pending}
-          className="pixel-border bg-accent-help px-3 py-2 text-xs font-pixel text-white disabled:cursor-not-allowed disabled:opacity-40"
+          className="pixel-border bg-accent-help px-3 py-2 text-label font-pixel text-white disabled:cursor-not-allowed disabled:opacity-40"
         >
           Send
         </button>

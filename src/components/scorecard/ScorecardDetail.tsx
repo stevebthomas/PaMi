@@ -24,9 +24,9 @@ function Bar({
   const color = score >= 7 ? "bg-accent-pulse" : score >= 4 ? "bg-accent-taskflow" : "bg-accent-danger";
   return (
     <div className="mb-3">
-      <div className="mb-1 flex items-center justify-between text-xs text-ink">
+      <div className="mb-1 flex items-center justify-between text-label text-ink">
         <span>{label}</span>
-        <span className="font-pixel text-[10px]">{loading ? "…" : `${score.toFixed(1)}/10`}</span>
+        <span className="font-pixel text-label">{loading ? "…" : `${score.toFixed(1)}/10`}</span>
       </div>
       <div className="pixel-border h-3 w-full bg-white">
         {loading ? (
@@ -36,10 +36,10 @@ function Bar({
         )}
       </div>
       {explanationLoading && !explanation && (
-        <p className="mt-1 text-[11px] italic text-ink-soft">Working out why this landed here…</p>
+        <p className="mt-1 text-label italic text-ink-soft">Working out why this landed here…</p>
       )}
       {explanation && explanation.explanation && (
-        <div className="mt-1 text-[11px] text-ink">
+        <div className="mt-1 text-label text-ink">
           <p className="leading-snug">{explanation.explanation}</p>
           {explanation.quotes.length > 0 && (
             <div className="mt-1 space-y-1">
@@ -102,9 +102,9 @@ export function ScorecardDetail({ record }: { record: DayScorecardRecord | Playt
   return (
     <>
       <div className="pixel-border mb-4 bg-white p-3 text-center">
-        <div className="text-[10px] text-ink-soft">Overall</div>
-        <div className="font-pixel text-2xl text-ink">{crossFunctionalLoading ? "…" : record.overall.toFixed(1)} / 10</div>
-        {crossFunctionalLoading && <div className="mt-1 text-[10px] italic text-ink-soft">still grading coordination…</div>}
+        <div className="text-label text-ink-soft">Overall</div>
+        <div className="font-pixel text-display text-ink">{crossFunctionalLoading ? "…" : record.overall.toFixed(1)} / 10</div>
+        {crossFunctionalLoading && <div className="mt-1 text-label italic text-ink-soft">still grading coordination…</div>}
       </div>
 
       <Bar
@@ -140,8 +140,8 @@ export function ScorecardDetail({ record }: { record: DayScorecardRecord | Playt
       />
 
       {postmortemText && (
-        <div className="pixel-border mt-4 bg-white p-3 text-xs text-ink">
-          <div className="mb-1 font-pixel text-[9px] text-ink-soft">YOUR POSTMORTEM</div>
+        <div className="pixel-border mt-4 bg-white p-3 text-label text-ink">
+          <div className="mb-1 font-pixel text-caption text-ink-soft">YOUR POSTMORTEM</div>
           <p className="whitespace-pre-wrap leading-snug">{postmortemText}</p>
         </div>
       )}
@@ -154,13 +154,13 @@ export function ScorecardDetail({ record }: { record: DayScorecardRecord | Playt
           isn't silently lost. */}
       {useExplanations && coachingNotes && coachingNotes.some((e) => e.messageId === "follow-up-ticket") && (
         <div className="mt-4">
-          <div className="mb-1 font-pixel text-[9px] text-ink-soft">FOLLOW-THROUGH</div>
+          <div className="mb-1 font-pixel text-caption text-ink-soft">FOLLOW-THROUGH</div>
           <div className="space-y-2">
             {coachingNotes
               .filter((e) => e.messageId === "follow-up-ticket")
               .map((entry) => (
-                <div key={entry.id} className="pixel-border bg-white p-3 text-xs text-ink">
-                  <div className="mb-1 text-[10px] text-ink-soft">
+                <div key={entry.id} className="pixel-border bg-white p-3 text-label text-ink">
+                  <div className="mb-1 text-label text-ink-soft">
                     {entry.label
                       ? `${entry.label}, ${formatSimTime(entry.sentAtSimMinutes)}`
                       : `Day 1 wrap-up, ${formatSimTime(entry.sentAtSimMinutes)}`}
@@ -174,11 +174,11 @@ export function ScorecardDetail({ record }: { record: DayScorecardRecord | Playt
 
       {!useExplanations && coachingNotes && coachingNotes.length > 0 && (
         <div className="mt-4">
-          <div className="mb-1 font-pixel text-[9px] text-ink-soft">COACHING NOTES</div>
+          <div className="mb-1 font-pixel text-caption text-ink-soft">COACHING NOTES</div>
           <div className="space-y-2">
             {coachingNotes.map((entry) => (
-              <div key={entry.id} className="pixel-border bg-white p-3 text-xs text-ink">
-                <div className="mb-1 text-[10px] text-ink-soft">
+              <div key={entry.id} className="pixel-border bg-white p-3 text-label text-ink">
+                <div className="mb-1 text-label text-ink-soft">
                   {entry.label
                     ? `${entry.label}, ${formatSimTime(entry.sentAtSimMinutes)}`
                     : entry.messageContent
@@ -198,14 +198,14 @@ export function ScorecardDetail({ record }: { record: DayScorecardRecord | Playt
       )}
 
       {studyAreasLoading && (
-        <div className="mt-4 text-center text-[11px] italic text-ink-soft">
+        <div className="mt-4 text-center text-label italic text-ink-soft">
           Thinking about what&apos;s worth exploring next…
         </div>
       )}
 
       {studyAreas && !studyAreasLoading && studyAreas.length > 0 && (
-        <div className="pixel-border mt-4 bg-white p-3 text-xs text-ink" style={{ borderColor: "var(--accent-help)" }}>
-          <div className="mb-2 font-pixel text-[9px] text-accent-help">AREAS TO STUDY</div>
+        <div className="pixel-border mt-4 bg-white p-3 text-label text-ink" style={{ borderColor: "var(--accent-help)" }}>
+          <div className="mb-2 font-pixel text-caption text-accent-help">AREAS TO STUDY</div>
           <ul className="space-y-2">
             {studyAreas.map((area, i) => (
               <li key={i}>
@@ -234,20 +234,20 @@ export function ScorecardDetail({ record }: { record: DayScorecardRecord | Playt
 
       {studyAreas && !studyAreasLoading && studyAreas.length === 0 && (
         noEngagement ? (
-          <div className="mt-4 text-center text-[11px] italic text-ink-soft">
+          <div className="mt-4 text-center text-label italic text-ink-soft">
             Nothing to study yet. Areas to study are drawn from what you actually did and asked
             today, and there was no engagement to draw from.
           </div>
         ) : (
-          <div className="mt-4 text-center text-[11px] italic text-ink-soft">
+          <div className="mt-4 text-center text-label italic text-ink-soft">
             Nothing flagged to study today. Nice work staying oriented.
           </div>
         )
       )}
 
       {playtesterNotes && (
-        <div className="pixel-border mt-4 bg-white p-3 text-xs text-ink" style={{ borderColor: "var(--accent-reviews)" }}>
-          <div className="mb-1 font-pixel text-[9px] text-accent-reviews">PLAYTESTER NOTES</div>
+        <div className="pixel-border mt-4 bg-white p-3 text-label text-ink" style={{ borderColor: "var(--accent-reviews)" }}>
+          <div className="mb-1 font-pixel text-caption text-accent-reviews">PLAYTESTER NOTES</div>
           <p className="leading-snug">{playtesterNotes}</p>
         </div>
       )}

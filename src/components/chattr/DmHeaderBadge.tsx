@@ -19,8 +19,8 @@ export function DmHeaderBadge() {
   return (
     <div className="flex items-center gap-2">
       <div className="text-right leading-tight">
-        <div className="text-[11px] font-semibold text-ink">{AGENT_NAMES[agentId]}</div>
-        <div className="text-[9px] text-ink-soft">{AGENT_TITLES[agentId]}</div>
+        <div className="text-label font-semibold text-ink">{AGENT_NAMES[agentId]}</div>
+        <div className="text-caption text-ink-soft">{AGENT_TITLES[agentId]}</div>
       </div>
       <PixelAvatar agentId={agentId} sizeClassName="h-7 w-7" />
     </div>

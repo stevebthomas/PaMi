@@ -94,7 +94,7 @@ export function PixelAvatar({ agentId, sizeClassName = "h-8 w-8" }: { agentId: A
   if (!sprite) {
     return (
       <div
-        className={`pixel-border flex shrink-0 items-center justify-center text-[10px] font-pixel text-white ${sizeClassName} ${FALLBACK_COLORS[agentId]}`}
+        className={`pixel-border flex shrink-0 items-center justify-center text-label font-pixel text-white ${sizeClassName} ${FALLBACK_COLORS[agentId]}`}
       >
         {AGENT_NAMES[agentId].slice(0, 1)}
       </div>

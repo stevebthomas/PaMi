@@ -35,7 +35,7 @@ export function Window({
       >
         <div className="flex items-center gap-2">
           {icon}
-          <span className="font-pixel text-[10px] text-ink">{title}</span>
+          <span className="font-pixel text-label text-ink">{title}</span>
         </div>
         <div className="flex items-center gap-3">
           {headerRight}
@@ -48,7 +48,7 @@ export function Window({
               }}
               onPointerDown={(e) => e.stopPropagation()}
               aria-label={`Close ${title}`}
-              className="flex h-4 w-4 items-center justify-center border-2 border-ink bg-bg-window text-[10px] leading-none text-ink hover:bg-accent-danger hover:text-white"
+              className="flex h-4 w-4 items-center justify-center border-2 border-ink bg-bg-window text-label leading-none text-ink hover:bg-accent-danger hover:text-white"
             >
               ×
             </button>

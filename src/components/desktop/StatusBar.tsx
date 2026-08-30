@@ -12,7 +12,7 @@ function BatteryIndicator({ level }: { level: number }) {
         <div className={`h-full ${color}`} style={{ width: `${pct}%` }} />
       </div>
       <div className="h-2 w-[3px] bg-ink" />
-      <span className="font-pixel text-[9px] text-ink">{pct}%</span>
+      <span className="font-pixel text-caption text-ink">{pct}%</span>
     </div>
   );
 }
@@ -40,11 +40,11 @@ export function StatusBar() {
 
   return (
     <div className="flex h-9 shrink-0 items-center justify-between border-b-2 border-ink bg-bg-taskbar px-3">
-      <div className="font-pixel text-[9px] text-ink-soft">BAZAARLOOP</div>
+      <div className="font-pixel text-caption text-ink-soft">BAZAARLOOP</div>
       <div className="flex items-center gap-3">
         <button
           onClick={() => setDifficulty(difficulty === "easy" ? "standard" : "easy")}
-          className="pixel-border bg-bg-window px-2 py-1 text-[9px] font-pixel text-ink hover:-translate-y-0.5"
+          className="pixel-border bg-bg-window px-2 py-1 text-caption font-pixel text-ink hover:-translate-y-0.5"
           title="Toggle the easy-difficulty fact checklist in Chattr"
         >
           {difficulty === "easy" ? "EASY" : "STANDARD"}
@@ -52,7 +52,7 @@ export function StatusBar() {
         <button
           onClick={() => !skipDisabled && advanceClock(15)}
           disabled={skipDisabled}
-          className={`pixel-border bg-bg-window px-2 py-1 text-[9px] font-pixel text-ink ${
+          className={`pixel-border bg-bg-window px-2 py-1 text-caption font-pixel text-ink ${
             skipDisabled ? "cursor-not-allowed opacity-40" : "hover:-translate-y-0.5"
           }`}
           title={
@@ -66,7 +66,7 @@ export function StatusBar() {
           ⏭ +15m
         </button>
         <BatteryIndicator level={batteryLevel} />
-        <div className="pixel-border bg-bg-window px-3 py-1 text-[10px] font-pixel text-ink">
+        <div className="pixel-border bg-bg-window px-3 py-1 text-label font-pixel text-ink">
           Day {day} · {formatSimTime(clockMinutes)}
         </div>
       </div>

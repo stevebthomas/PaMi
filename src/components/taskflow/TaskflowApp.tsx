@@ -29,7 +29,7 @@ function AssigneePicker({ ticket, onAssign }: { ticket: Ticket; onAssign: (id: A
     <div className="relative">
       <button
         onClick={() => setOpen((o) => !o)}
-        className={`pixel-border px-1.5 py-0.5 text-[9px] ${
+        className={`pixel-border px-1.5 py-0.5 text-caption ${
           ticket.assigneeId ? "bg-accent-taskflow text-white" : "bg-bg-window text-ink-soft"
         }`}
         title="Assign this ticket"
@@ -44,7 +44,7 @@ function AssigneePicker({ ticket, onAssign }: { ticket: Ticket; onAssign: (id: A
                 onAssign(null);
                 setOpen(false);
               }}
-              className="block w-full px-1.5 py-1 text-left text-[9px] text-ink-soft hover:bg-bg-window"
+              className="block w-full px-1.5 py-1 text-left text-caption text-ink-soft hover:bg-bg-window"
             >
               Unassign
             </button>
@@ -56,7 +56,7 @@ function AssigneePicker({ ticket, onAssign }: { ticket: Ticket; onAssign: (id: A
                 onAssign(member.id);
                 setOpen(false);
               }}
-              className="block w-full px-1.5 py-1 text-left text-[9px] hover:bg-bg-window"
+              className="block w-full px-1.5 py-1 text-left text-caption hover:bg-bg-window"
             >
               {member.name}
               <span className="ml-1 text-ink-soft">{member.title}</span>
@@ -107,21 +107,21 @@ function TicketCard({ ticket, onTimeAdvance }: { ticket: Ticket; onTimeAdvance: 
 
   return (
     <div
-      className={`pixel-border mb-2 p-2 text-xs text-ink ${
+      className={`pixel-border mb-2 p-2 text-label text-ink ${
         ticket.kind === "story" ? "border-l-4 border-l-accent-taskflow bg-accent-taskflow/10" : "bg-white"
       }`}
     >
       <div className="mb-1 font-semibold leading-snug">{ticket.title}</div>
       {ticket.description && <div className="mb-1 leading-snug text-ink-soft">{ticket.description}</div>}
-      {reporter && <div className="mb-2 text-[9px] text-ink-soft">Reported by {reporter}</div>}
+      {reporter && <div className="mb-2 text-caption text-ink-soft">Reported by {reporter}</div>}
       <div className="flex items-center justify-between gap-1">
-        <span className="text-[9px] text-ink-soft">{formatSimTime(ticket.createdAtSimMinutes)}</span>
+        <span className="text-caption text-ink-soft">{formatSimTime(ticket.createdAtSimMinutes)}</span>
         <div className="flex items-center gap-1">
           <AssigneePicker ticket={ticket} onAssign={(id) => assignTicket(ticket.id, id, clockMinutes)} />
           <button
             onClick={() => left && handleMove(left)}
             disabled={!left}
-            className="pixel-border bg-bg-window px-1.5 py-0.5 text-[9px] font-pixel text-ink disabled:cursor-not-allowed disabled:opacity-30"
+            className="pixel-border bg-bg-window px-1.5 py-0.5 text-caption font-pixel text-ink disabled:cursor-not-allowed disabled:opacity-30"
             title={left ? `Move to ${left}` : undefined}
           >
             ←
@@ -129,7 +129,7 @@ function TicketCard({ ticket, onTimeAdvance }: { ticket: Ticket; onTimeAdvance: 
           <button
             onClick={() => right && handleMove(right)}
             disabled={!right}
-            className="pixel-border bg-bg-window px-1.5 py-0.5 text-[9px] font-pixel text-ink disabled:cursor-not-allowed disabled:opacity-30"
+            className="pixel-border bg-bg-window px-1.5 py-0.5 text-caption font-pixel text-ink disabled:cursor-not-allowed disabled:opacity-30"
             title={right ? `Move to ${right}` : undefined}
           >
             →
@@ -180,7 +180,7 @@ export function TaskflowApp() {
           onChange={(e) => setTitle(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && handleAdd()}
           placeholder="New ticket title…"
-          className="pixel-border bg-white px-2 py-1 text-xs text-ink outline-none"
+          className="pixel-border bg-white px-2 py-1 text-label text-ink outline-none"
         />
         <div className="flex gap-2">
           <input
@@ -188,11 +188,11 @@ export function TaskflowApp() {
             onChange={(e) => setDescription(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && handleAdd()}
             placeholder="Short description (optional)…"
-            className="pixel-border flex-1 bg-white px-2 py-1 text-xs text-ink outline-none"
+            className="pixel-border flex-1 bg-white px-2 py-1 text-label text-ink outline-none"
           />
           <button
             onClick={handleAdd}
-            className="pixel-border bg-accent-taskflow px-3 py-1 text-[10px] font-pixel text-white hover:-translate-y-0.5"
+            className="pixel-border bg-accent-taskflow px-3 py-1 text-label font-pixel text-white hover:-translate-y-0.5"
           >
             + ADD
           </button>
@@ -200,7 +200,7 @@ export function TaskflowApp() {
       </div>
 
       {timeAdvanceNotice && (
-        <div className="shrink-0 border-b-2 border-ink bg-accent-pulse px-3 py-1.5 text-center font-pixel text-[10px] text-white">
+        <div className="shrink-0 border-b-2 border-ink bg-accent-pulse px-3 py-1.5 text-center font-pixel text-label text-white">
           LOGGED, +{TIME_ADVANCE_MINUTES} MIN
         </div>
       )}
@@ -208,7 +208,7 @@ export function TaskflowApp() {
       <div className="pixel-scrollbar grid min-h-0 flex-1 grid-cols-3 gap-2 overflow-y-auto bg-[#dfd6bd] p-2">
         {COLUMNS.map((col) => (
           <div key={col.status} className="flex min-h-0 flex-col">
-            <div className="mb-2 font-pixel text-[9px] text-ink-soft">
+            <div className="mb-2 font-pixel text-caption text-ink-soft">
               {col.label} ({tickets.filter((t) => t.status === col.status).length})
             </div>
             <div className="pixel-scrollbar min-h-0 flex-1 overflow-y-auto">

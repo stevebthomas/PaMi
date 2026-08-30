@@ -291,7 +291,7 @@ function Sparkline({
         </svg>
         {hovered && (
           <div
-            className="pointer-events-none absolute z-10 -translate-x-1/2 -translate-y-full whitespace-nowrap border-2 border-ink bg-bg-window px-1.5 py-0.5 font-pixel text-[9px] text-ink"
+            className="pointer-events-none absolute z-10 -translate-x-1/2 -translate-y-full whitespace-nowrap border-2 border-ink bg-bg-window px-1.5 py-0.5 font-pixel text-caption text-ink"
             style={{
               left: `${(xForT(hovered.t) / SPARKLINE_WIDTH) * 100}%`,
               top: `${(yForRate(hovered.rate) / SPARKLINE_HEIGHT) * 100}%`,
@@ -308,8 +308,8 @@ function Sparkline({
             className="absolute -translate-x-1/2 whitespace-nowrap text-center"
             style={{ left: `${(m.x / SPARKLINE_WIDTH) * 100}%` }}
           >
-            <div className="text-[8px] text-ink-soft">{formatSimTime(m.t)}</div>
-            <div className="text-[7px] italic text-ink-soft">{m.caption}</div>
+            <div className="text-caption text-ink-soft">{formatSimTime(m.t)}</div>
+            <div className="text-caption italic text-ink-soft">{m.caption}</div>
           </div>
         ))}
       </div>
@@ -348,8 +348,8 @@ function WeeklyAttemptsChart() {
   return (
     <div className="pixel-border bg-white p-3">
       <div className="mb-1 flex items-baseline justify-between">
-        <div className="text-[11px] text-ink-soft">Checkout attempts, last 7 days</div>
-        <div className="text-[9px] italic text-ink-soft">{formatFreshness(clockMinutes)}</div>
+        <div className="text-label text-ink-soft">Checkout attempts, last 7 days</div>
+        <div className="text-caption italic text-ink-soft">{formatFreshness(clockMinutes)}</div>
       </div>
       <div className="flex h-32 items-end gap-2">
         {days.map((d, i) => {
@@ -357,7 +357,7 @@ function WeeklyAttemptsChart() {
           return (
             <div key={d.label} className="relative flex h-full flex-1 flex-col justify-end">
               {isHovered && (
-                <div className="pointer-events-none absolute -top-8 left-1/2 z-10 -translate-x-1/2 whitespace-nowrap border-2 border-ink bg-bg-window px-1.5 py-0.5 font-pixel text-[9px] text-ink">
+                <div className="pointer-events-none absolute -top-8 left-1/2 z-10 -translate-x-1/2 whitespace-nowrap border-2 border-ink bg-bg-window px-1.5 py-0.5 font-pixel text-caption text-ink">
                   {d.label}: {formatAttemptCount(d.count)}
                 </div>
               )}
@@ -375,13 +375,13 @@ function WeeklyAttemptsChart() {
       </div>
       <div className="mt-1 flex gap-2">
         {days.map((d) => (
-          <div key={d.label} className="flex-1 text-center text-[9px] text-ink-soft">
+          <div key={d.label} className="flex-1 text-center text-caption text-ink-soft">
             {d.label}
             {d.partial ? "*" : ""}
           </div>
         ))}
       </div>
-      <div className="mt-1 text-[9px] italic text-ink-soft">* today, in progress</div>
+      <div className="mt-1 text-caption italic text-ink-soft">* today, in progress</div>
     </div>
   );
 }
@@ -399,8 +399,8 @@ function PaymentMethodBreakdown({ rows, freshness }: { rows: PaymentMethodBreakd
   return (
     <div className="pixel-border mb-4 bg-white p-3">
       <div className="mb-2 flex items-baseline justify-between">
-        <div className="text-[11px] text-ink-soft">Checkout success by payment method, today</div>
-        <div className="text-[9px] italic text-ink-soft">{freshness}</div>
+        <div className="text-label text-ink-soft">Checkout success by payment method, today</div>
+        <div className="text-caption italic text-ink-soft">{freshness}</div>
       </div>
       <div className="flex flex-col gap-1.5">
         {rows.map((r) => {
@@ -412,7 +412,7 @@ function PaymentMethodBreakdown({ rows, freshness }: { rows: PaymentMethodBreakd
           // 98.8%" read as a fabricated stat).
           const hasAttempts = attempts > 0;
           return (
-            <div key={r.method} className="flex items-center gap-2 text-[11px]">
+            <div key={r.method} className="flex items-center gap-2 text-label">
               <div className="w-20 text-ink-soft">{r.method}</div>
               <div className="flex-1 text-ink-soft">{formatAttemptCount(attempts)} attempts</div>
               <div className={`font-pixel ${hasAttempts && degraded ? "text-accent-danger" : "text-accent-pulse"}`}>
@@ -485,7 +485,7 @@ export function PulseMock() {
 
   return (
     <div className="pixel-scrollbar h-full w-full overflow-y-auto bg-[#f4f1e6] p-4 text-ink">
-      <div className="mb-3 flex items-center gap-2 font-pixel text-[10px] text-ink-soft">
+      <div className="mb-3 flex items-center gap-2 font-pixel text-label text-ink-soft">
         <span className="relative flex h-2 w-2">
           <span className="absolute inline-flex h-full w-full animate-ping bg-accent-pulse opacity-75" />
           <span className="relative inline-flex h-2 w-2 bg-accent-pulse" />
@@ -514,9 +514,9 @@ export function PulseMock() {
           { label: "CSAT (7d)", value: "82", tone: "text-accent-pulse", caption: undefined as string | undefined },
         ].map((stat) => (
           <div key={stat.label} className="pixel-border bg-white p-3">
-            <div className="text-[11px] text-ink-soft">{stat.label}</div>
-            <div className={`font-pixel text-lg ${stat.tone}`}>{stat.value}</div>
-            {stat.caption && <div className="mt-0.5 text-[9px] italic text-ink-soft">{stat.caption}</div>}
+            <div className="text-label text-ink-soft">{stat.label}</div>
+            <div className={`font-pixel text-heading ${stat.tone}`}>{stat.value}</div>
+            {stat.caption && <div className="mt-0.5 text-caption italic text-ink-soft">{stat.caption}</div>}
           </div>
         ))}
       </div>
@@ -525,10 +525,10 @@ export function PulseMock() {
 
       <div className="pixel-border mb-4 bg-white p-3">
         <div className="mb-1 flex items-center justify-between">
-          <div className="text-[11px] text-ink-soft">Checkout success rate, today</div>
+          <div className="text-label text-ink-soft">Checkout success rate, today</div>
           {statusBadge && (
             <span
-              className={`inline-flex items-center border-2 border-ink px-1.5 py-0.5 font-pixel text-[9px] leading-none text-white ${statusBadge.accentClass}`}
+              className={`inline-flex items-center border-2 border-ink px-1.5 py-0.5 font-pixel text-caption leading-none text-white ${statusBadge.accentClass}`}
             >
               {statusBadge.label}
             </span>

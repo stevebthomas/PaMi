@@ -52,12 +52,12 @@ export function MessageInput() {
         onKeyDown={handleKeyDown}
         rows={2}
         placeholder={`Message ${channelLabel}…`}
-        className="pixel-border flex-1 resize-none bg-white px-2 py-1.5 text-sm text-ink outline-none"
+        className="pixel-border flex-1 resize-none bg-white px-2 py-1.5 text-body text-ink outline-none"
       />
       <button
         onClick={handleSend}
         disabled={!value.trim() || Boolean(pendingReplyFrom)}
-        className="pixel-border bg-accent-chattr px-3 py-2 text-xs font-pixel text-white disabled:cursor-not-allowed disabled:opacity-40"
+        className="pixel-border bg-accent-chattr px-3 py-2 text-label font-pixel text-white disabled:cursor-not-allowed disabled:opacity-40"
       >
         Send
       </button>
