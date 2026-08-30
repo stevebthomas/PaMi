@@ -883,7 +883,7 @@ export const SCORE_EXPLANATION_PROMPT = `You are writing the short "why this sco
 You will be given three things: (1) the player's full Slack transcript for the day — every channel and DM, with who said what and when; (2) the five final scores; and (3) internal grader notes captured during the day, each possibly carrying a short topic label hinting which dimension it bears on. Treat the transcript as the source of truth for what happened, and use the grader notes as extra signal you can lean on so no detail is lost.
 
 The five dimensions you must explain, in order:
-- responseTime: how quickly the player acknowledged and engaged the incident once it was escalated to them.
+- responseTime: how quickly the player picked up EVERY response-requiring ask across the whole day, not just the first one — the initial incident pickup AND staying reachable when later asks (Derek's recap, the tradeoff decision, etc.) landed. Going dark mid-incident, even after a fast first ack, lowers this.
 - triageQuality: prioritization and judgment — investigating the real problem, assigning the right work to the right owner promptly, and foreseeing the downstream cost of a fix before committing to it.
 - commClarity: how clear, grounded, and appropriately-toned their communication was, including whether they closed the loop with a written postmortem.
 - stakeholderMgmt: keeping leadership and key people (e.g. the VP) in the loop, and owning decisions that were theirs to make instead of letting them escalate or default to someone else.

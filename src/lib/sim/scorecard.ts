@@ -1,32 +1,110 @@
 import type { AgentId, ClaimLedgerEntry, CoachingEntry, Evaluation, Message, ScorecardCategory, ScorecardScores, StateBag, StudyAreaEntry, Ticket } from "./types";
 import { AGENT_NAMES, PAYMENTS_DOMAIN_ASSIGNEES, rosterName } from "./types";
 import { STUDY_RESOURCES } from "../../data/study-resources";
-import { INCIDENT_DECLARED_AT } from "./incidentTimeline";
 import { day1ScenarioEvents } from "../../data/day1-scenario";
 
-// Day 1-specific: which event's acknowledgment feeds responseTime/stakeholderMgmt,
-// and the timing thresholds those scores are judged against. A future story with
-// its own event ids/timeline would need its own version of these three lines —
-// see scenario-audit-day1.md's Step 3 notes on moving this into story data.
-const INCIDENT_EVENT_ID = "priya-incidents-escalation";
+// Day 1-specific: which event's acknowledgment feeds stakeholderMgmt's
+// "did the player ever hear from Derek" fallback below. A future story with
+// its own event ids/timeline would need its own version of this line — see
+// scenario-audit-day1.md's Step 3 notes on moving this into story data.
 const DEREK_EVENT_ID = "derek-escalation";
-// Both derived from the single source of truth (incidentTimeline.ts /
-// day1-scenario.ts) rather than hardcoded, so they can't silently drift from
-// the scripted events they're meant to describe.
-const INCIDENT_TRIGGER_MINUTES = INCIDENT_DECLARED_AT; // priya-incidents-escalation fires at 9:15 AM
-const RAJ_NUDGE_EVENT = day1ScenarioEvents.find((e) => e.id === "raj-nudge");
-if (!RAJ_NUDGE_EVENT) {
-  throw new Error("scorecard.ts: expected a 'raj-nudge' event in day1ScenarioEvents to derive INCIDENT_DEADLINE_MINUTES from");
-}
-const INCIDENT_DEADLINE_MINUTES = RAJ_NUDGE_EVENT.triggerTimeMinutes; // raj-nudge at 9:45 AM marks a slow response
 
-function scoreResponseTime(ackAt: number | null): number {
-  if (ackAt === null) return 1;
-  const delta = ackAt - INCIDENT_TRIGGER_MINUTES;
+// QA #9 fix: responseTime used to score ONLY the first incident ack
+// (priya-incidents-escalation against a single fixed deadline), so a player
+// who acked fast then went dark for the rest of the incident — forcing Raj's
+// unilateral fix call and repeated Priya nudges — still scored a perfect 10.
+// It now averages a latency score across EVERY response-requiring moment of
+// the day (every fired requiresResponse ScenarioEvent, plus the tradeoff
+// decision), so staying reachable matters as much as the initial pickup. See
+// computeResponseTimeScore below.
+
+/** Deadline (minutes) assumed for a requiresResponse event that doesn't
+ * declare its own responseDeadlineMinutes. */
+const DEFAULT_RESPONSE_DEADLINE_MINUTES = 30;
+
+/** The rollback-vs-patch-forward tradeoff offer's own trigger time, pulled
+ * from day1-scenario.ts's data rather than hardcoded, so it can't silently
+ * drift from the scripted beat it describes (same discipline the old
+ * INCIDENT_TRIGGER_MINUTES derivation this replaces used). */
+const RAJ_TRADEOFF_OFFER_EVENT = day1ScenarioEvents.find((e) => e.id === "raj-tradeoff-offer");
+if (!RAJ_TRADEOFF_OFFER_EVENT) {
+  throw new Error("scorecard.ts: expected a 'raj-tradeoff-offer' event in day1ScenarioEvents to score the tradeoff-decision latency against");
+}
+
+/** One ask's latency curve — shared by every requiresResponse event and the
+ * tradeoff-decision entry below (see computeResponseTimeScore): answered
+ * within 5 min of the ask -> 10; within the ask's own deadline -> 8; within
+ * 2x that deadline -> 5; later than that -> 3; never answered by day end -> 1.
+ * This is the per-ask curve helper the old single-ack scoreResponseTime has
+ * been refactored into. */
+function scoreAskLatency(respondedAt: number | null, triggerAt: number, deadlineMinutes: number): number {
+  if (respondedAt === null) return 1;
+  const delta = respondedAt - triggerAt;
   if (delta <= 5) return 10;
-  if (delta <= 15) return 8;
-  if (delta <= INCIDENT_DEADLINE_MINUTES - INCIDENT_TRIGGER_MINUTES) return 6;
+  if (delta <= deadlineMinutes) return 8;
+  if (delta <= deadlineMinutes * 2) return 5;
   return 3;
+}
+
+/**
+ * QA #9: responseTime is the mean of a latency score for EVERY response-
+ * requiring moment of the day, not just the first incident ack — one entry
+ * per fired requiresResponse ScenarioEvent (scoreAskLatency against that
+ * event's own trigger time and deadline), plus one additional entry for the
+ * rollback-vs-patch-forward tradeoff decision when Raj's offer was made:
+ * decided within 30 min -> 10; within 60 -> 7; later -> 4; never decided (and
+ * Raj had to escalate/decide it himself) -> 1.
+ *
+ * "Fired" is approximated as triggerTimeMinutes <= completedAtSimMinutes.
+ * That's exact, not a heuristic, for every event scored here: none of
+ * priya-heads-up-dm / priya-incidents-escalation / maya-design-question /
+ * derek-escalation / postmortem-prompt / raj-tradeoff-offer carry a
+ * `condition` in day1-scenario.ts, so each fires unconditionally once the
+ * clock crosses its trigger time. A future story event scored here that DOES
+ * carry a `condition` would need this to check firedEventIds instead.
+ */
+function computeResponseTimeScore(stateBag: StateBag, completedAtSimMinutes: number): number {
+  const entries: number[] = [];
+
+  for (const e of day1ScenarioEvents) {
+    if (!e.requiresResponse) continue;
+    if (e.triggerTimeMinutes > completedAtSimMinutes) continue; // never fired
+    const respondedAt = stateBag.respondedAtMinutes[e.id] ?? null;
+    entries.push(
+      scoreAskLatency(respondedAt, e.triggerTimeMinutes, e.responseDeadlineMinutes ?? DEFAULT_RESPONSE_DEADLINE_MINUTES)
+    );
+  }
+
+  if (RAJ_TRADEOFF_OFFER_EVENT!.triggerTimeMinutes <= completedAtSimMinutes) {
+    const offeredAt = RAJ_TRADEOFF_OFFER_EVENT!.triggerTimeMinutes;
+    const decidedAt = stateBag.tradeoffDecidedAtMinutes;
+    let tradeoffScore: number;
+    if (decidedAt !== null) {
+      const delta = decidedAt - offeredAt;
+      tradeoffScore = delta <= 30 ? 10 : delta <= 60 ? 7 : 4;
+    } else {
+      // Never decided by the player. Scored 1 whether Raj had to escalate to
+      // Derek or just weighed the call himself (rajFallbackDecision) — both
+      // mean the tradeoff never got a player decision. (By day end this is
+      // the only way a fired offer stays undecided: Raj always eventually
+      // decides or escalates.)
+      tradeoffScore = 1;
+    }
+    entries.push(tradeoffScore);
+  }
+
+  if (entries.length === 0) {
+    // No response-requiring moment fired at all (an extremely early forced
+    // end-of-day) — fall back to the old single-ack behavior against the
+    // incident escalation ask so this never divides by zero.
+    return scoreAskLatency(
+      stateBag.respondedAtMinutes["priya-incidents-escalation"] ?? null,
+      555, // priya-incidents-escalation's triggerTimeMinutes (9:15 AM)
+      DEFAULT_RESPONSE_DEADLINE_MINUTES
+    );
+  }
+
+  return average(entries);
 }
 
 function average(values: number[]): number {
@@ -288,7 +366,7 @@ export function computeScorecard(
     };
   });
 
-  const responseTime = scoreResponseTime(stateBag.respondedAtMinutes[INCIDENT_EVENT_ID] ?? null);
+  const responseTime = computeResponseTimeScore(stateBag, completedAtSimMinutes);
 
   // Task Assignment (realism-features.md) — folds into triageQuality rather
   // than a standalone scorecard dimension, since "did you assign the right
