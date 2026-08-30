@@ -813,6 +813,13 @@ export interface StateBag {
    * subtask (A2); this is just the data. Empty for now. Must stay plain-JSON
    * (no Sets/Maps/closures) so it survives JSON round-tripping for persistence. */
   pendingObligations: ObligationEntry[];
+  /** Keys of canned in-channel redirects (see relevance.ts / getRedirectLine)
+   * that have already fired, one entry per `${day}:${agentId}:${channel}`. A
+   * given redirect line fires at most once per day per (agent, channel); after
+   * that the agent stays silent rather than repeat the identical canned line on
+   * every subsequent message. Lives here (not a Set) so it round-trips through
+   * session persistence as plain JSON, exactly like fixLandedFollowUpsSent. */
+  redirectsFiredToday: string[];
   /** The player's own name, captured on the orientation screen before Day 1
    * starts (see setPlayerName / WelcomeScreen). Empty string until entered —
    * which is also the state old persisted sessions and the HR orientation chat
@@ -846,6 +853,7 @@ export const initialStateBag: StateBag = {
   payoutInconsistencySurfaced: false,
   commitmentLedger: [],
   pendingObligations: [],
+  redirectsFiredToday: [],
   playerName: "",
 };
 

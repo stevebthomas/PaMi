@@ -133,6 +133,33 @@ const TRADEOFF_ENGAGEMENT_KEYWORDS =
  * Derek's 10:20 escalation would deliver even under +15m clock jumps. */
 const RAJ_FALLBACK_KICKOFF_MINUTES = 605;
 
+/** Static, per-choice fallback copy that is guaranteed consistent with the
+ * structured `choice` field. Used two ways: (1) the rollback entry backs the
+ * whole-decision API-failure fallback (SCRIPTED_RAJ_FALLBACK below), and (2)
+ * both entries back reconcileRajFallback's consistency guard — when the model's
+ * free-text argues for the OPPOSITE fix from the choice it returned, we keep the
+ * structured choice (it drives real state) and swap in the matching entry's
+ * reasoning + derekLine so the narrative can't contradict the state. Both texts
+ * argue strictly FOR their own key's fix; reasoning never names Derek in the
+ * third person (it may be relayed BY Derek). */
+const STATIC_RAJ_FALLBACK_COPY: Record<
+  "rollback" | "patch-forward",
+  { reasoning: string; derekLine: string }
+> = {
+  rollback: {
+    reasoning:
+      "Couldn't reach you and buyers are still failing checkout, so I made the call. Went with the rollback since it's the known-good fix and I can get it in fast. We lose last week's faster seller payouts for now, but I'd rather stop the bleeding and sort payout speed back out once this is stable.",
+    derekLine:
+      "Going with the rollback. It's the sure fix and I can't sit on this while checkout's bleeding, so I'm starting now.",
+  },
+  "patch-forward": {
+    reasoning:
+      "Couldn't reach you and buyers are still failing checkout, so I made the call. Went patch-forward to keep last week's faster seller payouts live, so nobody in today's fast-track batch gets pushed back. The tradeoff is I couldn't reproduce the exact Stripe failure, so I'm accepting the first ship might not fully cover it and I may need a second pass.",
+    derekLine:
+      "Going patch-forward. It keeps the faster payouts whole for sellers and the only real cost is it's on me if the first ship needs a follow-up pass. Starting now.",
+  },
+};
+
 /** Deterministic fallback for Raj's decision used ONLY when the model route
  * fails outright (network error / malformed response) — never on the happy
  * path. Documented as the API-failure path so the escalation still fires with
@@ -142,11 +169,38 @@ const RAJ_FALLBACK_KICKOFF_MINUTES = 605;
  * the caller at resolution time. */
 const SCRIPTED_RAJ_FALLBACK: { choice: "rollback"; reasoning: string; derekLine: string } = {
   choice: "rollback",
-  reasoning:
-    "Couldn't reach you and buyers are still failing checkout, so I made the call. Went with the rollback since it's the known-good fix and I can get it in fast. We lose last week's faster seller payouts for now, but I'd rather stop the bleeding and sort payout speed back out once this is stable.",
-  derekLine:
-    "Going with the rollback. It's the sure fix and I can't sit on this while checkout's bleeding, so I'm starting now.",
+  ...STATIC_RAJ_FALLBACK_COPY.rollback,
 };
+
+/** Keyword tests over Raj's fallback free-text: which fix does the prose argue
+ * for? Deliberately cheap and one-directional per pattern. */
+const RAJ_FALLBACK_ROLLBACK_TEXT = /roll(ing)? ?back|\brollback\b|revert(ing|ed)?|old (webhook|retry|cadence)/i;
+const RAJ_FALLBACK_PATCH_TEXT =
+  /patch[- ]?forward|patch(ing)? (it|the|forward)|keep(ing)? (the )?(faster )?payout|faster payouts?|forward fix/i;
+
+/** Deterministic consistency guard for Raj's fallback decision. The structured
+ * `choice` drives real state (the Taskflow ticket, Pulse recovery, applyEffect),
+ * while reasoning/derekLine drive only narrative — so if the model returns a
+ * choice whose own free-text clearly argues for the OPPOSITE fix, the two halves
+ * of the world split (Derek relays "the rollback" over reasoning that says "going
+ * patch-forward"). When the combined text points unambiguously the other way,
+ * keep the structured choice and swap in static, choice-consistent copy. Merely
+ * ambiguous text (neither pattern, or BOTH) is left untouched — no retry, no
+ * model call. */
+function reconcileRajFallback(d: {
+  choice: "rollback" | "patch-forward";
+  reasoning: string;
+  derekLine: string;
+}): { choice: "rollback" | "patch-forward"; reasoning: string; derekLine: string } {
+  const text = `${d.reasoning} ${d.derekLine}`;
+  const saysRollback = RAJ_FALLBACK_ROLLBACK_TEXT.test(text);
+  const saysPatch = RAJ_FALLBACK_PATCH_TEXT.test(text);
+  const clearlyOpposite =
+    (d.choice === "rollback" && saysPatch && !saysRollback) ||
+    (d.choice === "patch-forward" && saysRollback && !saysPatch);
+  if (!clearlyOpposite) return d;
+  return { choice: d.choice, ...STATIC_RAJ_FALLBACK_COPY[d.choice] };
+}
 
 export const ASK_CLAUDE_OPENER =
   "Ask me about any term or concept from today (HTTP codes, webhooks, business metrics, whatever's unfamiliar). I can't tell you what to say or do in the scenario, that part's yours to practice. But I'm happy to explain the vocabulary.";
@@ -376,7 +430,10 @@ async function requestRajFallbackDecision(): Promise<{
     recordUsage("tradeoff", data.usage);
     if (data.choice !== "rollback" && data.choice !== "patch-forward") return null;
     if (typeof data.reasoning !== "string" || typeof data.derekLine !== "string") return null;
-    return { choice: data.choice, reasoning: data.reasoning, derekLine: data.derekLine };
+    // Guard against a model output whose free-text argues for the opposite fix
+    // from the structured choice — keep the choice (it drives state), swap in
+    // consistent copy only when the prose is unambiguously contradictory.
+    return reconcileRajFallback({ choice: data.choice, reasoning: data.reasoning, derekLine: data.derekLine });
   } catch {
     return null;
   }
@@ -1439,11 +1496,24 @@ export const useSimStore = create<SimState>((set, get) => ({
     // Skipped entirely for the postmortem submission (see above).
     const { primary, secondary } = isPostmortemSubmission
       ? { primary: null, secondary: null }
-      : pickReactingAgents(channel, trimmed, pendingChannelEventsAtSendTime);
+      : pickReactingAgents(
+          channel,
+          trimmed,
+          pendingChannelEventsAtSendTime,
+          // The #general incident redirect stays gated until the incident is
+          // on the record (priya-heads-up-dm fired), so a pre-incident hello
+          // never triggers it. Other channels ignore this flag.
+          get().firedEventIds.has("priya-heads-up-dm")
+        );
 
     if (secondary) {
       const redirectLine = getRedirectLine(channel, secondary);
-      if (redirectLine) {
+      // A canned redirect line fires at most once per day per (agent, channel).
+      // The key lives in stateBag (plain JSON) so the cap survives persistence
+      // round-trips like every other sim flag; after the first fire the agent
+      // stays silent rather than repeat the identical line on every message.
+      const redirectKey = `${get().day}:${secondary}:${channel}`;
+      if (redirectLine && !get().stateBag.redirectsFiredToday.includes(redirectKey)) {
         const redirectMsg: Message = {
           id: makeId("msg"),
           channel,
@@ -1455,7 +1525,14 @@ export const useSimStore = create<SimState>((set, get) => ({
         set((s) => {
           const unread = new Set(s.unreadChannels);
           if (channel !== s.activeChannel) unread.add(channel);
-          return { messages: [...s.messages, redirectMsg], unreadChannels: unread };
+          return {
+            messages: [...s.messages, redirectMsg],
+            unreadChannels: unread,
+            stateBag: {
+              ...s.stateBag,
+              redirectsFiredToday: [...s.stateBag.redirectsFiredToday, redirectKey],
+            },
+          };
         });
       }
     }

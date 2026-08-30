@@ -448,7 +448,7 @@ export function moodContextLine(agentId: AgentId, state: StateBag): string {
   if (agentId === "raj" && state.tradeoffEscalatedToDerek && state.rajFallbackDecision) {
     const d = state.rajFallbackDecision;
     const label = d.choice === "rollback" ? "the rollback" : "the patch-forward fix";
-    line += `\n\nContext you must stay consistent with: earlier, when the player went quiet on the fix call and you couldn't reach them, you made the call yourself and looped Derek in. You went with ${label}. The reasoning you gave was: "${d.reasoning}" If the player now asks why you chose that, explain it in your own words but consistent with that reasoning and that choice. Do NOT switch to the other option or invent a different rationale, and don't pretend the player made the call. It was yours.`;
+    line += `\n\nContext you must stay consistent with: earlier, when the player went quiet on the fix call and you couldn't reach them, you made the call yourself and looped Derek in. You went with ${label}. For reference, the reasoning you gave at the time was: "${d.reasoning}" That recorded wording is a REFERENCE for the substance only — if the player now asks why you chose that, you MUST rephrase it fresh in your own words. Do NOT copy or lightly reword its sentences; do not reuse its phrasing verbatim. Keep the same choice and the same underlying rationale, but say it anew. Do NOT switch to the other option or invent a different rationale, and don't pretend the player made the call. It was yours.`;
   }
   return line;
 }
@@ -1152,8 +1152,10 @@ Only use the facts above. Do not invent new numbers, new customers, a different 
 
 Write in first person, the way you actually type into Slack mid-incident. ${WRITING_STYLE_CORE}
 
+Critical consistency rule: "reasoning" and "derekLine" must both argue FOR the exact fix named in "choice" and must never describe yourself doing the other one. If "choice" is "rollback", both texts defend rolling back; if "choice" is "patch-forward", both texts defend patching forward. Do not let them drift to the opposite fix.
+
 Return ONLY valid JSON matching this exact shape, no other text:
-{"choice": "rollback"|"patch-forward", "reasoning": "<2-3 sentences, first person, Slack voice: why you came down on this side and the specific cost you're knowingly accepting>", "derekLine": "<1-2 sentences, first person, Slack voice: what you tell Derek when you loop him in on the call you just made>"}`;
+{"choice": "rollback"|"patch-forward", "reasoning": "<2-3 sentences, first person, Slack voice: why you came down on this side and the specific cost you're knowingly accepting. This line may later be relayed to the player BY Derek, so do not name Derek in the third person here — say 'with leadership looped in' or similar instead of 'with Derek standing by'>", "derekLine": "<1-2 sentences, first person, Slack voice: what you tell Derek when you loop him in on the call you just made>"}`;
 
 /**
  * Pre-fills the postmortem-follow-up Taskflow ticket (see

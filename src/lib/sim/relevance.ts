@@ -1,4 +1,4 @@
-import type { AgentId, ChannelId, ScenarioEvent } from "./types";
+import { AGENT_NAMES, type AgentId, type ChannelId, type ScenarioEvent } from "./types";
 import { dmContactForChannel } from "./dmContacts";
 
 /** Every NPC who might reactively respond in a given channel/DM. DMs only
@@ -42,6 +42,31 @@ const RELEVANCE_KEYWORDS: Partial<Record<ChannelId, Partial<Record<AgentId, RegE
   },
 };
 
+/** Incident/domain nouns that mark a message as plausibly reporting an issue
+ * or seeking domain input — the deterministic relevance gate a #general
+ * message must clear before it earns a redirect. Greetings, intros, and
+ * chit-chat carry none of these and so get no canned redirect (they simply
+ * get no response, matching the ambient-world design). */
+const DOMAIN_INCIDENT_KEYWORDS =
+  /incident|outage|down\b|broken|failing|degrad|error|500s?\b|webhook|deploy|rollback|hotfix|payment|stripe|checkout|apple ?pay|google ?pay|customer|support|\bcs\b|ticket|csat|seller|refund|payout|\bbug\b|escalat|root cause|\bapi\b/i;
+
+/** True when the message plausibly reports a domain issue or seeks an agent's
+ * domain input (used to gate the #general redirect). */
+function seeksDomainInput(content: string): boolean {
+  return DOMAIN_INCIDENT_KEYWORDS.test(content);
+}
+
+/** True when the message is addressed TO this agent (an @mention of them) but
+ * carries no ask — a statement that delivers content rather than requesting
+ * their input. A redirect to "DM me for the answer" is a non-sequitur in reply
+ * to someone handing the agent the very thing they asked for, so it's
+ * suppressed. Deterministic and cheap: an @mention of the agent's name with no
+ * "?" reads as delivery, not a request. */
+function deliversContentTo(agentId: AgentId, content: string): boolean {
+  const mention = new RegExp(`@${AGENT_NAMES[agentId]}\\b`, "i");
+  return mention.test(content) && !content.includes("?");
+}
+
 /** The short, in-voice redirect a relevant-but-not-primary agent posts in
  * the shared channel, pointing the player to DM them for the full answer —
  * also what fires for the whole reply in a REDIRECT_ONLY_CHANNELS channel. */
@@ -79,11 +104,18 @@ export interface ReactingAgents {
  * that live in this channel (caller-computed from generic engine state —
  * pendingResponseIds cross-referenced with the scenario data — so this
  * function stays a pure, story-agnostic lookup).
+ *
+ * `incidentKnowable` gates the redirect-only-channel redirect on the
+ * underlying incident already being on the record (the caller passes
+ * firedEventIds.has("priya-heads-up-dm")). Before that, a #general hello can't
+ * be redirected to an incident that doesn't exist yet. Defaults to true so any
+ * non-story caller keeps the prior behavior.
  */
 export function pickReactingAgents(
   channel: ChannelId,
   content: string,
-  pendingChannelEvents: ScenarioEvent[] = []
+  pendingChannelEvents: ScenarioEvent[] = [],
+  incidentKnowable: boolean = true
 ): ReactingAgents {
   // Registry DM channels (dm_jordan, dm_chen, …) aren't in the static
   // CHANNEL_AGENTS map — they're resolved generically from DM_CONTACTS, so any
@@ -97,6 +129,13 @@ export function pickReactingAgents(
   if (!candidates || candidates.length === 0) return { primary: null, secondary: null };
 
   if (REDIRECT_ONLY_CHANNELS.has(channel)) {
+    // A #general redirect only fires when the message plausibly reports/seeks
+    // a domain issue AND the incident it points at is already knowable. A
+    // pre-incident greeting, intro, or chit-chat clears neither bar and gets
+    // no response at all (acceptable — matches the ambient-world design).
+    if (!incidentKnowable || !seeksDomainInput(content)) {
+      return { primary: null, secondary: null };
+    }
     return { primary: null, secondary: DEFAULT_PRIMARY[channel] ?? candidates[0] };
   }
 
@@ -115,6 +154,13 @@ export function pickReactingAgents(
   // Neither matched, or everyone matched — fall back to the default primary.
   const primary = defaultAgent;
   const secondary = matched.length === candidates.length ? candidates.find((id) => id !== primary) ?? null : null;
+  // Suppress the redirect when the message is addressed TO the would-be
+  // redirecting agent and merely delivers content (an @mention + statement,
+  // not an ask). Pointing them at "DM me for the answer" is a non-sequitur in
+  // reply to someone handing them what they asked for.
+  if (secondary && deliversContentTo(secondary, content)) {
+    return { primary, secondary: null };
+  }
   return { primary, secondary };
 }
 

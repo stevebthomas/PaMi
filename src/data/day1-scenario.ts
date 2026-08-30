@@ -374,7 +374,11 @@ export const day1ScenarioEvents: ScenarioEvent[] = [
       const d = state.rajFallbackDecision;
       if (!d) return `${prefix} Loop back with me when you're around.`;
       const label = d.choice === "rollback" ? "the rollback" : "the patch-forward fix";
-      return `${prefix} He went with ${label}: ${d.reasoning} Loop back with me when you're around.`;
+      // Quote Raj's reasoning as relayed speech rather than concatenating it
+      // bare — otherwise his first-person rationale renders in Derek's mouth
+      // ("...with Derek standing by," said by Derek). "His words:" makes the
+      // first-person pronouns unambiguously Raj's.
+      return `${prefix} He went with ${label}. His words: "${d.reasoning.trim()}" Loop back with me when you're around.`;
     },
     condition: (state) => state.tradeoffChoice === null && state.rajFallbackDecision !== null,
     // Read the choice and timing straight off Raj's decision — no longer a
