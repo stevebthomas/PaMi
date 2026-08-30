@@ -76,7 +76,16 @@ reason it is not built yet.
   loop instead of importing `useSimStore`, so Raj's fallback decision, the Marcus consult mechanic, and live
   Pulse readings go untested (its ticket records lack ids and assignees, so `fixTicketAssigneeId` is always
   null there). Not done yet because the harness was built for speed of iteration, and importing the real
-  store into a headless script is nontrivial.
+  store into a headless script is nontrivial. Its own copy of the tradeoff-evaluator gate is now stale versus
+  the store too: it's still keyed on the `raj-tradeoff-offer` beat and `#incidents`-only, while the store
+  keys on `raj-diagnosis` and also accepts `dm_raj` (commit 4c792bc); it also renders events via static
+  content, so `contentFor` variants never show there.
+- **Raj's conversational second promise.** Raj's holding follow-up — "once we've got enough traffic through
+  it," promised after a fix lands — has no delivery mechanism: the obligation engine's `ObligationKind` set
+  has no engineer-baseline kind, so only the fix-landed ping and the `#incidents` all-clear are guaranteed.
+  Delivering it would be a new `ObligationKind` (for example, triggered on the recovery/fully-recovered
+  threshold) plus a copy builder in `dmContacts`. Not done yet because it's a deliberate follow-up feature,
+  not a bolt-on to the fix pass.
 - **Schema validation on LLM output.** Every JSON route regex-matches the first `{...}`, parses it, and
   clamps scores, degrading silently to neutral defaults with no logging. Not done yet because the
   clamp-and-default path has been good enough for a single-player demo.

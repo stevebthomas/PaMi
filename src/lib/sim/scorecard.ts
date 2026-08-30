@@ -324,10 +324,14 @@ export function computeScorecard(
 
   // Raj asked for the rollback-vs-patch-forward call at 9:38 and never got
   // one, so Derek stepped in and made it himself (see day1-scenario.ts's
-  // derek-tradeoff-escalation). That's a stakeholder-management miss, not a
-  // triage or communication-clarity one, so it only touches that dimension —
-  // same additive-penalty pattern as noPostmortemPenalty above.
-  const tradeoffEscalationPenalty = stateBag.tradeoffEscalatedToDerek ? 2 : 0;
+  // derek-tradeoff-escalation). There used to be a standalone
+  // tradeoffEscalationPenalty here, but since dd6b4a4 Response time's
+  // per-ask latency rubric already includes a tradeoff-decision entry that
+  // scores 1 when Raj escalated, so an additive stakeholderMgmt penalty on
+  // top of that double-punished the same failure. Removed: the escalation
+  // still surfaces through the coaching note below and the transcript-based
+  // cross-functional grader, so the deterministic stakeholder score no
+  // longer subtracts for it.
 
   // C2 — unverified-attribution credibility penalty (see analyzeAttributions
   // and its block comment). A DELAYED, social consequence surfaced only here at
@@ -504,7 +508,6 @@ export function computeScorecard(
     (average(derekEvals.flatMap((e) => [e.scores.tone, e.scores.completeness])) ||
       (DEREK_EVENT_ID in stateBag.respondedAtMinutes ? 4 : 1)) -
       noPostmortemPenalty -
-      tradeoffEscalationPenalty -
       attributionPenalty
   );
 
