@@ -45,19 +45,19 @@ export function MessageInput() {
   }
 
   return (
-    <div className="flex items-end gap-2 border-t-2 border-ink bg-bg-window p-2">
+    <div className="flex items-end gap-2 border-t border-border-hairline bg-surface p-2">
       <textarea
         value={value}
         onChange={(e) => setValue(e.target.value)}
         onKeyDown={handleKeyDown}
         rows={2}
         placeholder={`Message ${channelLabel}…`}
-        className="pixel-border flex-1 resize-none bg-white px-2 py-1.5 text-body text-ink outline-none"
+        className="flex-1 resize-none rounded-md border border-border-hairline bg-surface px-3 py-2 text-body text-text-primary outline-none placeholder:text-text-secondary focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/30"
       />
       <button
         onClick={handleSend}
         disabled={!value.trim() || Boolean(pendingReplyFrom)}
-        className="pixel-border bg-accent-chattr px-3 py-2 text-label font-pixel text-white disabled:cursor-not-allowed disabled:opacity-40"
+        className="shrink-0 rounded-md bg-primary px-3 py-2 text-body font-medium text-primary-foreground transition-colors hover:bg-primary/80 disabled:cursor-not-allowed disabled:opacity-50"
       >
         Send
       </button>

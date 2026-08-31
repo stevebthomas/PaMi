@@ -27,32 +27,36 @@ export function ChannelList() {
   ];
 
   return (
-    <div className="pixel-scrollbar flex h-full w-44 shrink-0 flex-col overflow-y-auto border-r-2 border-ink bg-[#dfd6bd] p-2 text-body">
-      <div className="mb-1 mt-1 font-pixel text-caption text-ink-soft">CHANNELS</div>
+    <div className="flex h-full w-44 shrink-0 flex-col overflow-y-auto border-r border-border-hairline bg-canvas p-2 text-body">
+      <div className="mb-1 mt-1 px-2 text-label font-semibold uppercase tracking-wide text-text-secondary">CHANNELS</div>
       {channels.map((c) => (
         <button
           key={c.id}
           onClick={() => setActiveChannel(c.id)}
-          className={`mb-1 flex items-center justify-between rounded px-2 py-1 text-left ${
-            activeChannel === c.id ? "bg-accent-chattr text-white" : "hover:bg-black/10"
+          className={`mb-1 flex items-center justify-between rounded-md px-2 py-1 text-left ${
+            activeChannel === c.id
+              ? "bg-muted text-text-primary"
+              : "text-text-secondary hover:bg-muted/60 hover:text-text-primary"
           }`}
         >
           <span>{c.label}</span>
-          {unreadChannels.has(c.id) && <span className="h-2 w-2 rounded-full bg-accent-danger" />}
+          {unreadChannels.has(c.id) && <span className="h-2 w-2 rounded-full bg-accent-green" />}
         </button>
       ))}
 
-      <div className="mb-1 mt-3 font-pixel text-caption text-ink-soft">DIRECT MESSAGES</div>
+      <div className="mb-1 mt-3 px-2 text-label font-semibold uppercase tracking-wide text-text-secondary">DIRECT MESSAGES</div>
       {dms.map((c) => (
         <button
           key={c.id}
           onClick={() => setActiveChannel(c.id)}
-          className={`mb-1 flex items-center justify-between rounded px-2 py-1 text-left ${
-            activeChannel === c.id ? "bg-accent-chattr text-white" : "hover:bg-black/10"
+          className={`mb-1 flex items-center justify-between rounded-md px-2 py-1 text-left ${
+            activeChannel === c.id
+              ? "bg-muted text-text-primary"
+              : "text-text-secondary hover:bg-muted/60 hover:text-text-primary"
           }`}
         >
           <span>{c.label}</span>
-          {unreadChannels.has(c.id) && <span className="h-2 w-2 rounded-full bg-accent-danger" />}
+          {unreadChannels.has(c.id) && <span className="h-2 w-2 rounded-full bg-accent-green" />}
         </button>
       ))}
     </div>

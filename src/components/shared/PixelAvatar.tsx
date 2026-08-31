@@ -94,7 +94,7 @@ export function PixelAvatar({ agentId, sizeClassName = "h-8 w-8" }: { agentId: A
   if (!sprite) {
     return (
       <div
-        className={`pixel-border flex shrink-0 items-center justify-center text-label font-pixel text-white ${sizeClassName} ${FALLBACK_COLORS[agentId]}`}
+        className={`flex shrink-0 items-center justify-center rounded-full border border-border-hairline text-label font-sans font-medium text-white ${sizeClassName} ${FALLBACK_COLORS[agentId]}`}
       >
         {AGENT_NAMES[agentId].slice(0, 1)}
       </div>
@@ -102,7 +102,7 @@ export function PixelAvatar({ agentId, sizeClassName = "h-8 w-8" }: { agentId: A
   }
 
   return (
-    <div className={`pixel-border shrink-0 overflow-hidden ${sizeClassName} ${FALLBACK_COLORS[agentId]}`}>
+    <div className={`shrink-0 overflow-hidden rounded-full border border-border-hairline ${sizeClassName} ${FALLBACK_COLORS[agentId]}`}>
       <svg viewBox="0 0 8 8" shapeRendering="crispEdges" className="h-full w-full" aria-label={AGENT_NAMES[agentId]}>
         {sprite.grid.map((row, y) =>
           row.split("").map((ch, x) => {

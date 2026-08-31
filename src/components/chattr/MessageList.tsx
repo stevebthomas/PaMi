@@ -5,6 +5,7 @@ import { useDocsStore } from "@/store/docsStore";
 import { getSimDoc } from "@/data/simDocs";
 import { PixelAvatar } from "@/components/shared/PixelAvatar";
 import { TypingDots } from "@/components/shared/TypingDots";
+import { FileText } from "lucide-react";
 
 export function MessageList() {
   const activeChannel = useSimStore((s) => s.activeChannel);
@@ -24,9 +25,9 @@ export function MessageList() {
   }, [messages.length, showTyping]);
 
   return (
-    <div className="pixel-scrollbar flex-1 overflow-y-auto p-3">
+    <div className="flex-1 overflow-y-auto p-3">
       {messages.length === 0 && (
-        <p className="mt-6 text-center text-body text-ink-soft">Nothing here yet.</p>
+        <p className="mt-6 text-center text-body text-text-secondary">Nothing here yet.</p>
       )}
       {messages.map((m) => {
         // System-voice messages (the 8:30 welcome, the 9:00 standup digest,
@@ -45,20 +46,20 @@ export function MessageList() {
                 <span
                   className={
                     isSystem
-                      ? "text-body font-semibold font-pixel text-ink-soft"
-                      : "text-body font-semibold text-ink"
+                      ? "text-body font-semibold text-text-secondary"
+                      : "text-body font-semibold text-text-primary"
                   }
                 >
                   {AGENT_NAMES[m.senderId]}
                 </span>
-                <span className="text-label text-ink-soft">{formatSimTime(m.sentAtSimMinutes)}</span>
+                <span className="font-mono text-label tabular-nums text-text-secondary">{formatSimTime(m.sentAtSimMinutes)}</span>
               </div>
               {isSystem ? (
-                <p className="whitespace-pre-wrap border-l-2 border-[#5b5470] bg-[#5b5470]/10 py-0.5 pl-2 text-body italic leading-snug text-ink-soft">
+                <p className="whitespace-pre-wrap border-l border-border-hairline py-0.5 pl-2 text-body italic leading-snug text-text-secondary">
                   {m.content}
                 </p>
               ) : (
-                <p className="whitespace-pre-wrap text-body leading-snug text-ink">{m.content}</p>
+                <p className="whitespace-pre-wrap text-body leading-snug text-text-primary">{m.content}</p>
               )}
               {/* Doc chip(s): open in the in-sim Docs app, never a real
                   download. Covers both the singular `attachment` field and
@@ -77,9 +78,9 @@ export function MessageList() {
                       recordDocOpened(a.docId);
                       openDocRequest(a.docId);
                     }}
-                    className="pixel-border mt-1.5 inline-flex items-center gap-1 bg-white px-2 py-1 text-label text-ink hover:-translate-y-0.5"
+                    className="mt-1.5 inline-flex items-center gap-1.5 rounded-md border border-border-hairline bg-surface px-2 py-1 text-label text-text-primary transition-colors hover:bg-muted"
                   >
-                    <span>📄</span>
+                    <FileText className="size-3.5 text-text-secondary" aria-hidden />
                     {a.label}
                   </button>
                 ))}
@@ -88,9 +89,9 @@ export function MessageList() {
         );
       })}
       {showTyping && pendingReplyFrom && (
-        <div className="mb-3 flex items-center gap-2 text-label italic text-ink-soft">
+        <div className="mb-3 flex items-center gap-2">
           <PixelAvatar agentId={pendingReplyFrom} sizeClassName="h-6 w-6" />
-          <div className="pixel-border flex items-center bg-white px-2 py-1.5">
+          <div className="flex items-center rounded-md border border-border-hairline bg-surface px-2 py-1.5">
             <TypingDots />
           </div>
         </div>

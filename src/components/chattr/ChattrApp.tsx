@@ -14,7 +14,7 @@ export function ChattrApp() {
   return (
     <div className="@container flex h-full min-h-0 w-full">
       <ChannelList />
-      <div className="flex min-h-0 flex-1 flex-col">
+      <div className="flex min-h-0 flex-1 flex-col bg-surface">
         <MessageList />
         <MessageInput />
       </div>
