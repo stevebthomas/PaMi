@@ -4,7 +4,7 @@ import { dmContactForChannel } from "./dmContacts";
 /** Every NPC who might reactively respond in a given channel/DM. DMs only
  * ever have one candidate; shared channels like #incidents can have more
  * than one agent with a stake in what gets asked there. #general's single
- * candidate only ever matters as the redirect voice (see REDIRECT_ONLY_CHANNELS) —
+ * candidate only ever matters as the redirect voice (see REDIRECT_ONLY_CHANNELS):
  * nobody gives a full reply there. */
 export const CHANNEL_AGENTS: Partial<Record<ChannelId, AgentId[]>> = {
   incidents: ["raj", "priya"],
@@ -17,21 +17,21 @@ export const CHANNEL_AGENTS: Partial<Record<ChannelId, AgentId[]>> = {
 };
 
 /** When a channel message doesn't clearly point at one agent (or points at
- * all of them), this is who answers in full by default — matches who was
+ * all of them), this is who answers in full by default: matches who was
  * already the sole responder in #incidents before this existed. */
 const DEFAULT_PRIMARY: Partial<Record<ChannelId, AgentId>> = {
   incidents: "raj",
   general: "priya",
 };
 
-/** Channels where nobody ever gives a full generated reply — any player
+/** Channels where nobody ever gives a full generated reply: any player
  * message just gets a short, canned redirect line pointing at the real
  * conversation. #general isn't a real incident-response surface in this
  * story; previously a message there vanished entirely (no candidate agent
  * existed for it at all), which read as a void, not a redirect. */
 const REDIRECT_ONLY_CHANNELS = new Set<ChannelId>(["general"]);
 
-/** Keyword relevance per agent, per channel — used only where a channel has
+/** Keyword relevance per agent, per channel: used only where a channel has
  * more than one candidate agent. Deliberately simple/deterministic rather
  * than an extra AI call: it keeps the redirect guaranteed-short and adds no
  * latency to every channel message. */
@@ -43,7 +43,7 @@ const RELEVANCE_KEYWORDS: Partial<Record<ChannelId, Partial<Record<AgentId, RegE
 };
 
 /** Incident/domain nouns that mark a message as plausibly reporting an issue
- * or seeking domain input — the deterministic relevance gate a #general
+ * or seeking domain input: the deterministic relevance gate a #general
  * message must clear before it earns a redirect. Greetings, intros, and
  * chit-chat carry none of these and so get no canned redirect (they simply
  * get no response, matching the ambient-world design). */
@@ -57,7 +57,7 @@ function seeksDomainInput(content: string): boolean {
 }
 
 /** True when the message is addressed TO this agent (an @mention of them) but
- * carries no ask — a statement that delivers content rather than requesting
+ * carries no ask: a statement that delivers content rather than requesting
  * their input. A redirect to "DM me for the answer" is a non-sequitur in reply
  * to someone handing the agent the very thing they asked for, so it's
  * suppressed. Deterministic and cheap: an @mention of the agent's name with no
@@ -68,7 +68,7 @@ function deliversContentTo(agentId: AgentId, content: string): boolean {
 }
 
 /** The short, in-voice redirect a relevant-but-not-primary agent posts in
- * the shared channel, pointing the player to DM them for the full answer —
+ * the shared channel, pointing the player to DM them for the full answer:
  * also what fires for the whole reply in a REDIRECT_ONLY_CHANNELS channel. */
 const REDIRECT_LINES: Partial<Record<ChannelId, Partial<Record<AgentId, string>>>> = {
   incidents: {
@@ -81,7 +81,7 @@ const REDIRECT_LINES: Partial<Record<ChannelId, Partial<Record<AgentId, string>>
 };
 
 export interface ReactingAgents {
-  /** Who gives the full, live-generated reply in-channel — same as today. */
+  /** Who gives the full, live-generated reply in-channel: same as today. */
   primary: AgentId | null;
   /** Who (if anyone) posts a short in-channel redirect to DM instead. */
   secondary: AgentId | null;
@@ -101,8 +101,8 @@ export interface ReactingAgents {
  *   they weren't the "expected" one)
  *
  * `pendingChannelEvents` is the currently-pending requiresResponse events
- * that live in this channel (caller-computed from generic engine state —
- * pendingResponseIds cross-referenced with the scenario data — so this
+ * that live in this channel (caller-computed from generic engine state,
+ * pendingResponseIds cross-referenced with the scenario data, so this
  * function stays a pure, story-agnostic lookup).
  *
  * `incidentKnowable` gates the redirect-only-channel redirect on the
@@ -118,7 +118,7 @@ export function pickReactingAgents(
   incidentKnowable: boolean = true
 ): ReactingAgents {
   // Registry DM channels (dm_jordan, dm_chen, …) aren't in the static
-  // CHANNEL_AGENTS map — they're resolved generically from DM_CONTACTS, so any
+  // CHANNEL_AGENTS map: they're resolved generically from DM_CONTACTS, so any
   // future DM-capable contact behaves like the existing single-candidate DMs
   // (that contact answers in full, no secondary redirect) with zero new
   // per-character wiring here.
@@ -132,7 +132,7 @@ export function pickReactingAgents(
     // A #general redirect only fires when the message plausibly reports/seeks
     // a domain issue AND the incident it points at is already knowable. A
     // pre-incident greeting, intro, or chit-chat clears neither bar and gets
-    // no response at all (acceptable — matches the ambient-world design).
+    // no response at all (acceptable, matches the ambient-world design).
     if (!incidentKnowable || !seeksDomainInput(content)) {
       return { primary: null, secondary: null };
     }
@@ -151,7 +151,7 @@ export function pickReactingAgents(
     return { primary: matched[0], secondary: null };
   }
 
-  // Neither matched, or everyone matched — fall back to the default primary.
+  // Neither matched, or everyone matched: fall back to the default primary.
   const primary = defaultAgent;
   const secondary = matched.length === candidates.length ? candidates.find((id) => id !== primary) ?? null : null;
   // Suppress the redirect when the message is addressed TO the would-be

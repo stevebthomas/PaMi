@@ -70,7 +70,7 @@ function truncate(text: string, max: number): string {
   return `${text.slice(0, max).trimEnd()}…`;
 }
 
-/** Full scorecard body — scores, and (when present) postmortem, coaching
+/** Full scorecard body: scores, and (when present) postmortem, coaching
  * notes, areas to study, playtester notes. An aggregate record only has
  * scores (no per-message detail averages meaningfully), so every section
  * past the score bars is optional and simply omitted when its data isn't
@@ -86,7 +86,7 @@ export function ScorecardDetail({ record }: { record: DayScorecardRecord | Playt
 
   // C1: the five per-category, evidence-backed explanations shown under each
   // bar. Present on normal current-day records; absent on zero-engagement
-  // days, records that predate the feature, and playtests/*.json — in which
+  // days, records that predate the feature, and playtests/*.json, in which
   // case we degrade to the flat COACHING NOTES list below (fallback mode).
   const categoryExplanations =
     "categoryExplanations" in record ? (record.categoryExplanations ?? null) : null;
@@ -150,7 +150,7 @@ export function ScorecardDetail({ record }: { record: DayScorecardRecord | Playt
           explanations above. The one exception is a post-day follow-through
           note (recordFollowUpTicket, added when the player turns a postmortem
           line into a tracked ticket AFTER the day is recorded, i.e. too late to
-          fold into the summarizer) — surfaced here so that positive signal
+          fold into the summarizer); surfaced here so that positive signal
           isn't silently lost. */}
       {useExplanations && coachingNotes && coachingNotes.some((e) => e.messageId === "follow-up-ticket") && (
         <div className="mt-4">
@@ -252,7 +252,7 @@ export function ScorecardDetail({ record }: { record: DayScorecardRecord | Playt
         </div>
       )}
 
-      {/* Easter-egg display was removed deliberately (tone) — Day 1 Complete
+      {/* Easter-egg display was removed deliberately (tone): Day 1 Complete
           shouldn't undercut itself with achievement tracking. The underlying
           tracking (easterEggsFound, EasterEggDiscovery, the NPC reactions)
           stays; only this panel goes. */}

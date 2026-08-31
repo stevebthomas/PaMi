@@ -80,6 +80,8 @@ Next.js 16, React 19, TypeScript, Tailwind CSS 4, Zustand, `@anthropic-ai/sdk`, 
 
 ## Run locally
 
+Requires Node 20+, since this project runs Next.js 16.
+
 ```bash
 git clone <repo-url>
 cd pm-simulator
@@ -96,6 +98,16 @@ Per-agent model overrides live in `.env.local.example` (`RAJ_MODEL`, `PRIYA_MODE
 Approximate cost: NPC personas run on Haiku, the evaluator and coaching calls run on Sonnet, and a full
 day of play is a few dozen model calls total.
 
+### Scripts
+
+- `npm run dev`: starts the Next.js development server.
+- `npm run build`: builds the app for production.
+- `npm run lint`: runs ESLint over the project.
+- `npm run playtest`: runs the AI playtest suite (`scripts/playtest.ts`), four Opus personas driving the
+  real app and its API routes through the scenario.
+- `npm run scenario-audit`: runs a separate, static, LLM-driven design review of the scenario content
+  (`scripts/scenario-audit.ts`).
+
 ## Project structure
 
 ```
@@ -108,7 +120,7 @@ src/data/           day1-scenario (the scripted Day 1 events), study-resources
 scripts/            playtest, scenario-audit, test-day-outcome (headless store driver)
 playtests/          Playtest run output and findings logs
 supabase/           schema.sql (not currently wired to a working persistence path)
-docs/               technical-audit.md (the honest internal audit this README is based on)
+docs/               technical-audit.md (the honest internal audit this README is based on), PRD.md (Day 1 product requirements), roadmap.md (shipped, planned, and future work)
 .claude/agents/     executor.md, senior-executor.md (the orchestrator subagent definitions)
 ```
 

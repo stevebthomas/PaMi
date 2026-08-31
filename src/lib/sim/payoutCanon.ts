@@ -1,6 +1,6 @@
 /**
  * ============================================================================
- * SELLER PAYOUT PIPELINE CANON — leaf module, re-exported by worldCanon.
+ * SELLER PAYOUT PIPELINE CANON: leaf module, re-exported by worldCanon.
  * ============================================================================
  *
  * These are the load-bearing facts about the seller payout pipeline and what a

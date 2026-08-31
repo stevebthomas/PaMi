@@ -2,7 +2,7 @@ import type { AgentId, AssigneeId, ChannelId, DayOutcome, ScorecardScores, State
 import { getIncidentTimeline, RESOLUTION_ANNOUNCED_AT } from "./incidentTimeline";
 import { DM_CONTACTS, dmChannelId } from "./dmContacts";
 
-/** THE single builder for DayOutcome — see the type's own doc comment in
+/** THE single builder for DayOutcome: see the type's own doc comment in
  * types.ts for why this exists (a generic, day-agnostic "what actually
  * happened" record, not Day-1-specific prose). Every producer of a
  * DayScorecardRecord (the real store's recordDayScorecard and
@@ -12,7 +12,7 @@ import { DM_CONTACTS, dmChannelId } from "./dmContacts";
  */
 
 /** The narrow slice of live state buildDayOutcome needs. Callers pass
- * whatever they already have — this intentionally isn't "the whole store"
+ * whatever they already have: this intentionally isn't "the whole store"
  * (see incidentTimeline.ts's own IncidentTimelineInputs for the same
  * pattern). `tickets` is a minimal shape (just id + assigneeId) since
  * that's all fixTicketAssigneeId needs to look up; a caller with no real
@@ -39,7 +39,7 @@ export interface DayOutcomeInputs {
  * postmortem-submission ending and the forced-end-of-day boundary, and by
  * the time it runs, postmortemSubmitted truthfully reflects which one just
  * happened (the forced path only ever fires while dayComplete is still
- * false, which requires postmortemSubmitted to still be false too — see
+ * false, which requires postmortemSubmitted to still be false too, see
  * simStore.ts's advanceClock).
  */
 export function buildDayOutcome(inputs: DayOutcomeInputs): DayOutcome {

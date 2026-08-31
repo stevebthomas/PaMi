@@ -55,7 +55,7 @@ const CS_TEMPLATE_TAG = "cs-template";
 const SELLER_COMMS_TAG = "seller-comms";
 
 /**
- * Raj's "decision-acknowledged" entry, born settled — a fix decision, once
+ * Raj's "decision-acknowledged" entry, born settled: a fix decision, once
  * made, is settled context Raj is now operating under, not something for him to
  * re-acknowledge as news later. Records where it was made so his later
  * references stay consistent (the DM vs. #incidents cross-channel case is the
@@ -92,7 +92,7 @@ export function recordFixDecisionAck(
  * The assigned fix engineers' open "will report when the fix lands" commitment,
  * one per engineer. Kept open until the fix-landed follow-up DM actually goes
  * out (settleFixEngineerCommitment). `engineerIds` is passed in (see the
- * dependency note above) — the caller sources it from DM_CONTACTS.
+ * dependency note above); the caller sources it from DM_CONTACTS.
  */
 export function recordFixEngineerCommitments(
   ledger: CommitmentEntry[],
@@ -163,7 +163,7 @@ export function recordPlayerOwesSellerComms(ledger: CommitmentEntry[], atSimMinu
 }
 
 /** Settle Priya's seller-comms obligation (when the player attempts a
- * seller-facing note — see sellerCommsAttemptedAtMinutes in the store). */
+ * seller-facing note, see sellerCommsAttemptedAtMinutes in the store). */
 export function settlePlayerOwesSellerComms(ledger: CommitmentEntry[]): CommitmentEntry[] {
   return settleCommitment(ledger, commitmentId("player-owes-npc", "priya", SELLER_COMMS_TAG));
 }

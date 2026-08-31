@@ -9,9 +9,9 @@ import { AppIcon } from "@/components/shared/AppIcon";
 /**
  * Generic in-sim document viewer/library. Reads the active doc id from
  * docsStore: null (or an id that doesn't resolve in SIM_DOCS) shows the
- * library — a grid of tiles for every doc the player has opened so far
- * (stateBag.openedDocIds) — otherwise it renders the doc itself. Nothing
- * here is doc-specific — a new SIM_DOCS entry shows up with zero changes to
+ * library: a grid of tiles for every doc the player has opened so far
+ * (stateBag.openedDocIds); otherwise it renders the doc itself. Nothing
+ * here is doc-specific: a new SIM_DOCS entry shows up with zero changes to
  * this file.
  */
 export function DocsApp() {
@@ -83,7 +83,7 @@ export function DocsApp() {
 
 /**
  * Deliberately tiny, dependency-free markdown renderer, SCOPED to exactly the
- * subset the sim's docs use — no more:
+ * subset the sim's docs use, no more:
  *   - `# ` / `## ` headings
  *   - `---` horizontal rule
  *   - `- ` bullet lists (consecutive bullets grouped into one <ul>)
@@ -167,7 +167,7 @@ function renderMarkdown(markdown: string): ReactNode {
       continue;
     }
 
-    // Plain text — accumulate into the current paragraph.
+    // Plain text: accumulate into the current paragraph.
     paragraph.push(line.trim());
   }
 

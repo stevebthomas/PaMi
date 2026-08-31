@@ -17,7 +17,7 @@ export function getAnthropicClient(): Anthropic {
 
 /**
  * Per-agent model selection. The personas (Raj, Priya, Derek) are short,
- * in-character Slack replies — Haiku is fast and cheap enough for that.
+ * in-character Slack replies: Haiku is fast and cheap enough for that.
  * The evaluator judges PM skill quality, which benefits from a stronger
  * reasoning model, so it defaults to Sonnet.
  */
@@ -26,12 +26,12 @@ const PERSONA_MODELS: Partial<Record<AgentId, string>> = {
   priya: process.env.PRIYA_MODEL || "claude-haiku-4-5",
   derek: process.env.DEREK_MODEL || "claude-haiku-4-5",
   sam: process.env.SAM_MODEL || "claude-haiku-4-5",
-  // The assigned engineers answer narrow, in-character status questions —
+  // The assigned engineers answer narrow, in-character status questions:
   // same Haiku tier as the other personas.
   jordan: process.env.JORDAN_MODEL || "claude-haiku-4-5",
   chen: process.env.CHEN_MODEL || "claude-haiku-4-5",
   // Marcus answers a narrow, grounded set of payout-pipeline questions from
-  // his injected context — same Haiku tier as the other personas.
+  // his injected context: same Haiku tier as the other personas.
   marcus: process.env.MARCUS_MODEL || "claude-haiku-4-5",
 };
 
@@ -48,12 +48,12 @@ export const EVALUATOR_MODEL = process.env.EVALUATOR_MODEL || "claude-sonnet-4-6
  * point. It's one call per disengaged playthrough, so the cost is negligible. */
 export const RAJ_FALLBACK_MODEL = process.env.RAJ_FALLBACK_MODEL || "claude-sonnet-4-6";
 
-/** Ask Claude is a lightweight glossary/concepts tool, not a persona — Haiku is
+/** Ask Claude is a lightweight glossary/concepts tool, not a persona: Haiku is
  * plenty for short definitional answers. The "Areas to study" synthesis on the
  * scorecard uses EVALUATOR_MODEL instead, since that's closer to judgment work. */
 export const ASK_CLAUDE_MODEL = process.env.ASK_CLAUDE_MODEL || "claude-haiku-4-5";
 
-/** Stage B of the agent-to-agent cross-functional gate — a cheap, fast
+/** Stage B of the agent-to-agent cross-functional gate: a cheap, fast
  * classifier call, so it gets the same tier as the personas, not the
  * evaluator. */
 export const GATE_MODEL = process.env.GATE_MODEL || "claude-haiku-4-5";
@@ -93,7 +93,7 @@ const DASH_RUN = /\s*(?:—|--+)\s*/g;
  *  - Any ", ," or ", <punctuation>" artifact the above produces is
  *    collapsed away.
  *
- * Pure function — no side effects, safe to call on any persona reply text.
+ * Pure function: no side effects, safe to call on any persona reply text.
  */
 export function stripEmDashes(text: string): string {
   if (!text) return text;
@@ -116,7 +116,7 @@ export function stripEmDashes(text: string): string {
     .trim();
 }
 
-/** Real token counts straight off the API response — used for the local
+/** Real token counts straight off the API response: used for the local
  * session cost tracker. Never estimated; only the $/token conversion is an
  * approximation (see src/lib/costEstimate.ts). */
 export function extractUsage(response: Anthropic.Message): { inputTokens: number; outputTokens: number } {

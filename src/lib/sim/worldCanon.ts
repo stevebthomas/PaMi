@@ -9,7 +9,7 @@ import {
 
 /**
  * ============================================================================
- * WORLD CANON — the single home for load-bearing facts about BazaarLoop.
+ * WORLD CANON: the single home for load-bearing facts about BazaarLoop.
  * ============================================================================
  *
  * WHY THIS EXISTS: tonight's class of bug is content built without checking
@@ -77,7 +77,7 @@ export const PLAYER_ROLE = {
 } as const;
 
 /* ==========================================================================
- * RAJ'S ENGINEERING SQUAD — exactly five
+ * RAJ'S ENGINEERING SQUAD: exactly five
  * ========================================================================== */
 
 /** The five, and only five, engineers on Raj's squad. Raj's persona prompt
@@ -88,7 +88,7 @@ export const PLAYER_ROLE = {
 export type EngineerId = Extract<AssigneeId, "jordan" | "chen" | "marcus" | "ines" | "theo">;
 
 export interface Engineer {
-  /** Same id as the AssigneeId / DM-registry id — the join between an Office
+  /** Same id as the AssigneeId / DM-registry id: the join between an Office
    * card and its DM contact / availability, no name-matching. */
   id: EngineerId;
   name: string;
@@ -149,7 +149,7 @@ export const ENGINEERS: readonly Engineer[] = [
     skin: "#e0b58c",
     accent: "#c75146",
     defaultTask: "On this week's on-call rotation, patching a memory leak in search indexing that's causing nightly restarts.",
-    taskStartMinutes: 480, // 8:00 AM — on-call, in early
+    taskStartMinutes: 480, // 8:00 AM: on-call, in early
   },
   {
     id: "theo",
@@ -163,7 +163,7 @@ export const ENGINEERS: readonly Engineer[] = [
 ] as const;
 
 /* ==========================================================================
- * SCALE — checkout volume, Apple Pay share, funnel, support filing rate
+ * SCALE: checkout volume, Apple Pay share, funnel, support filing rate
  * ==========================================================================
  *
  * Every number in this section carries a one-line justification. The whole
@@ -185,7 +185,7 @@ export const APPLE_PAY_SHARE = 0.35;
 
 /** The incident-caused Apple Pay failure rate, in percentage POINTS, at full
  * degradation. This IS Raj's scripted fact (raj-diagnosis, 9:20 AM: "Stripe
- * webhook for Apple Pay is returning 500s on ~3% of attempts"). FIXED — do not
+ * webhook for Apple Pay is returning 500s on ~3% of attempts"). FIXED: do not
  * change. Everything a player can read is built off it so nothing contradicts
  * him. */
 export const APPLE_PAY_INCIDENT_FAILURE_POINTS = 3.0;
@@ -201,7 +201,7 @@ export const APPLE_PAY_INCIDENT_FAILURE_POINTS = 3.0;
 export const DEGRADED_RATE = BASELINE_RATE - APPLE_PAY_SHARE * APPLE_PAY_INCIDENT_FAILURE_POINTS;
 
 /** Priya's scripted escalation fact (priya-incidents-escalation, 9:15 AM: "14
- * tickets in the last hour about failed payments. All Apple Pay."). FIXED — do
+ * tickets in the last hour about failed payments. All Apple Pay."). FIXED: do
  * not change. It is the anchor the whole volume chain is reverse-derived from. */
 export const SUPPORT_TICKETS_PER_HOUR_AT_ESCALATION = 14;
 
@@ -237,7 +237,7 @@ export const TICKET_FILING_RATE = 0.5;
  * filing rate (every affected buyer files) the floor is 14 / 1.0 / 0.03 / 0.35
  * = ~1,333 attempts/hr = ~12,700/day. Getting to genuine low-thousands would
  * require lowering Priya's 14 (to ~2-3 tickets/hr) or dropping the Apple-Pay
- * reconciliation — both of which the spec forbids. So 0.50 filing + 0.35 Apple
+ * reconciliation, both of which the spec forbids. So 0.50 filing + 0.35 Apple
  * Pay share is the strongest HONEST reduction: ~25k/day, down from ~63k, is as
  * low as the fixed narrative facts allow without inventing an implausible 100%
  * filing rate.
@@ -272,7 +272,7 @@ export const SEARCHES_PER_MINUTE =
   ATTEMPT_VOLUME_PER_MINUTE / (SEARCH_TO_CART_RATE * CART_TO_CHECKOUT_START_RATE);
 
 /* ==========================================================================
- * INCIDENT — world facts (timing facts are imported from incidentTimeline)
+ * INCIDENT: world facts (timing facts are imported from incidentTimeline)
  * ==========================================================================
  *
  * The WORLD facts of the incident live here; the TIMING facts live in
@@ -301,7 +301,7 @@ export const INCIDENT = {
 } as const;
 
 /* ==========================================================================
- * SELLER PAYOUT PIPELINE — the downstream cost of a rollback (Marcus's beat)
+ * SELLER PAYOUT PIPELINE: the downstream cost of a rollback (Marcus's beat)
  * ==========================================================================
  *
  * A rollback fixes the buyer-side Apple Pay incident fast, but its cost isn't
@@ -330,7 +330,7 @@ export {
 };
 
 /* ==========================================================================
- * SAVE-FOR-LATER PRIOR TEST — Maya's ask-gated tradeoff data
+ * SAVE-FOR-LATER PRIOR TEST: Maya's ask-gated tradeoff data
  * ==========================================================================
  *
  * Unrelated to the payment incident: this backs Maya's low-stakes

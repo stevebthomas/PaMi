@@ -2,7 +2,7 @@
  * C2 end-to-end (case b) against the REAL simStore + REAL API routes, modeled
  * on scripts/test-day-outcome.ts. Plays a rollback day where the player NEVER
  * asks Priya anything, then tells Derek the ~60-seller figure is "Priya's
- * estimate" — an unverified attribution — and submits a postmortem. Prints the
+ * estimate" (an unverified attribution) and submits a postmortem. Prints the
  * stored claims ledger, the resulting stakeholderMgmt score, the "Attribution
  * accuracy" coaching note, and the rendered stakeholderMgmt category
  * explanation (the live C1 summarizer's output).
@@ -57,10 +57,10 @@ async function main() {
 
   S().startDay();
 
-  advanceTo(555); // 9:15 — incident escalation
+  advanceTo(555); // 9:15: incident escalation
   await S().sendPlayerMessage("incidents", "On it — digging into the Apple Pay checkout failures now, will keep everyone posted.");
 
-  // 9:20 — EARLY unverified attribution: the player pins ~60 sellers on Priya
+  // 9:20: EARLY unverified attribution. The player pins ~60 sellers on Priya
   // before Priya (or anyone) has ever stated a seller count. Priya has only
   // said "14 tickets" + offered to pull numbers, and the attribution check is
   // time-bounded to messages at/before this claim, so a later Priya "~60"
@@ -72,7 +72,7 @@ async function main() {
   );
 
   // Confirm what Priya had actually said by this point, and wait for the Derek
-  // DM's evaluation (with its claims ledger) to land BEFORE day end — otherwise
+  // DM's evaluation (with its claims ledger) to land BEFORE day end, otherwise
   // the fire-and-forget grading races the synchronous computeScorecard.
   console.log("\n=== Priya messages at/before the claim (min 560) ===");
   for (const m of S().messages.filter((m) => m.senderId === "priya" && m.sentAtSimMinutes <= 560)) {
@@ -84,12 +84,12 @@ async function main() {
   );
   console.log("derek eval with claims landed before day-end:", derekEvalLanded);
 
-  advanceTo(585); // 9:45 — decide rollback (no escalation penalty).
+  advanceTo(585); // 9:45: decide rollback (no escalation penalty).
   await S().sendPlayerMessage("incidents", "Let's roll back to the pre-payout-speed build — it's the sure, fast fix. We'll take the temporary seller-payout slowdown.");
   const ticketId = S().stateBag.tradeoffTicketId;
   if (ticketId) useTaskflowStore.getState().assignTicket(ticketId, "jordan", S().clockMinutes);
 
-  advanceTo(930); // 3:30 — postmortem
+  advanceTo(930); // 3:30: postmortem
   await S().sendPlayerMessage(
     "incidents",
     "Postmortem: Apple Pay checkout failures from Stripe-side webhook flakiness, roughly 3% of attempts. I acknowledged the escalation, chose to roll back to the pre-payout-speed build as the sure fix, and checkout recovered to baseline. Seller payouts went back to the old cadence temporarily. What I'd do differently: size the seller-payout impact with Priya directly before committing, rather than after."

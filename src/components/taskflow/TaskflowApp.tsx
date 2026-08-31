@@ -18,7 +18,7 @@ function adjacent(status: TicketStatus, direction: -1 | 1): TicketStatus | null 
 }
 
 /** Click-to-open assignee picker, front-and-center on the card itself (not a
- * settings menu) — matches real Jira's "who's doing this right now" being
+ * settings menu): matches real Jira's "who's doing this right now" being
  * the info people scan for. Local open/closed state is fine here (unlike
  * the time-advance toast) since losing it on a column-move remount just
  * means the picker closes, which is what a move should do anyway. */
@@ -80,19 +80,19 @@ function TicketCard({ ticket, onTimeAdvance }: { ticket: Ticket; onTimeAdvance: 
 
   // Only the specific ticket(s) flagged advancesTimeOnUpdate (today: the
   // tradeoff-decision ticket) advance the clock, and only once ever per
-  // ticket — timeCredited is the anti-gaming guard against toggling the
+  // ticket: timeCredited is the anti-gaming guard against toggling the
   // same ticket back and forth for free time. This is deliberately NOT
   // inside taskflowStore's own moveTicket action (which stays store-only,
-  // no dependency on simStore) — the UI is what already coordinates both
+  // no dependency on simStore); the UI is what already coordinates both
   // stores elsewhere in this app (see FollowUpTicketPrompt), so that's
   // where this reaches for advanceClock too, the same real mechanism +15m
   // already uses.
   //
-  // The confirmation itself is NOT local state on this card — a moved
+  // The confirmation itself is NOT local state on this card: a moved
   // ticket re-renders under a DIFFERENT column's parent <div> (todo/
   // in-progress/done are three separate filtered lists), so React
   // unmounts this exact instance and mounts a fresh one there. Any local
-  // useState set right before that move is lost before it ever paints —
+  // useState set right before that move is lost before it ever paints,
   // live-verified via the DOM, not a screenshot timing issue. onTimeAdvance
   // hands the "show a confirmation" decision up to TaskflowApp, which
   // stays mounted the whole time regardless of which column a card is in.
@@ -140,11 +140,11 @@ function TicketCard({ ticket, onTimeAdvance }: { ticket: Ticket; onTimeAdvance: 
   );
 }
 
-/** A minimal, real Kanban board — three columns, create a ticket, move it
+/** A minimal, real Kanban board: three columns, create a ticket, move it
  * between columns. Not gated behind easy difficulty (per the spec, this is
  * core Day 1, not an ambient-help feature). One or two tickets get seeded
  * automatically by the tradeoff decision (Feature B) and the postmortem
- * follow-up prompt (DayScorecard) — this component itself just renders and
+ * follow-up prompt (DayScorecard); this component itself just renders and
  * lets the player manage whatever's in useTaskflowStore. */
 export function TaskflowApp() {
   const tickets = useTaskflowStore((s) => s.tickets);
@@ -152,7 +152,7 @@ export function TaskflowApp() {
   const clockMinutes = useSimStore((s) => s.clockMinutes);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
-  // Owned here, not on the individual TicketCard — see the long comment on
+  // Owned here, not on the individual TicketCard: see the long comment on
   // TicketCard's handleMove for why a per-card confirmation silently never
   // rendered. TaskflowApp stays mounted regardless of which column any
   // given ticket ends up in, so this is the one place a "just happened"

@@ -6,7 +6,7 @@ import { normalizeQuoteWhitespace } from "@/lib/sim/scorecard";
 import type { ClaimLedgerEntry } from "@/lib/sim/types";
 
 interface EvaluateRequestBody {
-  /** The player's message being scored — must be the last entry in `transcript`. */
+  /** The player's message being scored: must be the last entry in `transcript`. */
   playerMessage: string;
   /** Which channel/DM `playerMessage` was sent in. */
   channel: string;
@@ -56,7 +56,7 @@ const CLAIM_STATUSES = new Set<ClaimLedgerEntry["status"]>(["GROUNDED", "UNSOURC
 
 /**
  * Parse and CODE-VALIDATE the evaluator's claims ledger (C2). Every well-formed
- * claim is KEPT — the claim itself is signal even when its evidence is bad — but
+ * claim is KEPT (the claim itself is signal even when its evidence is bad), but
  * the model-emitted `source` is treated as unverified: we independently check
  * whether that quote actually appears in the transcript the route received and
  * record the result as `sourceQuoteValidated`, rather than persisting it as if
@@ -93,7 +93,7 @@ function parseClaims(rawClaims: unknown, transcriptLineContents: string[]): Clai
 
 /** Grades a player's message against the four Day 1 scoring dimensions,
  * checking the claim against the real transcript rather than a static
- * summary — see EVALUATOR_PROMPT's groundedness check. */
+ * summary: see EVALUATOR_PROMPT's groundedness check. */
 export async function POST(request: Request) {
   const body: EvaluateRequestBody = await request.json();
   const { playerMessage, channel, transcript, observations } = body;
@@ -154,7 +154,7 @@ export async function POST(request: Request) {
     const jsonMatch = raw.match(/\{[\s\S]*\}/);
     if (!jsonMatch) {
       // Matches every other evaluator route's fallback shape (degrade to a
-      // neutral result instead of throwing an unhandled 500) — this route
+      // neutral result instead of throwing an unhandled 500); this route
       // used to be the one outlier that threw here.
       return NextResponse.json({ tone: 5, speed: 5, completeness: 5, strategicThinking: 5, feedback: "", claims: [], usage });
     }
@@ -168,7 +168,7 @@ export async function POST(request: Request) {
       feedback: typeof parsed.feedback === "string" ? parsed.feedback : "",
       // Capture the ledger the evaluator already emits (the prompt fills "claims"
       // before it scores). Validated against the transcript we received, never
-      // trusted blind — see parseClaims.
+      // trusted blind, see parseClaims.
       claims: parseClaims(parsed.claims, transcript.map((m) => m.content)),
     };
 

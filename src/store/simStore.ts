@@ -57,19 +57,19 @@ function recordUsage(callType: ApiCallType, usage: ApiUsage) {
 }
 
 /** Channels where a player message should be graded by the evaluator agent.
- * #design-review is Maya's low-stakes design-question channel — graded by
+ * #design-review is Maya's low-stakes design-question channel: graded by
  * the same evaluator/prompt as everywhere else, just under the #design-review
  * special case in EVALUATOR_PROMPT (handling/tone only, never the choice). */
 const GRADED_CHANNELS = new Set<ChannelId>(["incidents", "dm_derek", "design-review"]);
 
 /** A postmortem below this length is treated as ordinary chatter, not a
- * real submission — otherwise a stray short message sent in #incidents
+ * real submission; otherwise a stray short message sent in #incidents
  * after the prompt fires silently ends the day and gets scored as the
  * postmortem. */
 const POSTMORTEM_MIN_LENGTH = 120;
 
 /** Cheap, free pre-filter for "does this message look like a drafted
- * customer-facing template" — only messages that match ever trigger the
+ * customer-facing template": only messages that match ever trigger the
  * real (paid) quality evaluator below. */
 // Broadened after a live playtest miss: a well-written draft ("I'll write it
 // in the incident channel... posted the customer-facing draft") slipped
@@ -83,7 +83,7 @@ const POSTMORTEM_MIN_LENGTH = 120;
  * marcusConsultedAtMinutes. THE RULE: the message must be to Marcus's DM AND
  * mention at least one payout/pipeline/rollback term below. A bare "hi",
  * "you around?", or an off-topic aside does NOT count as consulting him on the
- * consequence — only a message that actually touches the thing he could warn
+ * consequence: only a message that actually touches the thing he could warn
  * about. Kept a plain regex (same pattern as CS_TEMPLATE_KEYWORDS) so it's
  * synchronous, deterministic, and adds no latency or model call. Asking Raj or
  * Priya to "check with Marcus" is deliberately OUT OF SCOPE for this signal:
@@ -99,13 +99,13 @@ const CS_TEMPLATE_KEYWORDS =
 /** B4: terms that mark a dm_priya reply as explicitly addressing the
  * seller-facing payout fallout, so it counts as the seller-comms attempt even
  * while the CS-template ask is still unhandled (the keyword only relaxes the
- * CS-priority gate — the substance floor in the detection block still applies).
+ * CS-priority gate; the substance floor in the detection block still applies).
  * Same plain-regex style as CS_TEMPLATE_KEYWORDS / MARCUS_PAYOUT_KEYWORDS:
  * synchronous, deterministic, no model call. */
 const SELLER_COMMS_KEYWORDS = /seller|payout|pay ?out|cadence|delay/i;
 
 /** Terms that mark a message to Derek (his DM) or the incident thread as an
- * actual incident briefing — a recap of what happened / the blast radius —
+ * actual incident briefing (a recap of what happened / the blast radius)
  * rather than off-topic chatter. Used to record derekBriefedOnIncidentAtMinutes
  * so Derek's 1:30 recap ask can acknowledge an earlier rundown instead of cold
  * re-asking for something the player already gave him. Deliberately anchored on
@@ -136,7 +136,7 @@ const RAJ_FALLBACK_KICKOFF_MINUTES = 605;
 /** Static, per-choice fallback copy that is guaranteed consistent with the
  * structured `choice` field. Used two ways: (1) the rollback entry backs the
  * whole-decision API-failure fallback (SCRIPTED_RAJ_FALLBACK below), and (2)
- * both entries back reconcileRajFallback's consistency guard — when the model's
+ * both entries back reconcileRajFallback's consistency guard: when the model's
  * free-text argues for the OPPOSITE fix from the choice it returned, we keep the
  * structured choice (it drives real state) and swap in the matching entry's
  * reasoning + derekLine so the narrative can't contradict the state. Both texts
@@ -161,7 +161,7 @@ const STATIC_RAJ_FALLBACK_COPY: Record<
 };
 
 /** Deterministic fallback for Raj's decision used ONLY when the model route
- * fails outright (network error / malformed response) — never on the happy
+ * fails outright (network error / malformed response), never on the happy
  * path. Documented as the API-failure path so the escalation still fires with
  * a coherent scripted reasoning line instead of silently vanishing. Both
  * choices are legitimate; rollback is picked here purely as the deterministic
@@ -180,12 +180,12 @@ const RAJ_FALLBACK_PATCH_TEXT =
 
 /** Deterministic consistency guard for Raj's fallback decision. The structured
  * `choice` drives real state (the Taskflow ticket, Pulse recovery, applyEffect),
- * while reasoning/derekLine drive only narrative — so if the model returns a
+ * while reasoning/derekLine drive only narrative, so if the model returns a
  * choice whose own free-text clearly argues for the OPPOSITE fix, the two halves
  * of the world split (Derek relays "the rollback" over reasoning that says "going
  * patch-forward"). When the combined text points unambiguously the other way,
  * keep the structured choice and swap in static, choice-consistent copy. Merely
- * ambiguous text (neither pattern, or BOTH) is left untouched — no retry, no
+ * ambiguous text (neither pattern, or BOTH) is left untouched: no retry, no
  * model call. */
 function reconcileRajFallback(d: {
   choice: "rollback" | "patch-forward";
@@ -205,7 +205,7 @@ function reconcileRajFallback(d: {
 export const ASK_CLAUDE_OPENER =
   "Ask me about any term or concept from today (HTTP codes, webhooks, business metrics, whatever's unfamiliar). I can't tell you what to say or do in the scenario, that part's yours to practice. But I'm happy to explain the vocabulary.";
 
-/** The fix engineers who ping when the fix lands — the non-adjacent registry
+/** The fix engineers who ping when the fix lands: the non-adjacent registry
  * DM contacts (Jordan lead, Chen support). Derived from DM_CONTACTS so a future
  * fix engineer needs no change here, and so it can't drift from the follow-up
  * block's own `role !== "adjacent"` filter. */
@@ -213,7 +213,7 @@ const FIX_ENGINEER_AGENT_IDS = DM_CONTACTS.filter((c) => c.role !== "adjacent").
 
 /**
  * The single fix engineer responsible for the guaranteed "fix landed" ping when
- * the player never DMed a fix engineer directly — i.e. the promise was made
+ * the player never DMed a fix engineer directly, i.e. the promise was made
  * through Raj ("I'll have Jordan ping you"), or Raj made the fix call himself on
  * the fallback path. Prefers the Taskflow fix-ticket assignee IF the player put
  * a real fix engineer (jordan/chen) on the ticket; otherwise the engineer the
@@ -222,7 +222,7 @@ const FIX_ENGINEER_AGENT_IDS = DM_CONTACTS.filter((c) => c.role !== "adjacent").
  * delivery / fixLandedFollowUpsSent / commitment-settle machinery unchanged, and
  * lands in that engineer's own DM (whose availability is already open once a fix
  * path exists). Returns null only if no fix engineer is registered at all (can't
- * happen with the current DM_CONTACTS) — the caller then sends nothing rather
+ * happen with the current DM_CONTACTS). The caller then sends nothing rather
  * than inventing a sender, since Raj is not a registry DM contact. */
 function resolveResponsibleFixEngineer(tradeoffTicketId: string | null): DmContact | null {
   const engineers = DM_CONTACTS.filter((c) => c.role !== "adjacent");
@@ -249,7 +249,7 @@ interface SimState {
   /** Whether the player has dismissed the full-screen DayScorecard overlay
    * for the current dayComplete. Persisted alongside dayComplete (see
    * sessionPersistence.ts) so reloading a completed day doesn't re-show the
-   * overlay and eat StatusBar clicks (QA finding #12b) — it was previously
+   * overlay and eat StatusBar clicks (QA finding #12b). It was previously
    * component-local state in Desktop.tsx that reset to false on every mount. */
   scorecardDismissed: boolean;
   messages: Message[];
@@ -259,33 +259,33 @@ interface SimState {
   helpQueries: HelpQuery[];
   activeChannel: ChannelId;
   pendingReplyFrom: AgentId | null;
-  /** Which channel pendingReplyFrom's reply is actually landing in — without
+  /** Which channel pendingReplyFrom's reply is actually landing in: without
    * this, the typing indicator would show up in whatever channel the player
    * happens to be looking at, not necessarily the one the reply belongs to,
    * if they switch channels while a reply is in flight. */
   pendingReplyChannel: ChannelId | null;
   unreadChannels: Set<ChannelId>;
   /** Ids of fired scenario events that required a response and haven't
-   * gotten one yet — drives the Chattr taskbar badge and escalation checks. */
+   * gotten one yet: drives the Chattr taskbar badge and escalation checks. */
   pendingResponseIds: Set<string>;
-  /** Ask Claude's conversation — lives here (not component state) so
+  /** Ask Claude's conversation: lives here (not component state) so
    * closing/reopening the window doesn't lose the thread. */
   askClaudeMessages: AskClaudeMessage[];
   askClaudePending: boolean;
-  /** One record per completed day, most recent last — powers the
+  /** One record per completed day, most recent last: powers the
    * end-of-day popup and the Reviews app off the same data. */
   dayRecords: DayScorecardRecord[];
-  /** The player's own free-form scratchpad — never AI-touched. */
+  /** The player's own free-form scratchpad, never AI-touched. */
   notesText: string;
   /** Gates ambient-help UI (e.g. the fact checklist) that only some
    * difficulty tiers show. Not read by scoring or NPC behavior. */
   difficulty: Difficulty;
   /** Purely-for-fun discoveries logged across the whole session (top-level,
    * not nested in stateBag, since stateBag is conceptually "this day's live
-   * state" — this is meant to accumulate the way dayRecords does). NEVER
-   * read by computeScorecard or anything scoring-related — see the
+   * state"; this is meant to accumulate the way dayRecords does). NEVER
+   * read by computeScorecard or anything scoring-related (see the
    * discovery-detection block in sendPlayerMessage for the one place this
-   * gets written. */
+   * gets written). */
   easterEggsFound: EasterEggDiscovery[];
   /** Transient (not persisted in stateBag): true while Raj's fallback-decision
    * model call is in flight, so advanceClock kicks it off exactly once. Lives
@@ -300,8 +300,8 @@ interface SimState {
   logHelpQuery: (question: string, topicTag: string | null) => void;
   sendAskClaudeMessage: (content: string) => Promise<void>;
   recordDayScorecard: (day: number, postmortemText: string) => void;
-  /** Rewards actually closing the postmortem-to-Taskflow loop — see
-   * FollowUpTicketPrompt. Patches the already-recorded day's scorecard
+  /** Rewards actually closing the postmortem-to-Taskflow loop (see
+   * FollowUpTicketPrompt). Patches the already-recorded day's scorecard
    * reactively (same pattern as the async coordination-score merge just
    * below), not a new scoring pass, since the ticket is created after the
    * scorecard's already been computed and shown. */
@@ -327,7 +327,7 @@ async function requestAgentReply(
     callType?: ApiCallType;
     easterEggDiscovered?: boolean;
     /** A different channel's real transcript this agent has independent
-     * visibility into — see groundingContextLine in prompts.ts. */
+     * visibility into (see groundingContextLine in prompts.ts). */
     groundingChannelLabel?: string;
     groundingTranscript?: { senderId: string; content: string }[];
     /** Pre-built established-state block appended to the system prompt as-is
@@ -374,8 +374,8 @@ async function requestAgentReply(
   }
 }
 
-/** Stage B of the cross-functional gate — see src/lib/sim/crossFunctionalGate.ts
- * for Stage A, the free pre-filter that decides whether this gets called at all. */
+/** Stage B of the cross-functional gate (see src/lib/sim/crossFunctionalGate.ts
+ * for Stage A, the free pre-filter that decides whether this gets called at all). */
 async function requestCrossFunctionalGate(
   playerMessage: string,
   primaryAgentId: AgentId,
@@ -416,8 +416,8 @@ async function requestTradeoffEvaluation(
 }
 
 /** Kicks off Raj's OWN reasoned fallback call on the fix tradeoff (rollback
- * vs. patch-forward) when the player has gone quiet — see the kickoff block in
- * advanceClock and RAJ_FALLBACK_DECISION_PROMPT. Goes through a real route (not
+ * vs. patch-forward) when the player has gone quiet (see the kickoff block in
+ * advanceClock and RAJ_FALLBACK_DECISION_PROMPT). Goes through a real route (not
  * an inline model call) so the headless playtest harness exercises the same
  * path. Returns null on any failure; the caller then uses a deterministic
  * scripted fallback so the escalation still fires. Cost is recorded under the
@@ -439,7 +439,7 @@ async function requestRajFallbackDecision(): Promise<{
     if (data.choice !== "rollback" && data.choice !== "patch-forward") return null;
     if (typeof data.reasoning !== "string" || typeof data.derekLine !== "string") return null;
     // Guard against a model output whose free-text argues for the opposite fix
-    // from the structured choice — keep the choice (it drives state), swap in
+    // from the structured choice: keep the choice (it drives state), swap in
     // consistent copy only when the prose is unambiguously contradictory.
     return reconcileRajFallback({ choice: data.choice, reasoning: data.reasoning, derekLine: data.derekLine });
   } catch {
@@ -555,7 +555,7 @@ async function fetchCoordinationScore(
   }
 }
 
-/** Day-end score-explanation summarizer (subtask C1) — turns the five final
+/** Day-end score-explanation summarizer (subtask C1): turns the five final
  * scores + the internal grader notes + the full transcript into five
  * per-category, evidence-backed explanations with code-validated verbatim
  * quotes. Fired after the coordination score resolves so crossFunctional is
@@ -627,7 +627,7 @@ export const useSimStore = create<SimState>((set, get) => ({
 
   advanceClock: (minutes) => {
     const dayEndMinutes = DAY_END_MINUTES[get().day];
-    // Hard clamp — the clock can never advance past end-of-day, regardless
+    // Hard clamp: the clock can never advance past end-of-day, regardless
     // of how many times "+15m" gets clicked (previously unbounded: observed
     // reaching well past midnight with no end-of-day behavior at all).
     set((s) => ({
@@ -672,12 +672,12 @@ export const useSimStore = create<SimState>((set, get) => ({
         });
 
         // The incident auto-resolves at 11 AM regardless of whether the
-        // player ever made the explicit rollback-vs-patch-forward call —
-        // the resolution message reports a fix shipped either way. If
+        // player ever made the explicit rollback-vs-patch-forward call.
+        // The resolution message reports a fix shipped either way. If
         // tradeoffChoice is still null when that fires, default it to
         // patch-forward (the resolution copy describes a fix being shipped
-        // in place, not a rollback) so every reader of this one field —
-        // Office's engineer assignments, Pulse's recovery curve — reflects
+        // in place, not a rollback) so every reader of this one field
+        // (Office's engineer assignments, Pulse's recovery curve) reflects
         // the auto-resolve outcome instead of staying frozen in a
         // pre-decision state that contradicts what the player was just told.
         const resolutionEvent = due.find((e) => e.id === "resolution-good" || e.id === "resolution-cold");
@@ -703,7 +703,7 @@ export const useSimStore = create<SimState>((set, get) => ({
         };
       });
 
-      // Feature C hooks — seed/move tickets off the same scripted beats,
+      // Feature C hooks: seed/move tickets off the same scripted beats,
       // so the board has real narrative continuity rather than starting
       // empty until the tradeoff decision. Two tickets: an early
       // investigation one that paces To Do -> In Progress -> Done across
@@ -721,10 +721,10 @@ export const useSimStore = create<SimState>((set, get) => ({
         );
       }
       // Raj's diagnosis (9:20) means the ticket is being worked, not
-      // resolved — In Progress, not Done, and handed to Raj since he's the
+      // resolved: In Progress, not Done, and handed to Raj since he's the
       // one who just diagnosed it. Only acts on a ticket still sitting in
       // To Do, and only assigns if nobody's assigned it yet: if the player
-      // already moved or assigned it themselves, don't fight them — only
+      // already moved or assigned it themselves, don't fight them. Only
       // auto-advance forward, never backward.
       if (due.some((e) => e.id === "raj-diagnosis")) {
         const investigating = useTaskflowStore.getState().tickets.find((t) => t.status === "todo" && t.title.startsWith("Investigate"));
@@ -738,7 +738,7 @@ export const useSimStore = create<SimState>((set, get) => ({
         }
       }
       // Done only lands once Raj has moved from diagnosing to actually
-      // proposing a fix (raj-tradeoff-offer, 9:38) — at least one +15m
+      // proposing a fix (raj-tradeoff-offer, 9:38): at least one +15m
       // advance after In Progress, so the wait is genuinely felt. Same
       // forward-only guard: only fires on a ticket still In Progress, so a
       // player-driven move isn't overridden.
@@ -747,7 +747,7 @@ export const useSimStore = create<SimState>((set, get) => ({
         if (investigating) useTaskflowStore.getState().moveTicket(investigating.id, "done");
       }
       if (due.some((e) => e.id === "resolution-good" || e.id === "resolution-cold")) {
-        // By id, not "whichever ticket happens to be in-progress" — the
+        // By id, not "whichever ticket happens to be in-progress": the
         // latter breaks the moment the player has moved anything else
         // (e.g. a freeform ticket) into in-progress themselves, which
         // would otherwise get swept to "done" instead of the actual fix
@@ -759,7 +759,7 @@ export const useSimStore = create<SimState>((set, get) => ({
 
     // Fix-landed follow-up DMs. When the chosen fix actually lands (the shared
     // timeline's landedAt is reached), any registry engineer the player DMed
-    // before landing sends a one-time, grounded follow-up ping — the promise
+    // before landing sends a one-time, grounded follow-up ping: the promise
     // an engineer may make in conversation, now actually kept by the system.
     // Timestamped at the REAL landing minute (timeline.landedAt), not the
     // current clock, so a +15m jump straight past landing still produces a
@@ -789,7 +789,7 @@ export const useSimStore = create<SimState>((set, get) => ({
         // engineer the player DMed DIRECTLY before landing. But the promised
         // ping is very often made THROUGH Raj ("go patch-forward, ping me the
         // moment it's live" -> "Got it, I'll have Jordan ping you") entirely in
-        // Raj's DM, with Jordan/Chen's own DMs never opened — and on the
+        // Raj's DM, with Jordan/Chen's own DMs never opened, and on the
         // Raj-fallback path the player was absent for the decision altogether.
         // In both cases the direct-DM filter is empty and the promise would drop
         // silently (the live repro: Jordan's DM stayed empty, no ping ever
@@ -821,7 +821,7 @@ export const useSimStore = create<SimState>((set, get) => ({
               if (m.channel !== s.activeChannel) unread.add(m.channel);
             });
             // Settle each pinging engineer's "will report when the fix lands"
-            // commitment now that the ping has actually gone out — the promise
+            // commitment now that the ping has actually gone out: the promise
             // is kept. Idempotent; a no-op for any contact that never had one
             // (e.g. a fallback/auto-resolve path where the append site didn't run).
             const settledLedger = due.reduce(
@@ -846,11 +846,11 @@ export const useSimStore = create<SimState>((set, get) => ({
     // the fix-landed pings, evaluate every pending obligation against live
     // state. Each fires ONLY when its declarative trigger's condition is
     // actually true right now (state-conditional, never a fixed clock), and
-    // settles silently when its cancel condition beat it — see obligations.ts
-    // for the fire/cancel-by-sim-time semantics. Mirrors the fix-landed block:
+    // settles silently when its cancel condition beat it (see obligations.ts
+    // for the fire/cancel-by-sim-time semantics). Mirrors the fix-landed block:
     // append the NPC messages (timestamped at the minute their condition became
     // true, straight off the engine), mark unread if not the active channel,
-    // and flip obligation status in the SAME set(). Re-entrancy-safe — the
+    // and flip obligation status in the SAME set(). Re-entrancy-safe: the
     // engine only ever acts on "pending" entries, and firing flips them to
     // fulfilled/cancelled in that same set(), so a re-entrant advanceClock (the
     // Raj-fallback path re-runs advanceClock(0)) can't double-fire.
@@ -880,8 +880,8 @@ export const useSimStore = create<SimState>((set, get) => ({
           // B4: fire-time ledger append. When Priya's seller-comms ask fires, a
           // "player-owes-npc" entry must be appended so her later replies treat
           // the seller note as an outstanding thing the player owes. Wired HERE,
-          // in the store block that renders firings, keyed on the firing's kind
-          // — NOT in obligations.ts, which stays a types-only leaf with no
+          // in the store block that renders firings, keyed on the firing's kind,
+          // NOT in obligations.ts, which stays a types-only leaf with no
           // commitments dependency (the same purity split A2 established: the
           // engine returns firing DESCRIPTORS, the store turns them into
           // messages/ledger writes). Idempotent by the entry's stable id.
@@ -936,7 +936,7 @@ export const useSimStore = create<SimState>((set, get) => ({
         set({ rajFallbackInFlight: true });
         requestRajFallbackDecision().then((res) => {
           // The player may have decided (or a decision may have otherwise
-          // landed) while the call was in flight — if so, drop this result so
+          // landed) while the call was in flight; if so, drop this result so
           // the escalation never fires against a player who answered.
           const cur = get().stateBag;
           if (cur.tradeoffChoice !== null || cur.rajFallbackDecision !== null) {
@@ -959,8 +959,8 @@ export const useSimStore = create<SimState>((set, get) => ({
       }
     }
 
-    // Hard end-of-day boundary: once reached, the day ends automatically —
-    // this applies regardless of whether the postmortem was ever submitted.
+    // Hard end-of-day boundary: once reached, the day ends automatically.
+    // This applies regardless of whether the postmortem was ever submitted.
     // A postmortem submission (sendPlayerMessage) already sets dayComplete
     // itself, so this only ever fires for the "never submitted" outcome.
     if (!get().dayComplete && dayEndMinutes !== undefined && get().clockMinutes >= dayEndMinutes) {
@@ -973,7 +973,7 @@ export const useSimStore = create<SimState>((set, get) => ({
     const trimmed = content.trim();
     if (!trimmed) return;
 
-    // Snapshot BEFORE this message can clear anything — both of these need
+    // Snapshot BEFORE this message can clear anything: both of these need
     // to reflect what was pending when the player sent this, not what's
     // left after their own message just resolved the one thing that was
     // pending (same message satisfying its own channel's pending event is
@@ -987,7 +987,7 @@ export const useSimStore = create<SimState>((set, get) => ({
     // message's send time, using the same inputs PulseMock reads off sim
     // state (see pulseMetrics). Stored on the message itself so every player
     // line carries the reading it was sent alongside, not just the graded
-    // one — an earlier message may have cited an earlier reading, and the
+    // one: an earlier message may have cited an earlier reading, and the
     // evaluator's repetition rule needs to see that original figure to treat
     // it as grounded. Returns null (and stays off the message) before the
     // incident starts, when the reading is a bare zero worth nothing here.
@@ -1014,7 +1014,7 @@ export const useSimStore = create<SimState>((set, get) => ({
     // record when. This is what tells "the player foresaw the rollback's
     // downstream cost by asking the one engineer on that pipeline" apart from
     // "never asked." Deterministic (channel + keyword match), set once, and
-    // deliberately separate from scoring/acknowledgment paths — it only feeds
+    // deliberately separate from scoring/acknowledgment paths: it only feeds
     // the payout consequence beats and the diligence coaching note.
     if (
       channel === dmChannelId("marcus") &&
@@ -1027,7 +1027,7 @@ export const useSimStore = create<SimState>((set, get) => ({
     // Tradeoff-engagement signal: the first substantive message the player
     // sends Raj (his DM or #incidents) about the incident/tradeoff BEFORE any
     // decision has landed. This is what tells "the PM went quiet
-    // mid-conversation" apart from "we never reached the PM at all" — so Raj's
+    // mid-conversation" apart from "we never reached the PM at all," so Raj's
     // and Derek's fallback-escalation beats don't assert a flat "couldn't reach
     // you" when the player was in an active DM thread with Raj about the very
     // same call. Gated on the incident being knowable (priya-heads-up-dm fired,
@@ -1035,7 +1035,7 @@ export const useSimStore = create<SimState>((set, get) => ({
     // routinely presents the rollback/patch options in dm_raj well before that
     // beat, and gating on it would miss that whole early thread. A keyword test
     // over incident/tradeoff nouns (plus the length floor) keeps morning small
-    // talk from counting. Set once, additively — same shape as the Marcus
+    // talk from counting. Set once, additively: same shape as the Marcus
     // diligence signal above. Harmless if THIS message turns out to be the
     // decision itself: the tradeoff evaluator then sets tradeoffChoice non-null
     // and the escalation beats (gated on tradeoffChoice === null) never fire, so
@@ -1074,16 +1074,16 @@ export const useSimStore = create<SimState>((set, get) => ({
     }
 
     // The postmortem is the player's own closing narrative beat, not a live
-    // conversational message — it shouldn't trigger an NPC reply (Raj used
+    // conversational message: it shouldn't trigger an NPC reply (Raj used
     // to sometimes generate a competing postmortem of his own here). This
     // also covers the case where THIS message's own trailing +3min advance
-    // (below) is what crosses the postmortem-prompt trigger — otherwise a
+    // (below) is what crosses the postmortem-prompt trigger: otherwise a
     // closing message sent within ~3 sim-minutes of that trigger would slip
     // through as a "regular" message and still get a competing NPC reply.
     const postmortemAlreadyDue = day1ScenarioEvents.some(
       (e) => e.id === "postmortem-prompt" && e.triggerTimeMinutes <= get().clockMinutes + 3
     );
-    // A short message here used to end the day on the spot — a stray "ok,
+    // A short message here used to end the day on the spot: a stray "ok,
     // on it" (or anything short) sent in #incidents after the prompt fired
     // silently became the scored postmortem, with no pushback since NPC
     // replies are suppressed for a real submission. Below the length floor,
@@ -1094,12 +1094,12 @@ export const useSimStore = create<SimState>((set, get) => ({
       (get().firedEventIds.has("postmortem-prompt") || postmortemAlreadyDue) &&
       trimmed.length >= POSTMORTEM_MIN_LENGTH;
 
-    // Clear any pending required-response events this message satisfies —
+    // Clear any pending required-response events this message satisfies:
     // generically, by checking every channel that counts as answering that
     // specific event (see satisfyingChannels / ScenarioEvent.reAsks /
     // alsoSatisfiedByChannels), not just the event's own literal channel.
     // If the player blew past the event's own response deadline, flag it
-    // for a one-time tone nudge in that agent's next reply — ambient
+    // for a one-time tone nudge in that agent's next reply: ambient
     // pressure, not a scored callout.
     const lateAgents: AgentId[] = [];
     const respondedNow: { id: string; sentAtSimMinutes: number }[] = [];
@@ -1138,14 +1138,14 @@ export const useSimStore = create<SimState>((set, get) => ({
       return { stateBag: next };
     });
 
-    // Easter eggs — purely-for-fun discoveries, deliberately kept separate
+    // Easter eggs: purely-for-fun discoveries, deliberately kept separate
     // from the acknowledgment block above rather than folded into it: these
     // events never set requiresResponse (no deadline, no nudge if ignored),
     // so this reuses firedEventIds instead of pendingResponseIds, and a
     // reply in the egg's own channel any time after it fires counts (no
     // reAsks/alsoSatisfiedByChannels equivalence needed for something this
-    // low-stakes). Writes ONLY to the top-level easterEggsFound array below
-    // — never touches stateBag, evaluations, or anything computeScorecard
+    // low-stakes). Writes ONLY to the top-level easterEggsFound array below:
+    // never touches stateBag, evaluations, or anything computeScorecard
     // reads, by design. This is the one and only place that boundary could
     // leak, so it stays intentionally isolated from every scoring path.
     const newlyDiscoveredEggs = day1ScenarioEvents.filter(
@@ -1179,19 +1179,19 @@ export const useSimStore = create<SimState>((set, get) => ({
     const csHandledBeforeThisMessage =
       get().stateBag.csTemplateAttemptedAtMinutes !== null || get().stateBag.csTemplateProvided;
 
-    // Feature A — CS template: csTemplateProvided means "provided AND
+    // Feature A (CS template): csTemplateProvided means "provided AND
     // good," not just "attempted." Awaited (not fire-and-forget) because
     // this flag gates which of the two resolution messages fires, and that
-    // firing is time-based — it needs to be settled before this function's
+    // firing is time-based: it needs to be settled before this function's
     // own trailing advanceClock(3) could plausibly cross that boundary, not
     // resolved after the fact.
     //
     // Two ways into the real evaluator, not one, after CS_TEMPLATE_KEYWORDS
     // alone missed real drafts live twice ("I'll write it in the incident
-    // channel", "give her something she can paste" — neither matched any
+    // channel", "give her something she can paste"; neither matched any
     // reasonable keyword list). In dm_priya, once she's actually asked for
     // this (priya-template-request fired), a substantial reply there has no
-    // other plausible purpose — trust the channel + timing over guessing
+    // other plausible purpose: trust the channel + timing over guessing
     // phrasing. Elsewhere (#incidents, or dm_priya before she's asked), that
     // signal doesn't hold, so keep the keyword pre-filter to avoid grading
     // unrelated chatter.
@@ -1206,7 +1206,7 @@ export const useSimStore = create<SimState>((set, get) => ({
       // A2: record that the player ATTEMPTED a customer-facing draft (any
       // attempt, good or not, in either channel), before the async evaluation
       // so a failed evaluator call still counts. This is what settles Priya's
-      // nudge/updated-context obligations silently — a mediocre draft must not
+      // nudge/updated-context obligations silently: a mediocre draft must not
       // still draw a cold "still waiting" nudge. Distinct from csTemplateProvided
       // ("attempted AND good"); set once, additively. The next advanceClock tick
       // (this function's trailing advanceClock(3)) lets the obligation engine act.
@@ -1251,7 +1251,7 @@ export const useSimStore = create<SimState>((set, get) => ({
       }
     }
 
-    // B4 — seller-facing comms detection + settlement. The seller counterpart
+    // B4: seller-facing comms detection + settlement. The seller counterpart
     // to the CS-template block above, and deliberately additive/self-contained
     // (the three documented bug-fix regions in this function stay untouched).
     // Once Priya's rollback-only seller-comms ask has FIRED (the
@@ -1259,7 +1259,7 @@ export const useSimStore = create<SimState>((set, get) => ({
     // fires), a substantive dm_priya reply is read as the player attempting the
     // seller note: it sets sellerCommsAttemptedAtMinutes once (additively) and
     // settles the "player owes a seller note" ledger entry. No nudge/resolved
-    // follow-up in this pass — the ask + owed-ledger + settlement is the scope.
+    // follow-up in this pass: the ask + owed-ledger + settlement is the scope.
     //
     // DISAMBIGUATION with the CS-template heuristic above (both watch dm_priya):
     //  - Substance floor first: a real attempt is >= 40 chars, matching the CS
@@ -1273,7 +1273,7 @@ export const useSimStore = create<SimState>((set, get) => ({
     //    substantive reply after the seller ask is the seller attempt.
     //  - A reply that explicitly names the seller/payout impact
     //    (SELLER_COMMS_KEYWORDS) is the seller attempt even if the CS template is
-    //    still unhandled — the keyword only relaxes the CS-priority gate, never
+    //    still unhandled: the keyword only relaxes the CS-priority gate, never
     //    the substance floor. (The untouched CS block may still ALSO grade such a
     //    message as a CS attempt; that's pre-existing behavior and harmless here,
     //    since the two settlements are independent.)
@@ -1294,7 +1294,7 @@ export const useSimStore = create<SimState>((set, get) => ({
             sellerCommsAttemptedAtMinutes:
               s.stateBag.sellerCommsAttemptedAtMinutes ?? playerMsg.sentAtSimMinutes,
             // Settle Priya's "player owes a seller note" entry. Idempotent and a
-            // no-op if the ask never fired (entry absent) — mirrors the
+            // no-op if the ask never fired (entry absent), mirrors the
             // CS-template settlement's own guarantees.
             commitmentLedger: settlePlayerOwesSellerComms(s.stateBag.commitmentLedger),
           },
@@ -1302,7 +1302,7 @@ export const useSimStore = create<SimState>((set, get) => ({
       }
     }
 
-    // Feature B — rollback vs. patch-forward tradeoff. Awaited for the same
+    // Feature B: rollback vs. patch-forward tradeoff. Awaited for the same
     // reason as the CS-template check above: tradeoffChoice/decidedAtMinutes
     // feed Pulse's recovery curve and the seeded Taskflow ticket, both of
     // which need this settled, not resolved after the fact.
@@ -1310,7 +1310,7 @@ export const useSimStore = create<SimState>((set, get) => ({
     // dm_raj is recognized alongside #incidents (A1 root-cause fix): a decision
     // stated privately to Raj now registers in state exactly as an #incidents
     // one does, instead of Raj roleplaying commitment in DM while state never
-    // records it — which was why his #incidents persona later re-acknowledged
+    // records it, which was why his #incidents persona later re-acknowledged
     // the same decision as brand new. A single message is only ever in one
     // channel, so this can't double-evaluate; tradeoffChoice === null stays the
     // master guard regardless.
@@ -1322,12 +1322,12 @@ export const useSimStore = create<SimState>((set, get) => ({
     // when it's live" -> "Got it, pulling Jordan in, will ping you"). Gating on
     // the 9:38 beat dropped that decision on the floor: tradeoffChoice stayed
     // null, Raj's 10:05 fallback fired, and the escalation beats announced "PM
-    // went quiet, so I made the call" — flatly contradicting Raj's own on-record
+    // went quiet, so I made the call": flatly contradicting Raj's own on-record
     // acceptance 50 min earlier. raj-diagnosis is the right threshold: before
     // 9:20 there's no fix framing at all, so a "decision" would be meaningless;
     // once Raj has diagnosed, an explicit choice is real and must register.
     // requestTradeoffEvaluation is still handed the 9:38 offer beat's static
-    // `content` as the classifier's reference framing — that scenario text lays
+    // `content` as the classifier's reference framing: that scenario text lays
     // out both options and is usable for classification whether or not the beat
     // has fired yet, so an early decision is classified against the same rubric.
     if (
@@ -1355,7 +1355,7 @@ export const useSimStore = create<SimState>((set, get) => ({
                   scores: { tone: 0, speed: 0, completeness: 0, strategicThinking: 0 },
                   feedback: tradeoffResult.hasReasoning
                     ? tradeoffResult.note
-                    : `${tradeoffResult.note} You picked a side but didn't say what you were trading off to get there. Naming the tradeoff you're accepting is the actual PM move here, not just the pick.`,
+                    : `${tradeoffResult.note} You picked a side but didn't say what you were trading off to get there. The PM move is naming the tradeoff you're accepting, not only picking.`,
                 },
               },
             }));
@@ -1371,15 +1371,15 @@ export const useSimStore = create<SimState>((set, get) => ({
             "in-progress",
             // advancesTimeOnUpdate: the player's own first move of THIS
             // ticket represents real time spent documenting/tracking the
-            // decision they just made — see TicketCard's move handler,
-            // which checks this + timeCredited before calling advanceClock.
+            // decision they just made (see TicketCard's move handler,
+            // which checks this + timeCredited before calling advanceClock).
             { kind: "story", advancesTimeOnUpdate: true, reporterId: "raj" }
           );
           // Captured so the resolution event below can move THIS specific
-          // ticket by id — see tradeoffTicketId's own doc comment for why
-          // the old "whichever ticket is in-progress" heuristic was wrong.
+          // ticket by id (see tradeoffTicketId's own doc comment for why
+          // the old "whichever ticket is in-progress" heuristic was wrong).
           // Same set records the commitment ledger for this decision: Raj's
-          // decision-acknowledged entry (born settled — a made decision is
+          // decision-acknowledged entry (born settled; a made decision is
           // settled context, not something to re-acknowledge later) and the
           // fix engineers' open "will ping when it lands" commitments. Both
           // appends are idempotent by stable id, so this is safe under the
@@ -1426,8 +1426,8 @@ export const useSimStore = create<SimState>((set, get) => ({
 
     // Grade the message if this channel is a scored one. The transcript
     // (every channel/DM the player has seen, up to and including this
-    // message) is what lets the evaluator check groundedness — whether a
-    // claimed fact was actually established yet — instead of grading
+    // message) is what lets the evaluator check groundedness (whether a
+    // claimed fact was actually established yet) instead of grading
     // against a static, spoiler-y description of the "real" situation.
     if (GRADED_CHANNELS.has(channel)) {
       const transcriptSoFar = get().messages.map((m) => ({
@@ -1502,7 +1502,7 @@ export const useSimStore = create<SimState>((set, get) => ({
       });
     }
 
-    // Reactive NPC reply — at most one full answer plus one short redirect.
+    // Reactive NPC reply: at most one full answer plus one short redirect.
     // Skipped entirely for the postmortem submission (see above).
     const { primary, secondary } = isPostmortemSubmission
       ? { primary: null, secondary: null }
@@ -1549,7 +1549,7 @@ export const useSimStore = create<SimState>((set, get) => ({
 
     if (primary) {
       // Capture state (which may carry a fresh lateResponseTo flag) before
-      // clearing it — the flag should color exactly this one reply.
+      // clearing it: the flag should color exactly this one reply.
       const stateForReply = get().stateBag;
       if (stateForReply.lateResponseTo?.[primary]) {
         set((s) => ({
@@ -1563,14 +1563,14 @@ export const useSimStore = create<SimState>((set, get) => ({
         .slice(-12);
 
       // Cross-channel #incidents grounding. A reply is otherwise scoped to
-      // just its own channel's history — but any persona who is actually
+      // just its own channel's history, but any persona who is actually
       // present in the #incidents war room carries what they've seen there
       // into a reply they give elsewhere (a DM, or any non-incidents
       // channel). That real transcript is what lets their own live reply
       // push back on / ask the source of a specific claim that isn't backed
-      // up, instead of accepting and relaying it — see groundingContextLine
-      // in prompts.ts. Presence is roster-driven (CHANNEL_PRESENCE in
-      // roster.ts, presence semantics — deliberately distinct from
+      // up, instead of accepting and relaying it (see groundingContextLine
+      // in prompts.ts). Presence is roster-driven (CHANNEL_PRESENCE in
+      // roster.ts, presence semantics; deliberately distinct from
       // relevance.ts's routing shortlist), so every #incidents member
       // (Derek, Raj, Priya, Marcus) gets the same grounding and none of them
       // can deny visibility into a channel they're actually in. Was formerly
@@ -1591,7 +1591,7 @@ export const useSimStore = create<SimState>((set, get) => ({
       // When the replier is one of the registry DM engineers, inject their
       // live fix status (path, decision time, ETA math, Pulse reading,
       // resolution) built from the same established state everything else
-      // reads — this is the only way today's specifics reach their otherwise
+      // reads: this is the only way today's specifics reach their otherwise
       // fact-free persona. Generic over the registry, no per-name branch.
       const dmContact = DM_CONTACTS.find((c) => c.agentId === primary);
       const personaContextOpt = dmContact
@@ -1630,7 +1630,7 @@ export const useSimStore = create<SimState>((set, get) => ({
 
         // Optional agent-to-agent reaction, gated in two stages (see
         // src/lib/sim/crossFunctionalGate.ts). Runs AFTER the primary
-        // reply is already rendered — never blocks it — and is capped at
+        // reply is already rendered (never blocks it) and is capped at
         // exactly one triggered reaction per player message by construction
         // (there is only ever one gate call here, not a recursive chain).
         const stageASkip = stageAShouldSkip({
@@ -1688,7 +1688,7 @@ export const useSimStore = create<SimState>((set, get) => ({
     // (CS-template/tradeoff evaluation calls, NPC reply generation) sit
     // between that snapshot and here, and the clock can advance out from
     // under this call in the meantime (another message sent, or the player
-    // clicking +15m) — which let an ordinary message get retroactively
+    // clicking +15m). This let an ordinary message get retroactively
     // misattributed as the postmortem once the prompt crossed its trigger
     // while this call was still in flight, ending the day on the wrong text.
     if (isPostmortemSubmission && !get().stateBag.postmortemSubmitted) {
@@ -1736,8 +1736,8 @@ export const useSimStore = create<SimState>((set, get) => ({
       clockMinutes,
       tickets
     );
-    // A clean, structured, generic record of what actually happened today —
-    // see DayOutcome's doc comment in types.ts. Built here (the one call
+    // A clean, structured, generic record of what actually happened today
+    // (see DayOutcome's doc comment in types.ts). Built here (the one call
     // site for both the postmortem-submission ending and the forced
     // end-of-day boundary) so it can never miss an ending path. Nothing
     // reads or reacts to this yet; it's for tests/logging only.
@@ -1784,7 +1784,7 @@ export const useSimStore = create<SimState>((set, get) => ({
       // Filled in async once the summarizer resolves (fired after the
       // coordination score lands, below, so crossFunctional is already final).
       explanationsLoading: shouldExplain,
-      // Snapshot only — never fed into scores/overall above, this section
+      // Snapshot only: never fed into scores/overall above, this section
       // exists purely so Reviews/the end-of-day popup can show it, entirely
       // separate from computeScorecard's math.
       easterEggsFound: easterEggsFound.filter((d) => d.day === day),
@@ -1792,7 +1792,7 @@ export const useSimStore = create<SimState>((set, get) => ({
     };
     set((s) => ({ dayRecords: [...s.dayRecords, record] }));
 
-    // Persist the outcome as soon as it exists — see outcomeStore.ts (the
+    // Persist the outcome as soon as it exists: see outcomeStore.ts (the
     // layer that actually works today, localStorage) and persist.ts's
     // logDayOutcomeToSupabase (best-effort mirror, no-op unless Supabase
     // is configured). Called again below once the coordination score
@@ -1800,7 +1800,7 @@ export const useSimStore = create<SimState>((set, get) => ({
     saveDayOutcome(get().sessionId, outcome);
     logDayOutcomeToSupabase(get().sessionId, outcome);
 
-    // Full transcript (not just the player's own lines) — the evaluator
+    // Full transcript (not just the player's own lines): the evaluator
     // needs context (what was asked, who by) to judge coordination quality.
     const fullTranscript = messages.map((m) => ({
       senderId: m.senderId,
@@ -1822,7 +1822,7 @@ export const useSimStore = create<SimState>((set, get) => ({
           }
           const merged = mergeCoordinationScore(r.scores, score);
           finalScores = merged.scores;
-          // Keep outcome.scores/overall in lockstep with the record's own —
+          // Keep outcome.scores/overall in lockstep with the record's own:
           // outcome is a snapshot of the SAME scores, not an independent copy
           // that's allowed to go stale once the async coordination score lands.
           const outcome = r.outcome ? { ...r.outcome, scores: merged.scores, overall: merged.overall } : r.outcome;
@@ -1840,7 +1840,7 @@ export const useSimStore = create<SimState>((set, get) => ({
       // The grader notes (per-message + synthetic coaching signal) are folded
       // in so their substance isn't lost when the flat notes dump is removed
       // from the UI; the coordination note rides along as a crossFunctional
-      // signal. Patches the same race-tolerant way as the merges above —
+      // signal. Patches the same race-tolerant way as the merges above:
       // spreads the latest record and only sets its own two fields, so it
       // never clobbers the coordination/study-area/follow-up patches.
       if (!shouldExplain) return;

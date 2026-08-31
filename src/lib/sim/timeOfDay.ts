@@ -64,7 +64,7 @@ function interpolateStops(stops: ColorStop[], progress: number): { color: string
 }
 
 /** Morning -> midday -> afternoon -> dusk, deliberately subtle (see the
- * opacity values) — this is meant to be easy to miss if you're not looking,
+ * opacity values). This is meant to be easy to miss if you're not looking,
  * not a dramatic scene change layered over the actual work on screen. */
 const TINT_STOPS: ColorStop[] = [
   { t: 0, r: 255, g: 244, b: 214, opacity: 0.1 }, // pale morning light
@@ -78,7 +78,7 @@ export function getAmbientTint(progress: number): { color: string; opacity: numb
   return interpolateStops(TINT_STOPS, progress);
 }
 
-/** Sunrise -> midday -> sunset, fully opaque — unlike the ambient tint this
+/** Sunrise -> midday -> sunset, fully opaque: unlike the ambient tint this
  * one IS meant to be plainly visible, it's the explicit "here's what time it
  * is" cue the subtle tint alone wasn't giving players. */
 const SUN_STOPS: ColorStop[] = [
@@ -89,7 +89,7 @@ const SUN_STOPS: ColorStop[] = [
 
 /** These are the WALLPAPER_VIEWBOX-space coordinates of the back mountain
  * range's polygon in Wallpaper.tsx (the lighter, more sharply-peaked of the
- * two ridge layers) — literally copied from that polygon's own points, not
+ * two ridge layers): literally copied from that polygon's own points, not
  * eyeballed. A rise/set path computed from a DIFFERENT set of numbers than
  * the actual silhouette is exactly the bug this pass exists to fix, so if
  * that polygon's points ever change, these four numbers need to change with
@@ -100,18 +100,18 @@ export const WALLPAPER_VIEWBOX = { width: 320, height: 180 };
 const SUNRISE_GAP = { x: 40, y: 144 };
 // Valley at x=280 (y=124), between the peaks at x=260 (y=116) and x=300 (y=114).
 const SUNSET_GAP = { x: 280, y: 124 };
-/** How far below its gap's valley floor the sun sits at day start/end —
+/** How far below its gap's valley floor the sun sits at day start/end:
  * comfortably inside the mountain polygon's fill (which extends from the
  * silhouette line down to the bottom of the scene), so it's genuinely
  * hidden behind the terrain, not just touching the line. */
 const HIDDEN_DEPTH = 14;
-/** How high above the sunrise/sunset baseline the sun climbs at midday —
+/** How high above the sunrise/sunset baseline the sun climbs at midday:
  * tuned so the peak (y ≈ 36) clears the tallest peak in the range (y = 114
  * at x=300) by a wide margin, well up into the sky bands. */
 const ARC_HEIGHT = 112;
 
 /** Sun position, in the SAME viewBox coordinate space as the mountain
- * silhouette (see WALLPAPER_VIEWBOX/Wallpaper.tsx) — not a percentage of
+ * silhouette (see WALLPAPER_VIEWBOX/Wallpaper.tsx), not a percentage of
  * the screen. Rendering the sun inside that same <svg>, behind the mountain
  * polygons in paint order, is what makes "hidden behind the mountains" and
  * "emerges through this specific gap" happen for free: whenever the sun's
@@ -129,7 +129,7 @@ export function getSunPosition(progress: number): { x: number; y: number; color:
   return { x, y, color };
 }
 
-/** Battery level, full at day start down to empty right as the day ends —
+/** Battery level, full at day start down to empty right as the day ends:
  * the same progress value the ambient tint uses, just inverted. */
 export function getBatteryLevel(progress: number): number {
   return Math.max(0, Math.min(1, 1 - progress));

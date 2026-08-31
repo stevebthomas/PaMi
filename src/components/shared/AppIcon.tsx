@@ -1,6 +1,6 @@
 import type { AppId } from "../desktop/Desktop";
 
-/** 8x8 pixel-art glyph per app, on that app's own accent color — one icon
+/** 8x8 pixel-art glyph per app, on that app's own accent color: one icon
  * definition shared by the dock (Taskbar) and every window's title bar, so
  * an app has exactly one visual identity used in both places. Legend: '.'
  * transparent, 'F' foreground glyph, 'L' a second, darker tone for detail

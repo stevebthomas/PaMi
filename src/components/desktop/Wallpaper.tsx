@@ -1,7 +1,7 @@
 import { getSunPosition, WALLPAPER_VIEWBOX } from "@/lib/sim/timeOfDay";
 
 /** A blocky pixel-art sun (a stepped-circle disc plus 8 rays), built from
- * plain rects so it stays crisp at any scale — matches the hard-edged style
+ * plain rects so it stays crisp at any scale: matches the hard-edged style
  * everywhere else in the UI rather than a smooth SVG circle. */
 function SunSprite({ cx, cy, color }: { cx: number; cy: number; color: string }) {
   const core = [
@@ -33,18 +33,18 @@ function SunSprite({ cx, cy, color }: { cx: number; cy: number; color: string })
   );
 }
 
-/** The full desktop scene — sunset-band sky, the sun, and a two-layer
- * mountain silhouette — as ONE inline SVG rather than a CSS background
+/** The full desktop scene: sunset-band sky, the sun, and a two-layer
+ * mountain silhouette, as ONE inline SVG rather than a CSS background
  * image. That's what lets the sun be geometrically locked to the mountain
  * polygons: it's drawn in the exact same viewBox coordinate space, behind
  * both mountain layers in paint order, so it's automatically occluded
  * wherever a polygon's fill covers its position and automatically visible
- * wherever it doesn't — "hidden behind the mountains" and "emerges through
+ * wherever it doesn't: "hidden behind the mountains" and "emerges through
  * this gap" both fall out of that for free, at any window size, instead of
  * needing to be hand-synced between a CSS background and a separately
  * percentage-positioned element. preserveAspectRatio="xMidYMax slice"
  * reproduces the old background-size:cover + background-position:center
- * bottom behavior — crop to fill, anchored to the bottom edge. */
+ * bottom behavior: crop to fill, anchored to the bottom edge. */
 export function Wallpaper({ dayProgress }: { dayProgress: number }) {
   const sun = getSunPosition(dayProgress);
 

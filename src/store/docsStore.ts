@@ -2,7 +2,7 @@ import { create } from "zustand";
 import { useWindowStore } from "@/store/windowStore";
 
 /**
- * Docs app state — which doc is showing plus the launch-animation flags.
+ * Docs app state: which doc is showing plus the launch-animation flags.
  *
  * NOT PERSISTED, by design: like windowStore and costStore, this is transient
  * UI plumbing (an open/animating window, a busy cursor), not sim state worth
@@ -11,7 +11,7 @@ import { useWindowStore } from "@/store/windowStore";
  */
 
 /** Duration of the dock-bounce launch animation. This is a PURE UI ANIMATION
- * timer, not a sim-advancing wall-clock timer — it never touches the sim clock
+ * timer, not a sim-advancing wall-clock timer: it never touches the sim clock
  * or NPC behavior, so it does NOT violate the project's no-wall-clock-timers
  * rule. Same carve-out as the persistence debounce in sessionPersistence.ts. */
 const LAUNCH_MS = 900;
@@ -21,7 +21,7 @@ const LAUNCH_MS = 900;
 const BUSY_CURSOR_CLASS = "cursor-busy";
 
 interface DocsStoreState {
-  /** Which SIM_DOCS entry the viewer should show — null = empty state. */
+  /** Which SIM_DOCS entry the viewer should show; null = empty state. */
   activeDocId: string | null;
   /** True while the dock-bounce launch animation is running (the Docs icon
    * hops and the cursor reads busy). */
@@ -40,10 +40,10 @@ interface DocsStoreState {
   /** Desktop clears the open signal once it has actually opened the window. */
   clearPendingOpen: () => void;
   /** Clears the active doc back to the library view. Does not touch window
-   * state — the Docs window itself stays open. */
+   * state: the Docs window itself stays open. */
   closeDoc: () => void;
   /** Library-tile entry point: the Docs window is already open (this is
-   * called from inside it), so just switch the active doc directly — no
+   * called from inside it), so just switch the active doc directly: no
    * bounce, no window-open signal. Contrast with openDocRequest, the
    * chattr-chip entry point that has to first ensure the window exists. */
   setActiveDoc: (docId: string) => void;
@@ -64,7 +64,7 @@ export const useDocsStore = create<DocsStoreState>((set, get) => ({
   openDocRequest: (docId) => {
     set({ activeDocId: docId });
 
-    // Already open: no launch animation — just show the new doc and raise the
+    // Already open: no launch animation, just show the new doc and raise the
     // window to the front.
     if (useWindowStore.getState().windows.docs) {
       useWindowStore.getState().bringToFront("docs");
@@ -73,7 +73,7 @@ export const useDocsStore = create<DocsStoreState>((set, get) => ({
 
     // Re-entrancy guard: a launch is already animating. The in-flight timer
     // will open the window with whatever doc is now active (already updated
-    // above), so don't start a second bounce or a second busy-cursor toggle —
+    // above), so don't start a second bounce or a second busy-cursor toggle:
     // that's what keeps the cursor leak-proof if the chip is clicked twice.
     if (get().launching) return;
 

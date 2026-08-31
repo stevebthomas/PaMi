@@ -15,36 +15,36 @@ import type { AgentId, Message, StateBag } from "@/lib/sim/types";
 
 interface ReplyRequestBody {
   agentId: AgentId;
-  /** Carries each message's `sentAtSimMinutes` alongside sender/content —
+  /** Carries each message's `sentAtSimMinutes` alongside sender/content:
    * elapsedTimeContextLine reads this to find the replying agent's own most
    * recent message and how long ago it was. */
   history: Pick<Message, "senderId" | "content" | "sentAtSimMinutes">[];
   state: StateBag;
-  /** Current sim-clock minute at send time — fed to elapsedTimeContextLine
+  /** Current sim-clock minute at send time: fed to elapsedTimeContextLine
    * alongside `history` to compute the elapsed-time-awareness context (A4). */
   clockMinutes?: number;
-  /** Present participants (AgentIds) in the channel being replied in — see
+  /** Present participants (AgentIds) in the channel being replied in: see
    * presentInChannel in src/lib/sim/roster.ts. Fed to rosterContextLine (A3)
    * so a persona knows who else is in the room and can address them directly
    * instead of talking about them in the third person. */
   channelRoster?: AgentId[];
-  /** Set only for a triggered agent-to-agent reaction call — appends that
+  /** Set only for a triggered agent-to-agent reaction call: appends that
    * persona's "how I react to another agent" instruction on top of the
    * normal prompt. Absent (the common case) means the lean, ordinary
    * player-facing prompt, unpadded. */
   reactingTo?: AgentId;
   /** Set only for the one reply immediately following an easter-egg
-   * discovery (see ScenarioEvent.easterEgg) — nudges tone only, never
+   * discovery (see ScenarioEvent.easterEgg): nudges tone only, never
    * content requirements, and has nothing to do with scoring. */
   easterEggDiscovered?: boolean;
   /** A different channel's real transcript this agent has independent
-   * visibility into (e.g. Derek watching #incidents) — see
+   * visibility into (e.g. Derek watching #incidents), see
    * groundingContextLine. Absent for the common case (an agent who only
    * knows what's been said directly to them). */
   groundingChannelLabel?: string;
   groundingTranscript?: { senderId: string; content: string }[];
   /** A pre-built, caller-supplied block of established state appended to the
-   * system prompt as-is (e.g. the assigned engineer's live fix status — see
+   * system prompt as-is (e.g. the assigned engineer's live fix status, see
    * buildEngineerPersonaContext in dmContacts.ts). Kept generic here: the
    * route just concatenates whatever grounded context the caller assembled,
    * it doesn't know or care that it's about the fix. */
@@ -86,7 +86,7 @@ export async function POST(request: Request) {
 
   // Only bracket-prefix messages from a THIRD party (e.g. Priya's line inside Raj's
   // #incidents history) so the model can tell voices apart. The agent's own past
-  // turns and the player's turns are sent as-is — prefixing the agent's own turns
+  // turns and the player's turns are sent as-is: prefixing the agent's own turns
   // taught it to echo "[agentId]: " into its next reply.
   const messages: Anthropic.MessageParam[] = history.map((m) => ({
     role: m.senderId === agentId ? "assistant" : "user",
@@ -102,7 +102,7 @@ export async function POST(request: Request) {
     const personaLine = personaContext ?? "";
     const rosterLine = rosterContextLine(agentId, channelRoster);
     const elapsedLine = elapsedTimeContextLine(agentId, clockMinutes, history);
-    // Only when the player actually entered a name on the orientation screen —
+    // Only when the player actually entered a name on the orientation screen:
     // empty/absent (old sessions, the HR orientation chat's initialStateBag)
     // appends nothing, keeping the prompt backward compatible.
     const playerNameLine =

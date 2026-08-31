@@ -6,11 +6,11 @@ import { SCORECARD_CATEGORIES, validateQuotes } from "@/lib/sim/scorecard";
 import type { CategoryExplanation, ScorecardScores } from "@/lib/sim/types";
 
 interface ExplainRequestBody {
-  /** The full day transcript (every channel/DM, all speakers) — the source
+  /** The full day transcript (every channel/DM, all speakers): the source
    * of truth the model explains against and the ONLY text a returned quote is
    * allowed to be a verbatim substring of (player lines only). */
   transcript: { senderId: string; channel: string; content: string; sentAtSimMinutes: number }[];
-  /** The five final scores — already computed, including the resolved
+  /** The five final scores: already computed, including the resolved
    * cross-functional score. The model explains these; it never re-scores. */
   scores: ScorecardScores;
   /** The internal grader notes assembled for the day (the per-message eval
@@ -36,7 +36,7 @@ export async function POST(request: Request) {
   const { transcript, scores, graderNotes } = body;
 
   const playerMessages = transcript.filter((m) => m.senderId === "player").map((m) => m.content);
-  // Nothing the player said means nothing to explain or quote — the caller
+  // Nothing the player said means nothing to explain or quote: the caller
   // already avoids this for zero-engagement days, but guard anyway.
   if (playerMessages.length === 0) {
     return NextResponse.json({ explanations: [] as CategoryExplanation[] });

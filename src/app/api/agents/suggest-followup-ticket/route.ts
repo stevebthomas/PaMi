@@ -8,7 +8,7 @@ interface SuggestFollowupBody {
 }
 
 /** Pulls one concrete, actionable line out of a postmortem's "what I'd do
- * differently" section to pre-fill the follow-up Taskflow ticket prompt —
+ * differently" section to pre-fill the follow-up Taskflow ticket prompt,
  * see FOLLOWUP_TICKET_PROMPT. */
 export async function POST(request: Request) {
   const body: SuggestFollowupBody = await request.json();

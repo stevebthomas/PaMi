@@ -20,7 +20,7 @@ export type AgentId =
   | "system"
   | "player";
 
-/** Everyone a Taskflow ticket can actually be assigned to — a mix of the
+/** Everyone a Taskflow ticket can actually be assigned to: a mix of the
  * chat-capable AgentIds (minus sam/system/player, who aren't realistic
  * ticket owners) and the four Office engineers (Jordan, Chen, Marcus, Ines).
  * Jordan and Chen are now DM-capable AgentIds too (see DmContactId below);
@@ -28,7 +28,7 @@ export type AgentId =
  * named people the player can hand work to. */
 export type AssigneeId = "raj" | "priya" | "derek" | "maya" | "theo" | "jordan" | "chen" | "marcus" | "ines";
 
-/** Who filed a ticket — either an NPC whose message/action generated it, or
+/** Who filed a ticket: either an NPC whose message/action generated it, or
  * the player themself (freeform tickets, and the postmortem follow-up). */
 export type ReporterId = AssigneeId | "player";
 
@@ -38,8 +38,8 @@ export interface RosterMember {
   title: string;
 }
 
-/** Assignment-target roster shown in Taskflow's assignee picker — see
- * TaskflowApp.tsx. Titles mirror AGENT_TITLES/OfficeApp's ENGINEERS below. */
+/** Assignment-target roster shown in Taskflow's assignee picker (see
+ * TaskflowApp.tsx). Titles mirror AGENT_TITLES/OfficeApp's ENGINEERS below. */
 export const ASSIGNABLE_TEAM: RosterMember[] = [
   { id: "raj", name: "Raj", title: "Engineering Manager" },
   { id: "priya", name: "Priya", title: "Operations & Support Lead" },
@@ -53,7 +53,7 @@ export const ASSIGNABLE_TEAM: RosterMember[] = [
 ];
 
 /** The two engineers already in payment-adjacent checkout code (see
- * OfficeApp's INCIDENT_ENGINEER_NAMES) — the domain-correct assignees for
+ * OfficeApp's INCIDENT_ENGINEER_NAMES): the domain-correct assignees for
  * the payments-incident fix ticket, used by the assignment_quality signal
  * in scorecard.ts. */
 export const PAYMENTS_DOMAIN_ASSIGNEES = new Set<AssigneeId>(["jordan", "chen"]);
@@ -84,7 +84,7 @@ export type ChannelId =
   | "dm_raj"
   | "dm_priya"
   | "dm_derek"
-  // Registry DM channels — one per DM_CONTACTS entry, e.g. "dm_jordan".
+  // Registry DM channels: one per DM_CONTACTS entry, e.g. "dm_jordan".
   | `dm_${DmContactId}`;
 
 export interface Message {
@@ -109,8 +109,8 @@ export interface Message {
   attachment?: { label: string; docId: string };
   /** Multiple document chips rendered under the message content, for beats
    * that hand over more than one doc at once (e.g. Maya's two mockups).
-   * Rendered alongside (not instead of) `attachment` — see MessageList's
-   * merged-list rendering. Optional: absent on almost all messages. */
+   * Rendered alongside (not instead of) `attachment` (see MessageList's
+   * merged-list rendering). Optional: absent on almost all messages. */
   attachments?: { label: string; docId: string }[];
 }
 
@@ -124,8 +124,8 @@ export interface EvaluationScores {
 /**
  * One entry in the per-message claims ledger the evaluator emits BEFORE it
  * scores (see EVALUATOR_PROMPT). Each records one specific factual claim the
- * graded player message made, its grounding status, and — new in C2 — who (if
- * anyone) the player explicitly credited as its source.
+ * graded player message made, its grounding status, and (new in C2) who, if
+ * anyone, the player explicitly credited as its source.
  *
  * TRUST BOUNDARY: `claim`, `status`, `source`, and `attributedTo` are all
  * MODEL-EMITTED and inherently unverified (docs/technical-audit.md:105). The
@@ -137,7 +137,7 @@ export interface EvaluationScores {
  * line); for UNSOURCED/CHALLENGED, `source` is a free-text note and the flag is
  * expected to be false. Crucially, the attribution SCORING signal (see
  * analyzeAttributions in scorecard.ts) does NOT rely on the model's `source` at
- * all — it re-derives, deterministically from message history, whether the
+ * all. It re-derives, deterministically from message history, whether the
  * attributed NPC actually supplied the thing.
  *
  * Plain-JSON (primitives only) so it round-trips through session persistence.
@@ -149,7 +149,7 @@ export interface ClaimLedgerEntry {
   status: "GROUNDED" | "UNSOURCED" | "CHALLENGED";
   /** Model-emitted: for GROUNDED, a quote of the NPC/system line that supplied
    * the claim; otherwise a short note on why it's unsourced / who challenged it.
-   * UNVERIFIED model output — see the trust-boundary note above. */
+   * UNVERIFIED model output (see the trust-boundary note above). */
   source: string;
   /** Code-computed in the evaluate route: whether `source`, as a quote, is a
    * real whitespace-normalized substring of some actual transcript line. Only
@@ -205,7 +205,7 @@ export interface ScorecardScores {
   crossFunctional: number;
 }
 
-/** The key of one of the five scored dimensions — used to key a per-category
+/** The key of one of the five scored dimensions: used to key a per-category
  * score explanation (see CategoryExplanation) back to the bar it belongs
  * under. */
 export type ScorecardCategory = keyof ScorecardScores;
@@ -217,8 +217,8 @@ export type ScorecardCategory = keyof ScorecardScores;
  * the UI.
  *
  * Integrity rule: every string in `quotes` is guaranteed to be a real,
- * verbatim substring (whitespace-normalized) of an actual player message —
- * the route validates each candidate quote against the transcript in code and
+ * verbatim substring (whitespace-normalized) of an actual player message.
+ * The route validates each candidate quote against the transcript in code and
  * drops any that fails (see validateQuotes in scorecard.ts), so a quote here
  * is never fabricated or a paraphrase presented as a quote. `quotes` may be
  * empty when nothing was quotable; the explanation then stands on its own. */
@@ -230,10 +230,10 @@ export interface CategoryExplanation {
   quotes: string[];
 }
 
-/** One coaching note, tied to the specific player message it's about —
+/** One coaching note, tied to the specific player message it's about,
  * not a loose paragraph of general advice. */
 export interface CoachingEntry {
-  /** Unique per note — the underlying Evaluation's own id. Needed because
+  /** Unique per note: the underlying Evaluation's own id. Needed because
    * several evaluations (e.g. the generic per-channel grade and a
    * side-channel one like "tradeoff-decision") can share the same
    * messageId, which would otherwise collide as a React list key. */
@@ -243,7 +243,7 @@ export interface CoachingEntry {
   sentAtSimMinutes: number;
   channel: ChannelId;
   feedback: string;
-  /** Overrides the default "Your message in #channel at TIME" header —
+  /** Overrides the default "Your message in #channel at TIME" header:
    * used by side-channel evaluations (cs-template, tradeoff-decision) so
    * they don't read as a duplicate of the generic per-message note that
    * often fires on the very same message. */
@@ -251,7 +251,7 @@ export interface CoachingEntry {
 }
 
 /** One "areas to study" bullet. `topicKey`/`resources` are populated only
- * when the topic matched a curated entry in study_resources — otherwise
+ * when the topic matched a curated entry in study_resources; otherwise
  * it's a plain, link-less bullet (see src/data/study-resources.ts). */
 export interface StudyAreaEntry {
   topicKey: string | null;
@@ -264,9 +264,9 @@ export type TicketStatus = "todo" | "in-progress" | "done";
 
 /** "story" tickets are seeded by the scripted narrative (the early
  * investigation ticket, the tradeoff-decision fix ticket, the postmortem
- * follow-up ticket) — these get a visually distinct card (see TaskflowApp)
+ * follow-up ticket). These get a visually distinct card (see TaskflowApp)
  * so it's clear at a glance why some tickets are tied to a real story beat
- * and others ("freeform" — anything typed into the + ADD form) aren't. */
+ * and others ("freeform": anything typed into the + ADD form) aren't. */
 export type TicketKind = "story" | "freeform";
 
 /** A Taskflow board card. Lives here (not taskflowStore.ts) like every other
@@ -280,26 +280,26 @@ export interface Ticket {
   createdAtSimMinutes: number;
   kind: TicketKind;
   /** Marks this specific ticket as one whose first player-driven move
-   * should advance the sim clock — see TicketCard in TaskflowApp.tsx, which
+   * should advance the sim clock. See TicketCard in TaskflowApp.tsx, which
    * reads this (and `timeCredited` below) before calling advanceClock. */
   advancesTimeOnUpdate?: boolean;
-  /** Set once this ticket's time-advance has already been credited — the
+  /** Set once this ticket's time-advance has already been credited: the
    * anti-gaming guard against toggling the same ticket back and forth. */
   timeCredited?: boolean;
-  /** Who filed this ticket — auto-set at creation from whichever
+  /** Who filed this ticket: auto-set at creation from whichever
    * persona's message/action generated it, or "player" for anything
    * self-filed (freeform tickets, the postmortem follow-up). Null only for
    * tickets created before this field existed. */
   reporterId: ReporterId | null;
-  /** Who's doing it. Null until the player assigns it — see
-   * taskflowStore's assignTicket. */
+  /** Who's doing it. Null until the player assigns it (see
+   * taskflowStore's assignTicket). */
   assigneeId: AssigneeId | null;
-  /** Sim-clock minute the ticket was last (re)assigned — feeds the
+  /** Sim-clock minute the ticket was last (re)assigned: feeds the
    * assignment_quality signal's "cost of inaction" / time-to-assign read. */
   assignedAtSimMinutes?: number;
 }
 
-/** One logged "easter egg" discovery — see ScenarioEvent.easterEgg. Entirely
+/** One logged "easter egg" discovery (see ScenarioEvent.easterEgg). Entirely
  * separate from Evaluation/ScorecardScores: never carries a score, never
  * feeds computeScorecard, purely a delight/collectible record. */
 export interface EasterEggDiscovery {
@@ -312,7 +312,7 @@ export interface EasterEggDiscovery {
 
 /** A completed day's scorecard, computed once when that day wraps up and
  * kept around so it can be reviewed later (the "Reviews" app) as well as
- * shown in the end-of-day popup — both read this same record. */
+ * shown in the end-of-day popup: both read this same record. */
 export interface DayScorecardRecord {
   day: number;
   scenarioLabel: string;
@@ -329,15 +329,15 @@ export interface DayScorecardRecord {
    * scorecard shows an honest "nothing to draw from" line instead of the
    * cheerful empty state. Not every producer sets it. */
   noEngagement?: boolean;
-  /** true while the whole-transcript coordination judgment is in flight —
+  /** true while the whole-transcript coordination judgment is in flight:
    * scores.crossFunctional is a placeholder (5) until this resolves. */
   crossFunctionalLoading: boolean;
   /** Five per-category, evidence-backed "why this score" explanations
    * (subtask C1), one per scored dimension, that the UI shows beneath each
    * bar in place of the flat coachingNotes dump. Optional: absent on
    * zero-engagement days (which keep a single presence note in coachingNotes),
-   * on records produced before this field existed, and on playtests/*.json —
-   * the scorecard UI degrades to the flat coachingNotes list whenever it's
+   * on records produced before this field existed, and on playtests/*.json.
+   * The scorecard UI degrades to the flat coachingNotes list whenever it's
    * missing. Every quote inside is code-validated verbatim against the
    * transcript before it lands here. */
   categoryExplanations?: CategoryExplanation[];
@@ -345,14 +345,14 @@ export interface DayScorecardRecord {
    * Optional (mirrors crossFunctionalLoading) so old/headless producers that
    * never run the call still compile and render via the fallback. */
   explanationsLoading?: boolean;
-  /** Purely-for-fun discoveries logged on this day — see EasterEggDiscovery.
+  /** Purely-for-fun discoveries logged on this day (see EasterEggDiscovery).
    * Optional (not every producer of a DayScorecardRecord-shaped object needs
    * to populate this, e.g. scripts/playtest.ts doesn't track it) and always
    * rendered in its own visually-separate section, never folded into
    * `scores`/`overall`. */
   easterEggsFound?: EasterEggDiscovery[];
   /** A clean, structured, generic record of what actually happened this day
-   * — see DayOutcome. Optional so older producers of a DayScorecardRecord-
+   * (see DayOutcome). Optional so older producers of a DayScorecardRecord-
    * shaped object (or any future one that skips it) still compile. Nothing
    * reads or reacts to this yet (no Day 2 exists); it exists purely as
    * structured data for logging/tests, built once by buildDayOutcome (see
@@ -361,11 +361,11 @@ export interface DayScorecardRecord {
 }
 
 /** A clean, structured, generic record of what actually happened on a given
- * day — deliberately free of narrative prose (other than the one verbatim
+ * day. Deliberately free of narrative prose (other than the one verbatim
  * quote, rajFallbackReasoning) so a future day can reuse the exact same
  * shape and builder (see buildDayOutcome in dayOutcome.ts) instead of this
  * being Day-1-specific. Nothing in the app reads or reacts to this yet (no
- * Day 2 exists to consume it) — it exists purely as structured data for
+ * Day 2 exists to consume it): it exists purely as structured data for
  * tests/logging. `schemaVersion` is bumped only if this shape changes in a
  * way that breaks an existing consumer. */
 export interface DayOutcome {
@@ -384,8 +384,8 @@ export interface DayOutcome {
      * once the day has ended, since the incident always auto-resolves). */
     decidedBy: "player" | "raj-fallback" | "auto-resolve" | null;
     decidedAtMinutes: number | null;
-    /** Raj's own first-person reasoning for his fallback call — see
-     * RajFallbackDecision. Null unless decidedBy is "raj-fallback". The
+    /** Raj's own first-person reasoning for his fallback call (see
+     * RajFallbackDecision). Null unless decidedBy is "raj-fallback". The
      * one narrative string on this whole record, kept because it's a direct
      * quote of something an NPC actually said, not summary prose. */
     rajFallbackReasoning: string | null;
@@ -396,13 +396,13 @@ export interface DayOutcome {
   diligence: {
     marcusConsultedAtMinutes: number | null;
     /** True iff Marcus was consulted at or before the fix decision, i.e. in
-     * time to actually act on his warning — same "in time" rule scorecard.ts
+     * time to actually act on his warning: same "in time" rule scorecard.ts
      * and day1-scenario.ts's consultedMarcusInTime already use. */
     marcusConsultedBeforeDecision: boolean;
     payoutInconsistencySurfaced: boolean;
   };
   responses: {
-    /** Copy of stateBag.respondedAtMinutes — event id -> the sim-clock
+    /** Copy of stateBag.respondedAtMinutes: event id -> the sim-clock
      * minute the player satisfied that event's requiresResponse ask. */
     respondedAtMinutes: Record<string, number>;
     firstIncidentAckAtMinutes: number | null;
@@ -416,7 +416,7 @@ export interface DayOutcome {
     // represents "the postmortem follow-up ticket was created" (see
     // recordFollowUpTicket in simStore.ts, which just patches an already-
     // recorded scorecard's score/coaching notes, not a boolean on StateBag
-    // or the Taskflow ticket itself) — see dayOutcome.ts's builder comment.
+    // or the Taskflow ticket itself). See dayOutcome.ts's builder comment.
   };
   /** Registry DM contacts (see DM_CONTACTS in dmContacts.ts) the player
    * DMed at least once today, in registry order. */
@@ -425,7 +425,7 @@ export interface DayOutcome {
   overall: number;
 }
 
-/** One decision point during a playtest run — the persona's stated internal
+/** One decision point during a playtest run: the persona's stated internal
  * reasoning before its in-character action, whether or not it acted.
  * Diagnostic data for us, not shown to a real player. */
 export interface PlaytestReasoningEntry {
@@ -435,7 +435,7 @@ export interface PlaytestReasoningEntry {
   simTime: string;
 }
 
-/** A scorecard produced by `npm run playtest` (scripts/playtest.ts) — an AI
+/** A scorecard produced by `npm run playtest` (scripts/playtest.ts): an AI
  * persona playing Day 1 blind. Same shape as a real player's scorecard,
  * plus the persona label, its free-form meta-commentary on the simulation
  * itself, and its decision-by-decision reasoning log. Read from
@@ -450,7 +450,7 @@ export interface PlaytestRecord extends DayScorecardRecord {
   runsTotal: number;
 }
 
-/** Average scores across a persona's N runs — same score shape as a single
+/** Average scores across a persona's N runs: same score shape as a single
  * run, no per-message detail (coaching notes/postmortem/study areas don't
  * average meaningfully, so those are left empty; look at the individual
  * runs for that). */
@@ -485,7 +485,7 @@ export interface ScenarioEvent {
   content: string;
   /** Optional state-dependent override for `content`. When present, the store
    * renders THIS (called with the live state bag at fire time) instead of the
-   * static `content` string — used by beats whose text must reflect a runtime
+   * static `content` string: used by beats whose text must reflect a runtime
    * decision (e.g. Derek relaying Raj's actual fallback reasoning, which isn't
    * known until a model call resolves). `content` stays as the deterministic
    * fallback for any consumer that doesn't call contentFor (e.g. the headless
@@ -494,12 +494,12 @@ export interface ScenarioEvent {
   requiresResponse?: boolean;
   responseDeadlineMinutes?: number;
   /** If set, a reply in THIS event's channel also counts as answering the
-   * named earlier event's requiresResponse ask — e.g. a DM chase-up that
-   * re-raises a question originally asked in a shared channel. Lets a
+   * named earlier event's requiresResponse ask (e.g. a DM chase-up that
+   * re-raises a question originally asked in a shared channel). Lets a
    * chase-up "count" without hardcoding which channels are equivalent. */
   reAsks?: string;
   /** Additional channels (beyond this event's own `channel`) where a reply
-   * also counts as answering this specific request — for an ask whose own
+   * also counts as answering this specific request: for an ask whose own
    * content plausibly invites a reply somewhere else (e.g. a DM that says
    * "saw the thread in #x", inviting a reply in #x instead). */
   alsoSatisfiedByChannels?: ChannelId[];
@@ -508,18 +508,18 @@ export interface ScenarioEvent {
   /** Applied to the state bag the moment this event fires. */
   applyEffect?: (state: StateBag) => Partial<StateBag>;
   /** Hand-curated, plain-fact bullets this message conveys (not tasks, not
-   * "you should" phrasing) — powers the easy-difficulty fact checklist.
+   * "you should" phrasing): powers the easy-difficulty fact checklist.
    * Absent for events that are asks/demands/system framing rather than
    * new information (e.g. a chase-up DM), which the checklist skips. */
   facts?: string[];
-  /** Marks this event as an optional, purely-for-fun discovery — reusable
+  /** Marks this event as an optional, purely-for-fun discovery, reusable
    * across any future ambient beat, any day. If the player replies in this
    * event's own channel any time after it fires, the discovery gets logged
    * (see StateBag-adjacent easterEggsFound in simStore) and the NPC's reply
    * gets a warmer, more delighted tone for that one message. `label` is the
    * short, player-facing description shown wherever discoveries are listed.
-   * Deliberately NOT wired into requiresResponse/scoring in any way — see
-   * the boundary comment at the discovery-tracking call site. */
+   * Deliberately NOT wired into requiresResponse/scoring in any way (see
+   * the boundary comment at the discovery-tracking call site). */
   easterEgg?: { label: string };
   /** A document chip to render under this event's Message once it fires (e.g.
    * Derek's welcome-doc). Clicking it opens the doc in the in-sim Docs app
@@ -528,7 +528,7 @@ export interface ScenarioEvent {
    * advanceClock. */
   attachment?: { label: string; docId: string };
   /** Multiple document chips to render under this event's Message once it
-   * fires — same idea as `attachment` but plural, for beats that hand over
+   * fires: same idea as `attachment` but plural, for beats that hand over
    * more than one doc at once. Carried onto the created Message unchanged by
    * advanceClock. Optional: absent on almost every event. */
   attachments?: { label: string; docId: string }[];
@@ -548,12 +548,12 @@ export type Difficulty = "easy" | "standard";
  * the call resolves (or a scripted API-failure fallback fills it in). */
 export interface RajFallbackDecision {
   choice: "rollback" | "patch-forward";
-  /** Raj's first-person, 2-3 sentence Slack-voice reasoning for the choice —
+  /** Raj's first-person, 2-3 sentence Slack-voice reasoning for the choice:
    * what Derek relays to the player and what Raj's own #incidents follow-up
    * is consistent with. */
   reasoning: string;
   /** The 1-2 sentence line Raj sends Derek when he loops him in on the call
-   * he made — Raj's own voice, reused for his #incidents announcement. */
+   * he made: Raj's own voice, reused for his #incidents announcement. */
   derekLine: string;
   /** Sim-clock minute the decision actually landed (when the model call
    * resolved), which is also when the escalation gets delivered. Truthful to
@@ -570,7 +570,7 @@ export type CommitmentKind =
    * as of 10:30, watching the error rate now"). */
   | "npc-commitment"
   /** A decision the NPC has acknowledged / is now operating under (e.g. Priya
-   * acknowledging the rollback path was chosen). Not the NPC's own promise —
+   * acknowledging the rollback path was chosen). Not the NPC's own promise:
    * their awareness of a call that was made. */
   | "decision-acknowledged"
   /** Something the PLAYER owes this NPC (e.g. Priya waiting on a CS draft, Derek
@@ -623,7 +623,7 @@ export type IncidentStateDescriptor =
   | "resolution-announced";
 
 /**
- * The condition under which a pending obligation should fire — a DECLARATIVE
+ * The condition under which a pending obligation should fire: a DECLARATIVE
  * DATA DESCRIPTOR, never a function/closure, so the whole obligation survives
  * JSON round-tripping for persistence. A2 owns the evaluation logic that turns
  * one of these descriptors into an actual boolean against live state; this type
@@ -638,16 +638,16 @@ export type ObligationTrigger =
   /** Fire once checkout metrics have recovered to baseline. */
   | { type: "metrics-recovered" }
   /** Fire once the player has (or has NOT, per A2's reading) delivered a
-   * specific artifact — e.g. Priya nudging about an undelivered CS draft. */
+   * specific artifact (e.g. Priya nudging about an undelivered CS draft). */
   | { type: "player-delivered"; deliverable: ObligationDeliverable }
-  /** Fire once `minutes` sim-minutes have elapsed since `sinceSimMinutes` —
-   * e.g. a nudge that only lands after a stretch of silence. */
+  /** Fire once `minutes` sim-minutes have elapsed since `sinceSimMinutes`
+   * (e.g. a nudge that only lands after a stretch of silence). */
   | { type: "sim-minutes-elapsed-since"; sinceSimMinutes: number; minutes: number }
   /** Fire when the incident reaches a named lifecycle state. */
   | { type: "incident-state-reached"; state: IncidentStateDescriptor };
 
 /**
- * Which seeded obligation this is — the discriminator the A2 engine uses to
+ * Which seeded obligation this is: the discriminator the A2 engine uses to
  * pick the deterministic copy builder for the NPC message it fires (see
  * buildObligationMessageContent in dmContacts.ts). The trigger/cancelWhen
  * descriptors below carry the state condition; this carries the identity and
@@ -678,10 +678,10 @@ export type ObligationKind =
  * plain descriptor object, so the array is fully JSON-serializable.
  */
 export interface ObligationEntry {
-  /** Stable unique id (e.g. `oblig-${kind}`) — the append is deduped by this,
+  /** Stable unique id (e.g. `oblig-${kind}`): the append is deduped by this,
    * so a re-entrant advanceClock / re-run applyEffect can't double-seed. */
   id: string;
-  /** Which seeded obligation this is — selects the copy builder (see
+  /** Which seeded obligation this is: selects the copy builder (see
    * ObligationKind). Lets the engine act on obligations generically while the
    * exact wording lives in one deterministic builder per kind. */
   kind: ObligationKind;
@@ -691,7 +691,7 @@ export interface ObligationEntry {
   summary: string;
   /** The channel the follow-up would surface in. */
   channel: ChannelId;
-  /** Declarative, JSON-serializable condition A2 evaluates — NOT a callback.
+  /** Declarative, JSON-serializable condition A2 evaluates, NOT a callback.
    * The obligation FIRES (emits its NPC message) when this becomes true, as
    * long as `cancelWhen` didn't become true first. */
   trigger: ObligationTrigger;
@@ -710,16 +710,16 @@ export interface ObligationEntry {
 export interface StateBag {
   /** Generic, event-id-keyed acknowledgment tracking: for every
    * requiresResponse event the player has satisfied (by replying in any
-   * channel that counts for it — see ScenarioEvent.reAsks /
+   * channel that counts for it, see ScenarioEvent.reAsks /
    * alsoSatisfiedByChannels), the sim-clock minute they did so. This is the
-   * one mechanism every story's escalation/scoring logic reads from —
+   * one mechanism every story's escalation/scoring logic reads from:
    * no per-story named boolean flags. */
   respondedAtMinutes: Record<string, number>;
-  /** "Provided AND judged good" — not just "attempted." See the CS-template
+  /** "Provided AND judged good": not just "attempted." See the CS-template
    * evaluator (/api/agents/evaluate-cs-template). */
   csTemplateProvided: boolean;
   /** Sim-clock minute the player first ATTEMPTED a customer-facing draft for
-   * Priya — set the moment the CS-template evaluation block runs in
+   * Priya: set the moment the CS-template evaluation block runs in
    * sendPlayerMessage, regardless of whether the draft was judged good. Null
    * until then. Distinct from csTemplateProvided ("attempted AND good"): this
    * is "attempted at all," which is what Priya's follow-up obligations settle
@@ -739,13 +739,13 @@ export interface StateBag {
   samMood: "neutral" | "calm" | "concerned";
   postmortemSubmitted: boolean;
   /** Which fix path the player chose when Raj offered the rollback vs.
-   * patch-forward tradeoff — null until decided. Drives Pulse's recovery
+   * patch-forward tradeoff: null until decided. Drives Pulse's recovery
    * curve and the seeded Taskflow ticket. */
   tradeoffChoice: "rollback" | "patch-forward" | null;
-  /** Sim-clock minute the tradeoff was decided — Pulse's recovery curve is
+  /** Sim-clock minute the tradeoff was decided: Pulse's recovery curve is
    * computed relative to this, not to when the incident started. */
   tradeoffDecidedAtMinutes: number | null;
-  /** The Taskflow ticket id created for the tradeoff-decision fix — null
+  /** The Taskflow ticket id created for the tradeoff-decision fix: null
    * until decided. Lets the resolution event's auto-move-to-done target
    * this SPECIFIC ticket by id instead of guessing "whichever ticket
    * happens to be in-progress right now," which breaks the moment the
@@ -758,20 +758,20 @@ export interface StateBag {
    * stakeholder-management coaching note/penalty in scorecard.ts. */
   tradeoffEscalatedToDerek: boolean;
   /** Sim-clock minute the player first engaged Raj substantively on the
-   * incident/tradeoff while it was still undecided — a message in #incidents or
+   * incident/tradeoff while it was still undecided: a message in #incidents or
    * Raj's DM that names an incident/tradeoff noun (see the keyword gate in
    * sendPlayerMessage) while tradeoffChoice is still null. Gated only on the
    * incident being knowable (priya-heads-up-dm fired, 8:45), NOT on Raj's 9:38
-   * #incidents tradeoff-offer beat — Raj's live persona routinely surfaces the
+   * #incidents tradeoff-offer beat. Raj's live persona routinely surfaces the
    * rollback/patch options in dm_raj well before that scripted beat, so gating
    * on it would miss a whole early DM thread. Set once, additively. Null until
    * then (and forever if the player never engaged). This is what lets Raj's and
    * Derek's fallback-escalation beats tell "the PM went quiet mid-conversation"
-   * apart from "we never reached the PM at all" — a live DM thread with Raj
+   * apart from "we never reached the PM at all": a live DM thread with Raj
    * makes the flat "couldn't reach you" line false. Plain number|null, so it
    * round-trips through persistence untouched. */
   tradeoffEngagedWithRajAtMinutes: number | null;
-  /** Sim-clock minute the player first briefed Derek on the incident — a
+  /** Sim-clock minute the player first briefed Derek on the incident: a
    * substantive message in Derek's DM or the incident thread that actually
    * recaps what happened / the blast radius (see DEREK_BRIEF_KEYWORDS in
    * simStore.ts), sent BEFORE his 1:30 recap ask (derek-escalation) fired. Set
@@ -782,7 +782,7 @@ export interface StateBag {
    * untouched. */
   derekBriefedOnIncidentAtMinutes: number | null;
   /** Raj's reasoned fallback call (see RajFallbackDecision) when the player
-   * never engaged the tradeoff — null until the model call resolves. Drives
+   * never engaged the tradeoff: null until the model call resolves. Drives
    * Derek's relayed escalation text and Raj's #incidents follow-up, and is
    * injected into Raj's live persona so a later "why'd you pick that?" answer
    * matches what Derek relayed. */
@@ -798,7 +798,7 @@ export interface StateBag {
   fixLandedFollowUpsSent: DmContactId[];
   /** Sim-clock minute the player first DMed Marcus with a message that
    * actually touches the payout pipeline / rollback / payouts (a generic
-   * "hi" does NOT count — see MARCUS_PAYOUT_KEYWORDS in simStore.ts for the
+   * "hi" does NOT count; see MARCUS_PAYOUT_KEYWORDS in simStore.ts for the
    * exact deterministic matcher). Null until that happens. This is the
    * "diligence" signal Part 6 keys off: whether the player foresaw the
    * rollback's downstream payout cost by asking the one engineer who was on
@@ -811,7 +811,7 @@ export interface StateBag {
    * false on patch-forward and on any rollback where the player consulted
    * Marcus in time. Read by the scorecard's diligence coaching note. */
   payoutInconsistencySurfaced: boolean;
-  /** Per-NPC ledger of commitments/decisions extracted from the conversation —
+  /** Per-NPC ledger of commitments/decisions extracted from the conversation:
    * distinct from raw message history (see CommitmentEntry). Populated by an
    * upcoming subtask (A1); empty for now. Must stay plain-JSON (a flat array of
    * primitive-valued entries, no Sets/Maps/functions) because a persistence
@@ -819,7 +819,7 @@ export interface StateBag {
   commitmentLedger: CommitmentEntry[];
   /** Obligations an NPC is waiting on/owes, each carrying a DECLARATIVE trigger
    * descriptor (see ObligationEntry / ObligationTrigger) rather than a
-   * function — the state-conditional engine that evaluates them is a later
+   * function: the state-conditional engine that evaluates them is a later
    * subtask (A2); this is just the data. Empty for now. Must stay plain-JSON
    * (no Sets/Maps/closures) so it survives JSON round-tripping for persistence. */
   pendingObligations: ObligationEntry[];
@@ -830,7 +830,7 @@ export interface StateBag {
    * every subsequent message. Lives here (not a Set) so it round-trips through
    * session persistence as plain JSON, exactly like fixLandedFollowUpsSent. */
   redirectsFiredToday: string[];
-  /** SIM_DOCS ids the player has opened, in first-open order — drives the
+  /** SIM_DOCS ids the player has opened, in first-open order: drives the
    * Docs app's library view (see DocsApp.tsx). Populated by
    * simStore.recordDocOpened, which appends an id once (deduped) the first
    * time it's opened via a chattr chip or a library tile. Plain string[], so
@@ -838,7 +838,7 @@ export interface StateBag {
    * redirectsFiredToday. */
   openedDocIds: string[];
   /** The player's own name, captured on the orientation screen before Day 1
-   * starts (see setPlayerName / WelcomeScreen). Empty string until entered —
+   * starts (see setPlayerName / WelcomeScreen). Empty string until entered,
    * which is also the state old persisted sessions and the HR orientation chat
    * (which sends initialStateBag before any name exists) present, so every
    * consumer must treat "" as "no name given." Plain string, so it round-trips

@@ -11,11 +11,11 @@ import { RAJ_FALLBACK_DECISION_PROMPT } from "@/lib/agents/prompts";
  * engineers given identical facts land differently, so both choices must be
  * reachable and neither nudged.
  *
- * The whole scenario is fixed, so this route needs no request body — it's
+ * The whole scenario is fixed, so this route needs no request body: it's
  * callable with `{}` and every call is the same request, with variability
  * coming from sampling. Uses RAJ_FALLBACK_MODEL (Sonnet, not the Haiku persona
  * tier) because Haiku collapses to a framing-driven mode on this knife-edge
- * tradeoff instead of genuinely deliberating — see that constant's note.
+ * tradeoff instead of genuinely deliberating (see that constant's note).
  * Default temperature (1.0) is intentional: we WANT run-to-run variation on a
  * real judgment call.
  */

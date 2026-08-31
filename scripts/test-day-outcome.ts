@@ -1,7 +1,7 @@
 /**
  * Headless verification for DayOutcome (see src/lib/sim/dayOutcome.ts /
- * src/lib/sim/types.ts). Drives the REAL sim store (src/store/simStore.ts)
- * — not a reimplementation — against the app's real API routes on a running
+ * src/lib/sim/types.ts). Drives the REAL sim store (src/store/simStore.ts),
+ * not a reimplementation, against the app's real API routes on a running
  * dev/prod server, same production code paths scripts/playtest.ts uses.
  *
  * Requires the app's dev server running at TEST_BASE_URL (default
@@ -67,13 +67,13 @@ const RUN = (() => {
 
 async function main() {
   // Imported dynamically, after the fetch shim above is installed, and
-  // after CLI parsing — this IS the real store, not a mirror of it.
+  // after CLI parsing. This IS the real store, not a mirror of it.
   const { useSimStore } = await import("../src/store/simStore");
   const { useTaskflowStore } = await import("../src/store/taskflowStore");
 
   // Advances the real clock (via the store's own advanceClock, which fires
   // whatever scripted events are now due) from wherever it currently sits
-  // up to an absolute target minute — so every step below can just state
+  // up to an absolute target minute, so every step below can just state
   // "get to 9:45" instead of hand-tracking how many minutes
   // sendPlayerMessage's own internal +3 already spent.
   function advanceTo(targetMinutes: number) {
@@ -86,13 +86,13 @@ async function main() {
   if (RUN === "a") {
     // --- Run (a): player chooses rollback at 9:45 after DMing Marcus about
     // payouts at 9:40, then submits a real postmortem. ---
-    advanceTo(555); // 9:15 AM — priya-incidents-escalation fires
+    advanceTo(555); // 9:15 AM: priya-incidents-escalation fires
     console.log(`[clock ${useSimStore.getState().clockMinutes}] ack incident escalation`);
     await useSimStore
       .getState()
       .sendPlayerMessage("incidents", "Got it — looking into the Apple Pay failures now, will keep everyone posted.");
 
-    advanceTo(578); // 9:38 AM — raj-tradeoff-offer fires
+    advanceTo(578); // 9:38 AM: raj-tradeoff-offer fires
     console.log(
       `[clock ${useSimStore.getState().clockMinutes}] raj-tradeoff-offer fired: ${useSimStore.getState().firedEventIds.has("raj-tradeoff-offer")}`
     );
@@ -121,7 +121,7 @@ async function main() {
       console.log(`  assigned fix ticket ${ticketId} to jordan`);
     }
 
-    advanceTo(810); // 1:30 PM — derek-escalation fires
+    advanceTo(810); // 1:30 PM: derek-escalation fires
     console.log(`[clock ${useSimStore.getState().clockMinutes}] ack derek's blast-radius ask`);
     await useSimStore
       .getState()
@@ -130,7 +130,7 @@ async function main() {
         "Blast radius: Apple Pay checkout failures only (~3% of attempts), card/Google Pay unaffected. Root cause: Stripe-side webhook flakiness, nothing we shipped. We rolled back payment-service to the pre-payout-speed build to stop it fast; seller payouts temporarily go back to the old cadence, Priya's getting ahead of that with affected sellers. Checkout success rate is back at baseline."
       );
 
-    advanceTo(930); // 3:30 PM — postmortem-prompt fires
+    advanceTo(930); // 3:30 PM: postmortem-prompt fires
     console.log(`[clock ${useSimStore.getState().clockMinutes}] submit postmortem`);
     await useSimStore
       .getState()
@@ -142,7 +142,7 @@ async function main() {
     // --- Run (b): player never engages at all. Raj's automatic model-call
     // fallback should pick the fix path himself, Derek escalates, and the
     // day ends via the forced end-of-day boundary (never a postmortem). ---
-    advanceTo(605); // 10:05 AM — crosses RAJ_FALLBACK_KICKOFF_MINUTES with tradeoffChoice still null
+    advanceTo(605); // 10:05 AM: crosses RAJ_FALLBACK_KICKOFF_MINUTES with tradeoffChoice still null
     console.log(
       `[clock ${useSimStore.getState().clockMinutes}] raj-tradeoff-offer fired: ${useSimStore.getState().firedEventIds.has("raj-tradeoff-offer")}, waiting on Raj's fallback model call...`
     );
@@ -167,12 +167,12 @@ async function main() {
       console.log(`  Raj's fallback resolved: ${JSON.stringify(useSimStore.getState().stateBag.rajFallbackDecision)}`);
     }
 
-    advanceTo(620); // 10:20 AM — derek-tradeoff-escalation applies the fallback decision
+    advanceTo(620); // 10:20 AM: derek-tradeoff-escalation applies the fallback decision
     console.log(
       `[clock ${useSimStore.getState().clockMinutes}] tradeoffEscalatedToDerek: ${useSimStore.getState().stateBag.tradeoffEscalatedToDerek}, tradeoffChoice: ${useSimStore.getState().stateBag.tradeoffChoice}`
     );
 
-    advanceTo(1080); // 6:00 PM — hard end-of-day boundary, forces the day to end (never a postmortem)
+    advanceTo(1080); // 6:00 PM: hard end-of-day boundary, forces the day to end (never a postmortem)
     console.log(`[clock ${useSimStore.getState().clockMinutes}] dayComplete: ${useSimStore.getState().dayComplete}`);
   }
 

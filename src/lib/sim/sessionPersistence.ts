@@ -16,7 +16,7 @@ import type {
 
 /**
  * ============================================================================
- * localStorage SESSION PERSISTENCE — STOPGAP, NOT THE DURABLE LAYER
+ * localStorage SESSION PERSISTENCE: STOPGAP, NOT THE DURABLE LAYER
  * ============================================================================
  *
  * This module lets an in-progress sim session survive a browser refresh by
@@ -30,7 +30,7 @@ import type {
  *     NO persistence rather than breaking the sim. The zustand stores remain
  *     the single source of truth in memory; this is only a mirror of them.
  *
- * The durable, cross-device layer is FUTURE WORK (Supabase — see
+ * The durable, cross-device layer is FUTURE WORK (Supabase, see
  * src/lib/supabase/persist.ts). Do NOT mistake this module for that layer or
  * build cross-device assumptions on top of it.
  *
@@ -48,7 +48,7 @@ const STORAGE_KEY = "pm-sim.session.v1";
  * and the session starts fresh (never a crash). */
 const SCHEMA_VERSION = 1;
 
-/** Debounce window for writes. This is a persistence-I/O debounce only — it
+/** Debounce window for writes. This is a persistence-I/O debounce only: it
  * does NOT drive any sim/NPC behavior, so it does not fall under the project's
  * "no wall-clock timers" rule (which bans timers that advance the sim). Writes
  * are additionally flushed synchronously on pagehide/visibilitychange so a
@@ -58,8 +58,8 @@ const WRITE_DEBOUNCE_MS = 300;
 /**
  * The serialized snapshot. Sets are stored as arrays here and rehydrated back
  * to Sets on load. `stateBag` is snapshotted as a WHOLE OBJECT (not
- * key-by-key), so any new plain-JSON field added to StateBag later — e.g. the
- * existing commitmentLedger / pendingObligations arrays — persists and restores
+ * key-by-key), so any new plain-JSON field added to StateBag later (e.g. the
+ * existing commitmentLedger / pendingObligations arrays) persists and restores
  * automatically without this module needing an edit.
  */
 interface SessionSnapshot {
@@ -97,7 +97,7 @@ function hasWindow(): boolean {
 
 /** Builds a snapshot of the current live state of both stores. Excludes the
  * transient/in-flight fields (pendingReplyFrom, pendingReplyChannel,
- * rajFallbackInFlight, askClaudePending) — any in-flight async is dead after a
+ * rajFallbackInFlight, askClaudePending): any in-flight async is dead after a
  * refresh, so those are never persisted and are reset to safe defaults on
  * restore. windowStore/costStore are intentionally out of scope. */
 function buildSnapshot(): SessionSnapshot {
@@ -138,14 +138,14 @@ function buildSnapshot(): SessionSnapshot {
 let suspended = false;
 
 /** Serializes and writes the current state immediately. All failures degrade
- * to a silent no-op — persistence is never allowed to break the sim. */
+ * to a silent no-op: persistence is never allowed to break the sim. */
 function persistNow(): void {
   if (suspended) return;
   if (!hasWindow()) return;
   try {
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(buildSnapshot()));
   } catch {
-    // Quota exceeded / private-mode / SecurityError — degrade to no
+    // Quota exceeded / private-mode / SecurityError: degrade to no
     // persistence rather than throwing into a store subscriber.
   }
 }
@@ -185,7 +185,7 @@ export function clearSession(): void {
 
 /** Dev "start over" affordance (see window.resetSimSession in Desktop.tsx):
  * permanently suspends persistence for THIS page instance, wipes the saved
- * session, then reloads into a fresh one. Suspending first is essential — the
+ * session, then reloads into a fresh one. Suspending first is essential: the
  * reload triggers the pagehide flush, which would otherwise immediately
  * re-persist the still-in-memory (started) session and undo the wipe. The
  * fresh page load starts a brand-new module instance with suspended=false, so
@@ -211,7 +211,7 @@ let restoredStartedSession = false;
  * happen after this returns).
  *
  * Any corrupt, unparseable, or schema-mismatched payload is discarded and the
- * session starts fresh — never a crash.
+ * session starts fresh, never a crash.
  */
 export function restoreSession(): boolean {
   if (restoreAttempted) return restoredStartedSession;
@@ -236,7 +236,7 @@ export function restoreSession(): boolean {
       !parsed.sim ||
       typeof parsed.sim.sessionId !== "string"
     ) {
-      // Corrupt or from an incompatible schema — discard, start fresh.
+      // Corrupt or from an incompatible schema: discard, start fresh.
       clearSession();
       return false;
     }
@@ -249,7 +249,7 @@ export function restoreSession(): boolean {
     if (!s.started) return false;
 
     useSimStore.setState({
-      // Restore the ORIGINAL sessionId — outcomeStore dedupes saved day
+      // Restore the ORIGINAL sessionId: outcomeStore dedupes saved day
       // outcomes by sessionId + day, so a fresh id here would fork the session
       // identity on every refresh.
       sessionId: s.sessionId,
@@ -267,7 +267,7 @@ export function restoreSession(): boolean {
       helpQueries: s.helpQueries ?? [],
       // Any async patch that was still in flight when the tab refreshed (the
       // coordination score, the study-areas lookup, and the C1 score
-      // explanations) died with the page — there is no fetch left to clear its
+      // explanations) died with the page; there is no fetch left to clear its
       // loading flag. So normalize every restored record's in-flight flags to
       // false, mirroring how the store's transient fields are reset below. The
       // record simply keeps whatever data had already been patched in; a flag
@@ -303,7 +303,7 @@ export function restoreSession(): boolean {
     restoredStartedSession = true;
     return true;
   } catch {
-    // Unparseable / unexpected shape — discard and start fresh.
+    // Unparseable / unexpected shape: discard and start fresh.
     clearSession();
     return false;
   }
@@ -313,7 +313,7 @@ let persistenceStarted = false;
 
 /** Subscribes to both stores so any state change (player/NPC message, clock
  * advance, day completion, ticket move, etc.) schedules a debounced write.
- * Idempotent — safe to call from an effect that may run more than once. */
+ * Idempotent: safe to call from an effect that may run more than once. */
 export function startSessionPersistence(): void {
   if (persistenceStarted) return;
   if (!hasWindow()) return;

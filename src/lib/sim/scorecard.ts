@@ -5,14 +5,14 @@ import { day1ScenarioEvents } from "../../data/day1-scenario";
 
 // Day 1-specific: which event's acknowledgment feeds stakeholderMgmt's
 // "did the player ever hear from Derek" fallback below. A future story with
-// its own event ids/timeline would need its own version of this line — see
+// its own event ids/timeline would need its own version of this line. See
 // scenario-audit-day1.md's Step 3 notes on moving this into story data.
 const DEREK_EVENT_ID = "derek-escalation";
 
 // QA #9 fix: responseTime used to score ONLY the first incident ack
 // (priya-incidents-escalation against a single fixed deadline), so a player
-// who acked fast then went dark for the rest of the incident — forcing Raj's
-// unilateral fix call and repeated Priya nudges — still scored a perfect 10.
+// who acked fast then went dark for the rest of the incident (forcing Raj's
+// unilateral fix call and repeated Priya nudges) still scored a perfect 10.
 // It now averages a latency score across EVERY response-requiring moment of
 // the day (every fired requiresResponse ScenarioEvent, plus the tradeoff
 // decision), so staying reachable matters as much as the initial pickup. See
@@ -31,7 +31,7 @@ if (!RAJ_TRADEOFF_OFFER_EVENT) {
   throw new Error("scorecard.ts: expected a 'raj-tradeoff-offer' event in day1ScenarioEvents to score the tradeoff-decision latency against");
 }
 
-/** One ask's latency curve — shared by every requiresResponse event and the
+/** One ask's latency curve, shared by every requiresResponse event and the
  * tradeoff-decision entry below (see computeResponseTimeScore): answered
  * within 5 min of the ask -> 10; within the ask's own deadline -> 8; within
  * 2x that deadline -> 5; later than that -> 3; never answered by day end -> 1.
@@ -48,7 +48,7 @@ function scoreAskLatency(respondedAt: number | null, triggerAt: number, deadline
 
 /**
  * QA #9: responseTime is the mean of a latency score for EVERY response-
- * requiring moment of the day, not just the first incident ack — one entry
+ * requiring moment of the day, not just the first incident ack: one entry
  * per fired requiresResponse ScenarioEvent (scoreAskLatency against that
  * event's own trigger time and deadline), plus one additional entry for the
  * rollback-vs-patch-forward tradeoff decision when Raj's offer was made:
@@ -84,7 +84,7 @@ function computeResponseTimeScore(stateBag: StateBag, completedAtSimMinutes: num
       tradeoffScore = delta <= 30 ? 10 : delta <= 60 ? 7 : 4;
     } else {
       // Never decided by the player. Scored 1 whether Raj had to escalate to
-      // Derek or just weighed the call himself (rajFallbackDecision) — both
+      // Derek or just weighed the call himself (rajFallbackDecision). Both
       // mean the tradeoff never got a player decision. (By day end this is
       // the only way a fired offer stays undecided: Raj always eventually
       // decides or escalates.)
@@ -95,7 +95,7 @@ function computeResponseTimeScore(stateBag: StateBag, completedAtSimMinutes: num
 
   if (entries.length === 0) {
     // No response-requiring moment fired at all (an extremely early forced
-    // end-of-day) — fall back to the old single-ack behavior against the
+    // end-of-day). Fall back to the old single-ack behavior against the
     // incident escalation ask so this never divides by zero.
     return scoreAskLatency(
       stateBag.respondedAtMinutes["priya-incidents-escalation"] ?? null,
@@ -113,18 +113,18 @@ function average(values: number[]): number {
 }
 
 // ---------------------------------------------------------------------------
-// C2 — unverified-attribution credibility signal.
+// C2: unverified-attribution credibility signal.
 //
 // When the player credits a specific person as the source of a claim ("that's
 // Priya's estimate") but never actually got that from them, it's a real
 // judgment/trust lapse. Nobody catches it live (by design: no NPC callout, no
-// mid-day UI signal) — in a real org it surfaces LATER, when stakeholders
+// mid-day UI signal). In a real org it surfaces LATER, when stakeholders
 // compare notes. So this deliberately stays a DELAYED, SOCIAL consequence: the
 // day-end scorecard is the first and only place it shows up, as a small,
 // bounded stakeholderMgmt penalty plus a coaching note.
 //
 // The evaluator emits which claims the player attributed to whom (the ledger's
-// `attributedTo`), but that field — like all model output — is not trusted for
+// `attributedTo`), but that field, like all model output, is not trusted for
 // scoring. Whether the attributed NPC ACTUALLY supplied the thing is re-derived
 // here, deterministically, from real message history, via a pragmatic tiered
 // check. Its LIMITS, stated honestly:
@@ -140,7 +140,7 @@ function average(values: number[]): number {
 //     exchange with the attributed NPC (that NPC authored at least one message
 //     the player could see before the claim), but the specific figure isn't
 //     traceable to them. Could be a real off-transcript hallway conversation we
-//     can't see, or could be a misattribution — we can't tell, so it's flagged
+//     can't see, or could be a misattribution. We can't tell, so it's flagged
 //     but treated more leniently than Tier 3.
 //   - Tier 3 ("never spoke to them"): the attributed NPC never sent the player
 //     a single message before the claim. Crediting a figure to someone you
@@ -166,7 +166,7 @@ export interface AttributionFinding {
   /** Sim-minute of the player message that made the attributed claim (so the
    * coaching note can be timestamped to the moment it happened). */
   claimAtSimMinutes: number;
-  /** Short human-readable reason for the verdict — debugging / note aid. */
+  /** Short human-readable reason for the verdict (debugging / note aid). */
   reason: string;
 }
 
@@ -179,7 +179,7 @@ function extractNumbers(text: string): string[] {
 
 /** Map a model-emitted attribution label ("Priya", "priya's", "Marcus") to a
  * real NPC AgentId. Returns null when it can't be resolved to a known NPC (the
- * player, the system, or an unrecognized name) — such a claim yields no signal
+ * player, the system, or an unrecognized name). Such a claim yields no signal
  * rather than a guessed penalty. */
 function resolveAttributedAgent(attributedTo: string): AgentId | null {
   // Lowercase, strip a trailing possessive ('s / ') and surrounding punctuation.
@@ -234,7 +234,7 @@ function verifyAttribution(
  * Run the deterministic attribution check across every captured claims ledger.
  * Exported so the headless C2 verification script (and any future test) can
  * drive it directly. Reads `claims` off the Evaluation records and re-derives
- * each attribution's verdict from real message history — see verifyAttribution.
+ * each attribution's verdict from real message history. See verifyAttribution.
  */
 export function analyzeAttributions(
   evaluations: Record<string, Evaluation>,
@@ -263,7 +263,7 @@ export function analyzeAttributions(
   return findings;
 }
 
-/** Same Day 1 scoring formula as before — just extracted into one place so
+/** Same Day 1 scoring formula as before, just extracted into one place so
  * both the end-of-day popup and the Reviews app compute it identically.
  * `messages` is used only to attribute each coaching note back to the
  * specific player message it graded. */
@@ -271,12 +271,12 @@ export function computeScorecard(
   evaluations: Record<string, Evaluation>,
   stateBag: StateBag,
   messages: Message[],
-  /** Sim-clock minute the day actually ended at — normally the postmortem
+  /** Sim-clock minute the day actually ended at. Normally the postmortem
    * submission's own timestamp, but for a forced end-of-day with no
    * postmortem, the hard end-of-day boundary. Used only to timestamp the
    * synthetic "no postmortem" coaching note below so it sorts last. */
   completedAtSimMinutes: number,
-  /** Taskflow's board state at day-end — optional (defaults to none) so
+  /** Taskflow's board state at day-end, optional (defaults to none) so
    * callers with no real board (e.g. scripts/playtest.ts's headless local
    * simulation, which never drives the real taskflowStore) don't need to
    * fake one; the assignment_quality signal below just contributes nothing
@@ -286,7 +286,7 @@ export function computeScorecard(
   const evalList = Object.values(evaluations);
   const incidentEvals = evalList.filter((e) => e.eventId === "incidents");
   const derekEvals = evalList.filter((e) => e.eventId === "dm_derek");
-  // Real, 4-dimension graded-message evaluations only — excludes side-channel
+  // Real, 4-dimension graded-message evaluations only. Excludes side-channel
   // entries that reuse this same Evaluation record shape just to surface a
   // coaching note (e.g. eventId "cs-template", "tradeoff-decision"), which
   // don't carry meaningful tone/completeness scores and would otherwise
@@ -295,7 +295,7 @@ export function computeScorecard(
   // channel with a full 4-dimension grade, just under EVALUATOR_PROMPT's
   // #design-review special case that scores tone/speed on handling and
   // holds completeness/strategicThinking at a flat satisfied-by-default
-  // value — so only its tone feeding commClarity here is meaningful;
+  // value, so only its tone feeding commClarity here is meaningful;
   // triageQuality/stakeholderMgmt below don't read it at all.
   const scoredEvals = evalList.filter(
     (e) => e.eventId === "incidents" || e.eventId === "dm_derek" || e.eventId === "design-review"
@@ -316,7 +316,7 @@ export function computeScorecard(
   const noEngagement = playerMessageCount === 0 && evalList.length === 0;
 
   // A day that ends with no postmortem ever submitted is a real, notable
-  // outcome, not a neutral "missing data point" — the retro never happened.
+  // outcome, not a neutral "missing data point". The retro never happened.
   // Penalize the two dimensions that outcome actually reflects (closing
   // communication, and keeping Derek/leadership in the loop through to the
   // end) rather than silently leaving them as if nothing was wrong.
@@ -333,7 +333,7 @@ export function computeScorecard(
   // cross-functional grader, so the deterministic stakeholder score no
   // longer subtracts for it.
 
-  // C2 — unverified-attribution credibility penalty (see analyzeAttributions
+  // C2: unverified-attribution credibility penalty (see analyzeAttributions
   // and its block comment). A DELAYED, social consequence surfaced only here at
   // day end: crediting a claim to someone who didn't actually supply it dents
   // stakeholderMgmt, the dimension credibility with people lives on. Bounded and
@@ -372,13 +372,13 @@ export function computeScorecard(
 
   const responseTime = computeResponseTimeScore(stateBag, completedAtSimMinutes);
 
-  // Task Assignment (realism-features.md) — folds into triageQuality rather
+  // Task Assignment (realism-features.md). Folds into triageQuality rather
   // than a standalone scorecard dimension, since "did you assign the right
   // ticket to the right person, promptly" is fundamentally a triage
   // judgment, not a new axis of communication/stakeholder skill. Stays
   // path-flexible: no single "correct" assignee, just domain-match/cost-of-
   // inaction patterns surfaced as coaching notes (and a small score nudge
-  // only for the clear anti-pattern — sitting unassigned all day).
+  // only for the clear anti-pattern: sitting unassigned all day).
   const criticalTicket = stateBag.tradeoffTicketId ? tickets.find((t) => t.id === stateBag.tradeoffTicketId) : undefined;
   const assignmentNotes: CoachingEntry[] = [];
   let assignmentDelta = 0;
@@ -511,7 +511,7 @@ export function computeScorecard(
       attributionPenalty
   );
 
-  // crossFunctional is deliberately a placeholder here — it's judged by a
+  // crossFunctional is deliberately a placeholder here. It's judged by a
   // dedicated whole-transcript evaluator call (see evaluate-coordination),
   // not this synchronous heuristic. Callers fill it in once that resolves.
   const scores: ScorecardScores = {
@@ -525,7 +525,7 @@ export function computeScorecard(
 
   // Side-channel evaluations reuse the Evaluation shape purely to surface a
   // coaching note, but they grade a specific *decision* the player made
-  // inside an ordinary channel message — not the message's general
+  // inside an ordinary channel message, not the message's general
   // communication quality, which the generic per-channel evaluator above
   // already grades separately. Giving them their own header (instead of
   // reusing "Your message in #channel at TIME") keeps them from reading as
@@ -677,7 +677,7 @@ export const SCORECARD_CATEGORIES: { category: ScorecardCategory; label: string 
 
 /** Collapses every run of whitespace (spaces, tabs, newlines) to a single
  * space and trims the ends. The ONLY normalization applied before a quote is
- * checked against the transcript — content is otherwise compared
+ * checked against the transcript. Content is otherwise compared
  * character-for-character, so a paraphrase can never pass as a verbatim
  * quote. */
 export function normalizeQuoteWhitespace(text: string): string {
@@ -690,14 +690,14 @@ export function normalizeQuoteWhitespace(text: string): string {
  * messages, returns only those quotes that are a real, verbatim substring
  * (whitespace-normalized) of some actual player message. Anything the model
  * fabricated, paraphrased, stitched together across messages, or lifted from
- * an NPC/system line fails the substring check and is dropped — never shown
+ * an NPC/system line fails the substring check and is dropped. Never shown
  * as a quote. This is enforcement in code, not just prompt instruction: a
  * fabricated quote cannot reach the UI even if the model ignores its
  * instructions.
  *
  * Also caps the result at two quotes, drops empties, and de-duplicates, so a
  * category shows at most two distinct, real quotes. The returned strings are
- * the normalized form (safe to display — only whitespace was collapsed).
+ * the normalized form (safe to display, only whitespace was collapsed).
  */
 export function validateQuotes(rawQuotes: unknown, playerMessages: string[]): string[] {
   if (!Array.isArray(rawQuotes)) return [];
@@ -717,8 +717,8 @@ export function validateQuotes(rawQuotes: unknown, playerMessages: string[]): st
   return valid;
 }
 
-/** Turns AI-returned topic keys/labels into the actual curated bullets —
- * real descriptions and links come from our own data, never from the model.
+/** Turns AI-returned topic keys/labels into the actual curated bullets.
+ * Real descriptions and links come from our own data, never from the model.
  * Shared by the app's store and the standalone playtest script. */
 export function buildStudyAreas(matchedTopicKeys: string[], additionalTopics: string[]): StudyAreaEntry[] {
   const resourceMap = new Map(STUDY_RESOURCES.map((r) => [r.topicKey, r]));

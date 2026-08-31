@@ -7,7 +7,7 @@ export function MessageInput() {
   // Per-channel drafts: keyed by ChannelId so switching channels shows that
   // channel's own in-progress text instead of one draft shared across every
   // channel/DM (see QA finding #10). Deliberately component state, NOT added
-  // to persisted session state — a draft dying on refresh is accepted.
+  // to persisted session state: a draft dying on refresh is accepted.
   const [drafts, setDrafts] = useState<Partial<Record<ChannelId, string>>>({});
   const activeChannel = useSimStore((s) => s.activeChannel);
   const sendPlayerMessage = useSimStore((s) => s.sendPlayerMessage);

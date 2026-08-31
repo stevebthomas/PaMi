@@ -16,7 +16,7 @@ import type {
  * THE CENTRAL RULE (see the subtask brief): a follow-up is NEVER fired on a
  * fixed clock regardless of state. Every firing must pass a real state check at
  * fire time. Elapsed SIM time is a legitimate trigger COMPONENT (it's sim
- * state), but a time trigger alone never fires an obligation — it's always
+ * state), but a time trigger alone never fires an obligation: it's always
  * paired, via `cancelWhen`, with the state condition that would make the
  * follow-up moot (the player already handled it, the underlying condition never
  * held). There are zero wall-clock timers here; everything keys off the sim
@@ -43,8 +43,8 @@ import type {
  */
 
 /** How long after Priya's ask (priya-template-request, 9:26 AM) she nudges once
- * about the still-undelivered customer-facing draft — a "reasonable interval"
- * of silence, not a hard deadline. 45 sim-minutes. Only ever fires alongside
+ * about the still-undelivered customer-facing draft (a "reasonable interval"
+ * of silence, not a hard deadline). 45 sim-minutes. Only ever fires alongside
  * the "still not attempted" state check (see the cancelWhen on the seed). */
 export const PRIYA_CS_NUDGE_DELAY_MINUTES = 45;
 
@@ -77,8 +77,8 @@ export function appendObligation(list: ObligationEntry[], entry: ObligationEntry
 
 /**
  * Raj's incident all-clear in #incidents. He posts it once checkout metrics
- * have fully recovered — the follow-through on "watching the error rate come
- * down now" — UNLESS the 11:00 scripted resolution announcement
+ * have fully recovered (the follow-through on "watching the error rate come
+ * down now") UNLESS the 11:00 scripted resolution announcement
  * (resolution-good/resolution-cold) fires first, in which case his personal
  * all-clear is moot and settles silently (the cancelWhen). Seeded the moment a
  * fix path is decided, on BOTH the player-decision path (simStore Feature B)
@@ -107,8 +107,8 @@ export function seedRajAllClear(obligations: ObligationEntry[], decidedAtSimMinu
 /**
  * Priya's one-time nudge for the customer-facing draft. Fires only if
  * PRIYA_CS_NUDGE_DELAY_MINUTES have passed since she asked AND the player still
- * hasn't ATTEMPTED a draft (the cancelWhen). Attempting at any point — even a
- * mediocre draft — settles this silently, so it never reads as a cold "still
+ * hasn't ATTEMPTED a draft (the cancelWhen). Attempting at any point, even a
+ * mediocre draft, settles this silently, so it never reads as a cold "still
  * waiting" after the player already sent something. Seeded when she asks
  * (priya-template-request).
  */
@@ -163,7 +163,7 @@ export function seedPriyaCsResolvedFollowUp(obligations: ObligationEntry[], aske
  * rollback is DECIDED she asks for a seller-facing note explaining the delay,
  * the natural follow-up to her 9:42 payout flag (priya-seller-payout-flag). It
  * participates in the A2 mechanism like any other ask: a plain
- * `sim-minutes-elapsed-since` trigger, no cancelWhen — once the rollback is
+ * `sim-minutes-elapsed-since` trigger, no cancelWhen: once the rollback is
  * decided the sellers ARE affected and the note is genuinely owed, so unlike the
  * CS nudge there is no state that makes the ask itself moot (delivery is tracked
  * separately via sellerCommsAttemptedAtMinutes + the ledger, not by cancelling
@@ -202,19 +202,19 @@ export function seedPriyaSellerCommsAsk(obligations: ObligationEntry[], decidedA
  */
 export interface ObligationInputs {
   clockMinutes: number;
-  /** timeline.landedAt — null until the fix has actually landed. */
+  /** timeline.landedAt: null until the fix has actually landed. */
   landedAtMinutes: number | null;
-  /** timeline.fullyRecoveredAt — the minute checkout metrics return to baseline;
+  /** timeline.fullyRecoveredAt: the minute checkout metrics return to baseline;
    * null until the fix has landed (and it may be in the future relative to the
    * clock, so the evaluator gates it on clock >= this). */
   fullyRecoveredAtMinutes: number | null;
-  /** timeline.incidentDeclaredAt — null until the escalation fired. */
+  /** timeline.incidentDeclaredAt: null until the escalation fired. */
   incidentDeclaredAtMinutes: number | null;
-  /** timeline.decidedAt — the minute a fix path was chosen; null until decided. */
+  /** timeline.decidedAt: the minute a fix path was chosen; null until decided. */
   decidedAtMinutes: number | null;
-  /** timeline.resolutionAnnouncedAt — null until resolution-good/cold fired. */
+  /** timeline.resolutionAnnouncedAt: null until resolution-good/cold fired. */
   resolutionAnnouncedAtMinutes: number | null;
-  /** stateBag.csTemplateAttemptedAtMinutes — the minute the player first
+  /** stateBag.csTemplateAttemptedAtMinutes: the minute the player first
    * attempted the customer-facing draft (good or not); null if never. */
   csTemplateAttemptedAtMinutes: number | null;
 }
@@ -280,7 +280,7 @@ export function triggerSatisfiedAt(trigger: ObligationTrigger, inputs: Obligatio
 
 /** One obligation that fires this tick: enough for the caller to build the NPC
  * message (it renders the copy from `kind` via buildObligationMessageContent).
- * `sentAtSimMinutes` is the minute the condition became true — the message is
+ * `sentAtSimMinutes` is the minute the condition became true: the message is
  * timestamped there, per the fix-landed follow-up precedent, never later than
  * the current clock. */
 export interface ObligationFiring {
@@ -330,8 +330,8 @@ export function evaluateObligations(obligations: ObligationEntry[], inputs: Obli
 
     // Fire when the trigger is satisfied and the cancel condition didn't beat
     // it (unsatisfied, or the trigger happened strictly earlier). A tie goes to
-    // cancel below — e.g. metrics recovering at the exact resolution minute is
-    // "not before" the resolution, so the personal all-clear is moot.
+    // cancel below (e.g. metrics recovering at the exact resolution minute is
+    // "not before" the resolution, so the personal all-clear is moot).
     if (fireAt !== null && (cancelAt === null || fireAt < cancelAt)) {
       changed = true;
       firings.push({

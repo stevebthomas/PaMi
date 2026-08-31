@@ -6,7 +6,7 @@ import type { AgentId, ChannelId } from "./types";
  * runs client-side with zero API calls, before we ever consider paying for
  * the Stage B LLM gate (see CROSS_FUNCTIONAL_GATE_PROMPT in prompts.ts and
  * the /api/agents/gate route). The whole point is to filter out the routine
- * majority of messages for free — same philosophy as a cheap noise-filter
+ * majority of messages for free: same philosophy as a cheap noise-filter
  * ahead of a richer call. Any one of these three being true is reason
  * enough to skip; this is deliberately biased toward "no."
  */
@@ -14,11 +14,11 @@ export interface StageAInput {
   channel: ChannelId;
   content: string;
   /** Number of currently-pending requiresResponse events (StateBag-derived,
-   * via the store's `pendingResponseIds.size`) — a fully generic signal for
+   * via the store's `pendingResponseIds.size`): a fully generic signal for
    * "is there live, unresolved business right now," not tied to any one
    * story's specific event ids. */
   pendingResponseCount: number;
-  /** From pickReactingAgents(channel, content) — non-null only when this
+  /** From pickReactingAgents(channel, content): non-null only when this
    * channel has more than one candidate agent AND more than one of their
    * keyword sets matched the message. */
   secondaryAgentId: AgentId | null;
@@ -32,7 +32,7 @@ export function stageAShouldSkip(input: StageAInput): boolean {
   const candidateCount = CHANNEL_AGENTS[channel]?.length ?? 0;
 
   // Bullet 1: in a channel with more than one candidate agent, only one
-  // agent's keywords actually matched — no overlap, no reason to think a
+  // agent's keywords actually matched: no overlap, no reason to think a
   // second persona has a stake in this specific message.
   if (candidateCount > 1 && secondaryAgentId === null) return true;
 
@@ -49,7 +49,7 @@ export function stageAShouldSkip(input: StageAInput): boolean {
 
 /** Validates the Stage B gate's suggested second agent against who's
  * actually a legitimate participant in this channel (CHANNEL_AGENTS is the
- * same data pickReactingAgents already uses) — reusing existing data rather
+ * same data pickReactingAgents already uses); reusing existing data rather
  * than inventing a new allow-list. A second agent who isn't a member of the
  * channel gets rejected here rather than being rendered into a DM/channel
  * they have no presence in; see the report for why this is a deliberate v1

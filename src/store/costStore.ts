@@ -32,7 +32,7 @@ export interface GateSkipLogEntry {
   id: string;
   timestamp: number;
   /** Which Stage A rule skipped it, e.g. "no keyword overlap" / "message too
-   * short" / "nothing pending" — see stageAShouldSkip's three bullets. */
+   * short" / "nothing pending": see stageAShouldSkip's three bullets. */
   reason: string;
 }
 
@@ -74,18 +74,18 @@ export interface SessionCostSummary {
   callsByType: Record<ApiCallType, number>;
   /** Primary NPC replies that never triggered a second agent. */
   singleAgentReplyCalls: number;
-  /** Stage B gate calls + the reaction replies they triggered — the whole
+  /** Stage B gate calls + the reaction replies they triggered: the whole
    * cost of the agent-to-agent feature. */
   gatedCrossFunctionalCalls: number;
-  /** Stage A skips — free, no API call made. */
+  /** Stage A skips: free, no API call made. */
   stageAFreeSkips: number;
-  /** stageAFreeSkips / (stageAFreeSkips + gate calls) — the proof the cheap
+  /** stageAFreeSkips / (stageAFreeSkips + gate calls): the proof the cheap
    * pre-filter is actually doing work, not just the gate call itself. */
   stageAFilterRate: number;
 }
 
 /** Plain function (not a hook) so it can be called from anywhere, including
- * a console — reads the store's current state directly. */
+ * a console. Reads the store's current state directly. */
 export function getSessionCostSummary(): SessionCostSummary {
   const { calls, gateSkips } = useCostStore.getState();
 

@@ -12,7 +12,7 @@ const STATIC_DM_AGENT: Partial<Record<ChannelId, AgentId>> = {
 export function DmHeaderBadge() {
   const activeChannel = useSimStore((s) => s.activeChannel);
   // Static DMs map directly; registry DMs (dm_jordan, …) resolve through the
-  // same DM_CONTACTS lookup everything else uses — no per-engineer branch.
+  // same DM_CONTACTS lookup everything else uses: no per-engineer branch.
   const agentId = STATIC_DM_AGENT[activeChannel] ?? dmContactForChannel(activeChannel)?.agentId;
   if (!agentId) return null;
 

@@ -54,7 +54,7 @@ export const APP_MIN_SIZE: Record<AppId, { width: number; height: number }> = {
 
 export function Desktop() {
   // "loading" until the mount effect has run the client-only restore. The
-  // resume decision depends on restoreSession(), which reads localStorage —
+  // resume decision depends on restoreSession(), which reads localStorage:
   // unavailable during server prerender. Deciding it in a useState initializer
   // would run on the server (returns false -> onboarding HTML) AND on the
   // resuming client (returns true -> desktop), a structural hydration
@@ -67,7 +67,7 @@ export function Desktop() {
   const dayComplete = useSimStore((s) => s.dayComplete);
   // Persisted (not component-local) so reloading a completed day doesn't
   // re-render the full-screen DayScorecard overlay and eat StatusBar clicks
-  // (QA finding #12b) — see scorecardDismissed in simStore.ts.
+  // (QA finding #12b); see scorecardDismissed in simStore.ts.
   const scorecardDismissed = useSimStore((s) => s.scorecardDismissed);
   const dismissScorecard = useSimStore((s) => s.dismissScorecard);
   const day = useSimStore((s) => s.day);
@@ -84,7 +84,7 @@ export function Desktop() {
   const openApps = useMemo(() => new Set(Object.keys(windows) as AppId[]), [windows]);
 
   // Client-only restore + persistence startup, on mount. restoreSession()
-  // hydrates both stores SYNCHRONOUSLY here — before the desktop can render
+  // hydrates both stores SYNCHRONOUSLY here, before the desktop can render
   // (so before any user-triggered advanceClock is reachable) and before the
   // desktop-entry effect below can call startDay (effects run in definition
   // order, and the entry effect no-ops while phase is still "loading" this
@@ -105,7 +105,7 @@ export function Desktop() {
   }, []);
 
   // Dev-only console hooks so the API call/cost tracker is inspectable and the
-  // saved session can be wiped without a debug panel — call
+  // saved session can be wiped without a debug panel: call
   // getSessionCostSummary() in devtools. resetSimSession() clears the saved
   // session and reloads a fresh one; it exists because refreshing no longer
   // wipes state (dev iteration used to rely on that), so this is the explicit
@@ -117,7 +117,7 @@ export function Desktop() {
     }
   }, []);
 
-  // Entry into the desktop — fires both for a fresh onboarding->start and for
+  // Entry into the desktop: fires both for a fresh onboarding->start and for
   // a resume. startDay()'s own `if (started) return` guard makes it a no-op on
   // resume (the initial scripted beat never re-fires); it only does real work
   // on a genuinely fresh session. Guaranteed to run AFTER restore: on the
@@ -134,7 +134,7 @@ export function Desktop() {
 
   // Opens the Docs window once the docsStore's launch animation completes and
   // flips pendingOpen. Kept here (not in the store) so openWindow is still only
-  // ever called with real containerRef desk dimensions — the window then
+  // ever called with real containerRef desk dimensions: the window then
   // centers/cascades exactly like every other app. Clearing the flag after is
   // idempotent under StrictMode (openWindow bringsToFront if already open).
   useEffect(() => {

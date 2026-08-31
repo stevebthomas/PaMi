@@ -1,7 +1,7 @@
 import { AGENT_NAMES, type AgentId, type ChannelId } from "./types";
 
 /**
- * CHANNEL PRESENCE ROSTER — who is actually *present in / able to read* a
+ * CHANNEL PRESENCE ROSTER: who is actually *present in / able to read* a
  * channel, as distinct from `CHANNEL_AGENTS` in relevance.ts, which answers a
  * different question ("who might reactively reply here, for routing"). The two
  * are deliberately NOT the same map and must not be conflated:
@@ -10,15 +10,15 @@ import { AGENT_NAMES, type AgentId, type ChannelId } from "./types";
  *     Marcus, who speaks in #incidents only via a scripted beat; Derek, who
  *     reads #incidents but answers from his own DM).
  *   - THIS roster is presence/awareness. It's the answer to "if an NPC replies
- *     in this channel, who else can see it / is in the room?" — the context an
+ *     in this channel, who else can see it / is in the room?" This is the context an
  *     upcoming subtask (A3/A4) injects into NPC prompts so a persona knows who's
  *     watching. Getting Marcus into #incidents here (he is present, he posts the
  *     payout-inconsistency beat there) is exactly why this can't just reuse
  *     CHANNEL_AGENTS.
  *
- * Membership is derived from scenario evidence — who actually speaks in a
+ * Membership is derived from scenario evidence: who actually speaks in a
  * channel in src/data/day1-scenario.ts, plus what personas in
- * src/lib/agents/prompts.ts claim to read — with the rationale recorded per
+ * src/lib/agents/prompts.ts claim to read, with the rationale recorded per
  * channel below. Presence lists NPC AgentIds plus "player" where the player
  * participates; "system" is excluded on purpose (it's automated announcement
  * output, not a participant who reads or reacts).
@@ -74,7 +74,7 @@ const CHANNEL_PRESENCE: Record<
   },
 };
 
-/** True for any DM channel id. Every DM channel is `dm_${agentId}` — the static
+/** True for any DM channel id. Every DM channel is `dm_${agentId}`: the static
  * DMs (dm_raj/dm_priya/dm_derek) and the registry DMs (dm_jordan/dm_chen/
  * dm_marcus) all share that shape, and the suffix is always a valid AgentId. */
 function dmAgentId(channel: ChannelId): AgentId | null {
@@ -85,7 +85,7 @@ function dmAgentId(channel: ChannelId): AgentId | null {
 /**
  * Who is present in / can read a channel: the participant AgentIds plus the
  * player where the player takes part. For a DM this is exactly the two
- * participants — the one NPC and the player — resolved generically from the
+ * participants (the one NPC and the player), resolved generically from the
  * `dm_${agentId}` channel id, so any current or future DM contact works with
  * no per-name wiring. Returns [] for an unknown channel id.
  */

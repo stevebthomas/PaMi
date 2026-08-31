@@ -82,7 +82,7 @@ export function DesktopWindow({
     e.currentTarget.releasePointerCapture(e.pointerId);
   }, []);
 
-  // Resize handle — same pointer-capture pattern as the title-bar drag above,
+  // Resize handle: same pointer-capture pattern as the title-bar drag above,
   // just growing width/height from the bottom-right corner instead of moving x/y.
   const handleResizeDown = useCallback(
     (e: PointerEvent<HTMLDivElement>) => {
@@ -142,7 +142,7 @@ export function DesktopWindow({
       >
         {children}
       </Window>
-      {/* Resize grip — a sibling of Window (not a child), because Window's root
+      {/* Resize grip: a sibling of Window (not a child), because Window's root
           is overflow-hidden and would clip a handle placed inside it. Sits at
           the outer div's bottom-right corner, above content, with a small hit
           area + touch-none so it never eats window scrolling. */}

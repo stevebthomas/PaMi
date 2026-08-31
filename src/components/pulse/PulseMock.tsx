@@ -20,7 +20,7 @@ import {
   type PaymentMethodBreakdownRow,
 } from "@/lib/sim/pulseMetrics";
 
-/** Live checkout success-rate stat plus its history so far today — the one
+/** Live checkout success-rate stat plus its history so far today: the one
  * real consequence of Feature B's rollback-vs-patch-forward decision.
  * Everything else on this page stays a static preview; this is kept
  * proportionate to what was actually asked for rather than building out
@@ -60,7 +60,7 @@ function useCheckoutSuccessRate() {
   };
 }
 
-/** Live "failed checkouts" blast-radius stat — the direct answer to "what's
+/** Live "failed checkouts" blast-radius stat: the direct answer to "what's
  * the blast radius," computed off the same incident/tradeoff timeline as
  * the success-rate stat above (see pulseMetrics.ts) rather than a number a
  * player has to invent themselves. Neutral zero state before the incident
@@ -83,13 +83,13 @@ function useFailedCheckouts() {
   };
 }
 
-/** Self-built sparkline — proportionate to what was asked (a trend shape,
+/** Self-built sparkline: proportionate to what was asked (a trend shape,
  * not a charting library) since this is the one place on Pulse where the
  * dip-and-recovery shape actually needs to be visible over time, not just
  * as a single current number.
  *
  * The x-axis domain is the FIXED full-day range (dayStart..dayEnd), not
- * history[0].t..history[last].t — that was a real bug, not just a "flat
+ * history[0].t..history[last].t. That was a real bug, not just a "flat
  * data looks boring" perception issue: an auto-scaling domain always
  * stretches to fit whatever's been sampled so far, which pins the latest
  * point to the same right-edge pixel on every single render regardless of
@@ -104,14 +104,14 @@ const SPARKLINE_WIDTH = 280;
 const SPARKLINE_HEIGHT = 64;
 const SPARKLINE_PAD = 4;
 // Below this pixel gap (in the sparkline's own coordinate space), a later
-// time marker's label would visibly collide with the previously-kept one —
+// time marker's label would visibly collide with the previously-kept one:
 // dropped rather than stacked, since this chart is only 64px tall.
 const SPARKLINE_MARKER_MIN_GAP = 32;
 const SPARKLINE_LINE_COLOR = "#34c3a3";
 
 /** Monotone cubic Hermite interpolation (Fritsch-Carlson), the same family
  * as D3's curveMonotoneX. Smooths the polyline into a curved path WITHOUT
- * the overshoot a naive Catmull-Rom spline produces past a sharp turn —
+ * the overshoot a naive Catmull-Rom spline produces past a sharp turn:
  * load-bearing here because the recovery ramp is exactly that kind of sharp
  * turn (flat degraded -> steep climb -> flat baseline), and an overshooting
  * spline would visibly dip the line below the degraded floor or above
@@ -208,12 +208,12 @@ function Sparkline({
 
   // Time markers under the chart: day start, incident start (once the
   // incident's actually fired), the tradeoff recovery point (once decided),
-  // and "now." Culled by PRIORITY, not by time order — incident/recovery/now
+  // and "now." Culled by PRIORITY, not by time order: incident/recovery/now
   // are the narratively load-bearing markers, so a marker only survives if
   // it doesn't collide with an already-kept HIGHER-priority one; day start
   // is lowest priority and is the one that yields when space is tight
   // (previously this culled in time order, which meant day start always won
-  // and incident start — the one that actually matters — got dropped
+  // and incident start, the one that actually matters, got dropped
   // whenever it landed close to it). The kept set is then sorted by time
   // for rendering.
   type Marker = { key: string; t: number; caption: string };
@@ -258,7 +258,7 @@ function Sparkline({
             crosshair/tooltip. The default ("xMidYMid meet") uniformly scales
             the 280x64 viewBox to fit the rendered box and CENTERS it, so with
             a container wider than 280px the line only occupies a letterboxed
-            strip in the middle — but the hover math (clientX->viewBox via the
+            strip in the middle, but the hover math (clientX->viewBox via the
             full rendered width) and the CSS-percent tooltip/marker overlay
             both assume the viewBox spans the full width. That mismatch is what
             put the highlight dot and tooltip off from the cursor. Forcing
@@ -317,7 +317,7 @@ function Sparkline({
   );
 }
 
-/** 25330 -> "25.3k" — WEEKLY_ATTEMPTS runs in the tens of thousands (see
+/** 25330 -> "25.3k". WEEKLY_ATTEMPTS runs in the tens of thousands (see
  * worldCanon.ts's ATTEMPT_VOLUME_PER_MINUTE), so the tooltip shows a compact
  * form instead of a long comma-separated string in a small pixel-art popup. */
 function formatAttemptCount(n: number): string {
@@ -326,7 +326,7 @@ function formatAttemptCount(n: number): string {
 }
 
 /** Bar chart with real numbers behind each bar, weekday labels, and a
- * hover tooltip — sharp-edged pixel-art style (border-2/bg-bg-window,
+ * hover tooltip: sharp-edged pixel-art style (border-2/bg-bg-window,
  * matching Taskbar's own icon tooltip) rather than a soft rounded corporate
  * popup. Today's bar is visually distinguished (lighter fill, dashed top
  * edge) since it's the one incomplete day in the set. */
@@ -336,7 +336,7 @@ function WeeklyAttemptsChart() {
 
   // Today's (Monday's) bar is LIVE: the volume accumulated in sim time so
   // far, a pure function of the clock (mondayAttemptsSoFar), so it reads ~0 at
-  // 8:30 and grows on the same cadence as the live stat cards — not the old
+  // 8:30 and grows on the same cadence as the live stat cards, not the old
   // fixed "7.4k". WEEKLY_ATTEMPTS itself now holds only the six complete
   // historical days; Monday is appended here.
   const days = [
@@ -386,7 +386,7 @@ function WeeklyAttemptsChart() {
   );
 }
 
-/** Per-payment-method checkout breakdown — the card that makes the incident
+/** Per-payment-method checkout breakdown: the card that makes the incident
  * legible: Apple Pay visibly carries the damage (drops to ~96.7%, matching
  * Raj's "~3% of attempts" 500ing) while Card and Google Pay hold at baseline,
  * matching Priya's "All Apple Pay." Same sharp pixel-art styling as the other
@@ -407,7 +407,7 @@ function PaymentMethodBreakdown({ rows, freshness }: { rows: PaymentMethodBreakd
           const attempts = Math.round(r.share * totalToday);
           const degraded = r.successRate < BASELINE_RATE - 0.05;
           // No attempts yet today means the rate curve's number isn't backed
-          // by any real volume — show a neutral dash instead of asserting a
+          // by any real volume: show a neutral dash instead of asserting a
           // rate over zero data (QA finding #13: "Apple Pay · 0 attempts ·
           // 98.8%" read as a fabricated stat).
           const hasAttempts = attempts > 0;
@@ -432,7 +432,7 @@ type StatusBadge = { label: string; accentClass: string };
  * fired-event trigger the failed-checkouts card uses: incidentStartMinutes is
  * null until "priya-incidents-escalation" fires (see useCheckoutSuccessRate /
  * useFailedCheckouts), so this badge and the failed-checkouts card can never
- * disagree about whether an incident is live — no pre-declaration of an
+ * disagree about whether an incident is live: no pre-declaration of an
  * incident state before the sim has actually escalated it.
  *
  * Precedence: fully recovered/resolved beats "recovering" beats "active".

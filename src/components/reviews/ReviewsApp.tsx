@@ -53,10 +53,10 @@ function EntryCard({ entry, onClick }: { entry: ScorecardEntry; onClick: () => v
 }
 
 /** Lists every completed day's scorecard for this session, most recent
- * first, and lets the player click into any one for the full detail — a
+ * first, and lets the player click into any one for the full detail: a
  * "look how you've improved" view. Also lists AI playtester runs (from
- * `npm run playtest`) — per-run scorecards, a per-persona aggregate, and
- * the synthesized "guidance opportunities" findings — all clearly
+ * `npm run playtest`): per-run scorecards, a per-persona aggregate, and
+ * the synthesized "guidance opportunities" findings, all clearly
  * separated from the player's own sessions. */
 export function ReviewsApp() {
   const dayRecords = useSimStore((s) => s.dayRecords);

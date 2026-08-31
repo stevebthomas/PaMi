@@ -5,14 +5,14 @@ import { ASK_CLAUDE_PROMPT, ASK_CLAUDE_TAG_INSTRUCTION } from "@/lib/agents/prom
 
 interface HelpRequestBody {
   /** Full conversation so far, including the player's latest question as
-   * the last entry — mirrors the shape used for Raj/Priya/Derek's history. */
+   * the last entry: mirrors the shape used for Raj/Priya/Derek's history. */
   history: { senderId: "assistant" | "player"; content: string }[];
 }
 
 const TOPIC_LINE = /\n?TOPIC:\s*(.+)\s*$/i;
 
 /**
- * Glossary/concepts helper — explains jargon only, never coaches on the
+ * Glossary/concepts helper: explains jargon only, never coaches on the
  * scenario itself. Every answer ends with a machine-readable "TOPIC: ..."
  * line that gets parsed out here and returned separately for logging;
  * the player never sees that line.

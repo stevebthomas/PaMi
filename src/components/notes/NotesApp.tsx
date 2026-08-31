@@ -2,7 +2,7 @@
 
 import { useSimStore } from "@/store/simStore";
 
-/** A plain personal scratchpad — no AI involved. Text lives in the sim
+/** A plain personal scratchpad: no AI involved. Text lives in the sim
  * store, so it survives closing/reopening the window like every other
  * app's data, without needing any debounce (it's already an in-memory
  * write, not an I/O call). */

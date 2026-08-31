@@ -9,7 +9,7 @@ export function ChannelList() {
   const unreadChannels = useSimStore((s) => s.unreadChannels);
   // The registry predicate reads the same generic engine state Office does, so
   // a contact appears the instant they become available and drops when they
-  // don't — driven purely by subscribing to those slices here.
+  // don't, driven purely by subscribing to those slices here.
   const stateBag = useSimStore((s) => s.stateBag);
   const firedEventIds = useSimStore((s) => s.firedEventIds);
   const tickets = useTaskflowStore((s) => s.tickets);
@@ -17,7 +17,7 @@ export function ChannelList() {
   const channels = CHANNELS.filter((c) => c.kind === "channel");
   const staticDms = CHANNELS.filter((c) => c.kind === "dm");
   // Static DM entries plus every registry contact whose predicate is currently
-  // true. No Jordan/Chen-specific branch — this loop is over the registry.
+  // true. No Jordan/Chen-specific branch: this loop is over the registry.
   const dms: { id: ChannelId; label: string }[] = [
     ...staticDms.map((c) => ({ id: c.id, label: c.label })),
     ...availableDmContacts({ stateBag, firedEventIds, tickets }).map((c) => ({

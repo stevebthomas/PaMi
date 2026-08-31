@@ -6,14 +6,14 @@ import { COORDINATION_PROMPT } from "@/lib/agents/prompts";
 interface CoordinationRequestBody {
   /** The player's own messages across the day, each with enough context to
    * judge who they were talking to and when. Intentionally just the raw
-   * transcript — no persona identity, no "this is a playtest" framing, so
+   * transcript: no persona identity, no "this is a playtest" framing, so
    * the evaluator has no way to know who or what it's grading. */
   transcript: { senderId: string; channel: string; content: string; sentAtSimMinutes: number }[];
 }
 
 /**
  * Judges cross-functional coordination across the whole day via an explicit
- * rubric, replacing the old keyword-regex heuristic — a player can coordinate
+ * rubric, replacing the old keyword-regex heuristic: a player can coordinate
  * well without ever typing the word "template".
  */
 export async function POST(request: Request) {

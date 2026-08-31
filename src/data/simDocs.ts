@@ -1,12 +1,12 @@
 /**
- * In-sim document registry — the single source of truth for every document
+ * In-sim document registry: the single source of truth for every document
  * the Docs app can open. A doc is pure data (id + title + markdown); the
  * viewer (see DocsApp.tsx) is fully generic and renders whichever entry an
  * attachment's `docId` points at.
  *
  * THIS IS THE EXTENSION POINT: adding a new in-sim doc is exactly one edit
  * here (add a SIM_DOCS entry) plus referencing its `id` from a message/event
- * `attachment: { label, docId }` — no component changes required. Docs open
+ * `attachment: { label, docId }`, no component changes required. Docs open
  * inside the sim's Docs window and NEVER trigger a real browser download.
  */
 
@@ -21,7 +21,7 @@ export interface SimDoc {
 }
 
 /** Derek's new-hire intro doc, previously a real file download
- * (public/docs/welcome-to-bazaarloop.md) — now embedded verbatim so it opens
+ * (public/docs/welcome-to-bazaarloop.md): now embedded verbatim so it opens
  * in-sim instead of leaving the player's machine with a file. */
 const WELCOME_TO_BAZAARLOOP = `# Welcome to BazaarLoop
 
@@ -62,7 +62,7 @@ There's no script for a day like this. Nothing on your calendar is guaranteed to
 Good luck. Start your day whenever you're ready.
 `;
 
-/** Maya's mockup A — the "saved!" animation option for Theo's wishlist
+/** Maya's mockup A: the "saved!" animation option for Theo's wishlist
  * save-for-later tap. */
 const MAYA_MOCKUP_SAVED_ANIMATION = `# Mockup A — "saved!" animation
 
@@ -73,7 +73,7 @@ wishlist ticket.
 - **Costs you:** a beat of delay and motion before the interaction feels done
 `;
 
-/** Maya's mockup B — the silent, instant option for the same tap. */
+/** Maya's mockup B: the silent, instant option for the same tap. */
 const MAYA_MOCKUP_SILENT_INSTANT = `# Mockup B — silent + instant
 
 No animation — the item just saves the moment you tap save-for-later.

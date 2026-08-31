@@ -5,7 +5,7 @@ import type { ChannelId, Message, ScenarioEvent } from "./types";
  * requires-response event: the event's own channel, any channel it
  * explicitly names as an alternate valid venue (`alsoSatisfiedByChannels`),
  * and the channel of any other event that re-asks it (`reAsks`). This is
- * the whole mechanism — generic across any story's events, driven entirely
+ * the whole mechanism: generic across any story's events, driven entirely
  * by data on the events themselves, not by hardcoded channel names.
  */
 export function satisfyingChannels(event: ScenarioEvent, allEvents: ScenarioEvent[]): Set<ChannelId> {
@@ -20,7 +20,7 @@ export function satisfyingChannels(event: ScenarioEvent, allEvents: ScenarioEven
  * Looser sibling of the requiresResponse-only `respondedAtMinutes` tracking:
  * has the player sent ANY message, in ANY channel that counts as answering
  * this event (same `satisfyingChannels` set), at or after it fired? Doesn't
- * require the event to be `requiresResponse` — works for a plain informational
+ * require the event to be `requiresResponse`: works for a plain informational
  * beat too. Built from `messages`, which every story already tracks, so
  * nothing new needs to be stored. Used by ambient/memory-aid UI (e.g. the
  * easy-difficulty fact checklist) that wants "has the player moved on from

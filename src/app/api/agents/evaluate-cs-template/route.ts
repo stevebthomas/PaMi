@@ -6,13 +6,13 @@ import { CS_TEMPLATE_EVAL_PROMPT } from "@/lib/agents/prompts";
 interface EvalCsTemplateBody {
   /** The player's drafted customer-facing message. */
   draft: string;
-  /** Full transcript so far — what lets the evaluator check whether the
+  /** Full transcript so far: what lets the evaluator check whether the
    * draft states anything not actually established yet. */
   transcript: { senderId: string; channel: string; content: string; sentAtSimMinutes: number }[];
 }
 
 /**
- * Judges a candidate CS-template draft for quality/groundedness — gates
+ * Judges a candidate CS-template draft for quality/groundedness: gates
  * whether it's good enough to set csTemplateProvided (see Feature A: the
  * flag now means "provided AND good," not just "attempted").
  */

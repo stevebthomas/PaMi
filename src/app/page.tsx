@@ -17,7 +17,7 @@ export default function Home() {
           START DAY 1
         </Link>
         <p className="mt-6 text-label text-ink-soft">
-          Phase 0 + 1 preview — Monday only. Requires an ANTHROPIC_API_KEY to talk to Raj, Priya, and Derek.
+          Day 1 is the complete playable scenario. Requires an ANTHROPIC_API_KEY to talk to Raj, Priya, and Derek.
         </p>
       </div>
     </div>

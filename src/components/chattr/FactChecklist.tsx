@@ -12,8 +12,8 @@ interface FactRow {
  * Easy-difficulty ambient memory aid: a live, per-person list of facts
  * people have told the player so far, crossed out once the player has
  * moved on from that message (same channel-based signal the acknowledgment
- * system uses — see hasPlayerAddressed). Tracks FACTS STATED, never
- * instructions or "you should" phrasing — this is a memory aid, not a
+ * system uses, see hasPlayerAddressed). Tracks FACTS STATED, never
+ * instructions or "you should" phrasing: this is a memory aid, not a
  * to-do list telling the player what's expected of them.
  */
 export function FactChecklist() {

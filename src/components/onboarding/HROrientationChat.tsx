@@ -39,7 +39,7 @@ async function requestSamReply(history: HrMessage[]): Promise<string | null> {
   }
 }
 
-/** The interactive Sam chat panel — meant to sit side by side with the
+/** The interactive Sam chat panel: meant to sit side by side with the
  * static WelcomeScreen recap. Starting the day happens from that panel's
  * button, not from here, so the player can chat as much or as little as
  * they want without it gating anything. */

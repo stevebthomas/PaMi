@@ -5,7 +5,7 @@ import { formatSimClock } from "./timeOfDay";
 import { PAYOUT_PIPELINE, MARCUS_ROLLBACK_CONCERN } from "./worldCanon";
 
 /**
- * Registry of DM-capable characters who are NOT static CHANNELS entries —
+ * Registry of DM-capable characters who are NOT static CHANNELS entries:
  * they appear in Chattr's DM list (and become clickable in Office) the moment
  * their `availableWhen` predicate turns true, and drop out again when it turns
  * false. This is the single, generic mechanism behind "message the engineer
@@ -17,7 +17,7 @@ import { PAYOUT_PIPELINE, MARCUS_ROLLBACK_CONCERN } from "./worldCanon";
  * Day 1 registers three contacts:
  *  - jordan and chen, the two engineers pulled onto the incident fix. Their
  *    availability derives from the SAME source of truth Office uses for their
- *    desk labels — stateBag.tradeoffChoice being non-null — so a card flipping
+ *    desk labels (stateBag.tradeoffChoice being non-null), so a card flipping
  *    to "on the fix" and the DM opening up are guaranteed to happen together,
  *    whether the fix path was chosen by the player, by a Derek escalation, or
  *    by the 11:00 auto-resolve.
@@ -46,7 +46,7 @@ export interface DmContact {
   availableWhen: (ctx: DmAvailabilityContext) => boolean;
 }
 
-/** Everything a predicate is allowed to read — deliberately the same generic
+/** Everything a predicate is allowed to read: deliberately the same generic
  * engine state Office and the store already hold, never a per-story flag. */
 export interface DmAvailabilityContext {
   stateBag: StateBag;
@@ -54,7 +54,7 @@ export interface DmAvailabilityContext {
   tickets?: Ticket[];
 }
 
-/** True once a fix path exists at all — the one source of truth Office's desk
+/** True once a fix path exists at all: the one source of truth Office's desk
  * labels also key off. Shared so the predicate and any caller that wants the
  * raw condition stay in lockstep. */
 function onIncidentFix(ctx: DmAvailabilityContext): boolean {
@@ -79,7 +79,7 @@ export const DM_CONTACTS: DmContact[] = [
     availableWhen: onIncidentFix,
   },
   {
-    // Marcus is available all day — he's a real engineer at his desk on the
+    // Marcus is available all day: he's a real engineer at his desk on the
     // payout pipeline, not gated on the incident. The `true` predicate is what
     // makes his Office card clickable and his DM present from the start, so the
     // rollback's payout consequence is discoverable through diligence.
@@ -92,7 +92,7 @@ export const DM_CONTACTS: DmContact[] = [
   },
 ];
 
-/** The DM channel id for a registry contact — the one place `dm_${id}` is
+/** The DM channel id for a registry contact: the one place `dm_${id}` is
  * constructed, so the template-literal ChannelId stays honest. */
 export function dmChannelId(id: DmContactId): ChannelId {
   return `dm_${id}`;
@@ -109,7 +109,7 @@ export function dmContactForChannel(channel: ChannelId): DmContact | null {
   return DM_CONTACTS.find((c) => dmChannelId(c.id) === channel) ?? null;
 }
 
-/** Whether an AgentId is one of the registry DM engineers — lets generic
+/** Whether an AgentId is one of the registry DM engineers: lets generic
  * lookups (relevance, the store) treat them as a class, not by name. */
 export function isDmContactAgent(agentId: AgentId): boolean {
   return DM_CONTACTS.some((c) => c.agentId === agentId);
@@ -118,7 +118,7 @@ export function isDmContactAgent(agentId: AgentId): boolean {
 /**
  * The live, grounded context block injected into an engineer's system prompt
  * at request time (passed through the reply route's `personaContext`). This is
- * the ONLY channel through which today's actual state reaches them — the base
+ * the ONLY channel through which today's actual state reaches them: the base
  * persona in prompts.ts is static and deliberately fact-free.
  *
  * Every timing fact here comes from ONE source of truth, getIncidentTimeline,
@@ -166,7 +166,7 @@ export function buildEngineerPersonaContext(contact: DmContact, ctx: DmAvailabil
   }
 
   // When the player went quiet and Raj made the fix call himself (looped Derek
-  // in), the engineers were put on the fix by Raj, not by the PM — so they must
+  // in), the engineers were put on the fix by Raj, not by the PM. So they must
   // not credit or thank the PM for a decision the PM never made.
   if (stateBag.tradeoffEscalatedToDerek) {
     lines.push(
@@ -178,7 +178,7 @@ export function buildEngineerPersonaContext(contact: DmContact, ctx: DmAvailabil
     `- Scripted facts you can state: the Stripe webhook for Apple Pay is returning 500s on ~3% of Apple Pay checkout attempts. Card and Google Pay are unaffected. Nothing shipped to payments in the last 24h; root cause is Stripe-side webhook flakiness.`
   );
 
-  // The ONE timing fact, straight off the shared timeline — never re-derived
+  // The ONE timing fact, straight off the shared timeline: never re-derived
   // here. When asked "when did/will it land," the persona quotes this verbatim.
   if (timeline.landedAt !== null) {
     const recoveredLine =
@@ -236,7 +236,7 @@ export function buildEngineerPersonaContext(contact: DmContact, ctx: DmAvailabil
 }
 
 /**
- * Marcus's injected persona context — the payout-pipeline counterpart to
+ * Marcus's injected persona context: the payout-pipeline counterpart to
  * buildEngineerPersonaContext. Marcus isn't on the incident fix, so his block
  * carries none of the fix-status timing; instead it carries the grounded
  * payout facts from worldCanon (PAYOUT_PIPELINE + MARCUS_ROLLBACK_CONCERN) so
@@ -337,14 +337,14 @@ export function buildFixLandedFollowUp(contact: DmContact, timeline: IncidentTim
  * NPC-initiated follow-up has to be deterministic and self-contained; and every
  * grounded timing/number word comes straight off the shared IncidentTimeline so
  * it can't drift from what the persona says in conversation. The engine itself
- * stays a ./types-only leaf and never imports the timeline — it returns firing
+ * stays a ./types-only leaf and never imports the timeline: it returns firing
  * DESCRIPTORS and the store renders them through buildObligationMessageContent
  * below. A new obligation kind adds one more builder here plus its case.
  * -------------------------------------------------------------------------- */
 
 /**
- * Raj's incident all-clear in #incidents, fired once metrics fully recover (and
- * before the 11:00 formal resolution — the engine guarantees that side of the
+ * Raj's incident all-clear in #incidents, fired once metrics fully recover and
+ * before the 11:00 formal resolution (the engine guarantees that side of the
  * collision). Grounded entirely in the timeline: the exact landing minute, the
  * exact fully-recovered minute, and the same Pulse reading the evaluator and the
  * engineer personas quote. Copy varies by fix path (a rollback is a clean
@@ -373,8 +373,8 @@ export function buildRajAllClear(timeline: IncidentTimeline): string {
 
 /**
  * Priya's single light nudge for the customer-facing draft after a stretch of
- * silence. Deliberately low-pressure ("no rush," "even a couple rough lines") —
- * a reminder, not a reprimand — since the engine only ever fires this when the
+ * silence. Deliberately low-pressure ("no rush," "even a couple rough lines"):
+ * a reminder, not a reprimand, since the engine only ever fires this when the
  * draft is genuinely still unattempted.
  */
 export function buildPriyaCsNudge(): string {
@@ -385,7 +385,7 @@ export function buildPriyaCsNudge(): string {
  * Priya's updated-context follow-up when the incident resolved before she ever
  * got a draft. Reflects the changed situation (it's resolved; her team has been
  * covering it) instead of re-asking cold, and leaves the door open without
- * nagging — so the thread closes honestly rather than dying silently.
+ * nagging, so the thread closes honestly rather than dying silently.
  */
 export function buildPriyaCsResolvedFollowUp(): string {
   return "Looks like the incident's been called resolved. I never got a customer-facing note from you, so my team's been fielding the Apple Pay tickets with our own holding message. If you still want to send wording for any follow-ups I'll take it, otherwise we've got it covered from here.";
@@ -413,7 +413,7 @@ export function buildPriyaSellerCommsAsk(): string {
  * calls this per firing so the switch-on-kind lives here in the copy module,
  * next to the builders, rather than leaking into advanceClock. `timeline` is
  * passed for the grounded builders (Raj's all-clear); the Priya builders ignore
- * it. Exhaustive over ObligationKind — a new kind won't compile until it has a
+ * it. Exhaustive over ObligationKind: a new kind won't compile until it has a
  * case here.
  */
 export function buildObligationMessageContent(kind: ObligationKind, timeline: IncidentTimeline): string {

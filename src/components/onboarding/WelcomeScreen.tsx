@@ -10,7 +10,7 @@ const TEAM: { agentId: AgentId; name: string; title: string; blurb: string }[] =
   { agentId: "derek", name: "Derek", title: "VP of Product", blurb: "Your manager." },
 ];
 
-/** The static recap panel — company/role summary, team cards, and the button
+/** The static recap panel: company/role summary, team cards, and the button
  * that actually starts Day 1. Meant to sit side by side with the Sam chat. */
 export function WelcomeScreen({ onStart }: { onStart: (name: string) => void }) {
   const [name, setName] = useState("");

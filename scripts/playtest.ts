@@ -1,9 +1,9 @@
 /**
- * AI blind playtesting — runs two AI personas through Day 1 completely
+ * AI blind playtesting: runs two AI personas through Day 1 completely
  * blind (no instructions beyond what a real player sees), using the real
  * scenario logic and the app's real API routes (so Raj/Priya/Derek replies,
  * evaluation scores, coordination judgment, and study-area matching are all
- * the production code paths — nothing here is mocked).
+ * the production code paths: nothing here is mocked).
  *
  * Each run captures the persona's decision-by-decision reasoning (why it
  * did or didn't respond at each moment), not just its final messages. Runs
@@ -57,8 +57,8 @@ const RUNS = (() => {
   const n = arg ? parseInt(arg.split("=")[1], 10) : NaN;
   return Number.isFinite(n) && n > 0 ? n : 3;
 })();
-/** Optional comma-separated persona slug filter (e.g. --personas=chaos,adversarial)
- * — lets a run target just the persona(s) under active development instead
+/** Optional comma-separated persona slug filter (e.g. --personas=chaos,adversarial):
+ * lets a run target just the persona(s) under active development instead
  * of paying for all four every time. Absent = every persona, unchanged
  * default behavior. */
 const PERSONA_FILTER: string[] | null = (() => {
@@ -72,7 +72,7 @@ const PERSONA_FILTER: string[] | null = (() => {
   return slugs.length > 0 ? slugs : null;
 })();
 /** Re-runs only the cheap findings-log step against the gaming report and
- * guidance opportunities already on disk in OUT_DIR — no persona calls, no
+ * guidance opportunities already on disk in OUT_DIR: no persona calls, no
  * server required. Lets the log wiring be re-verified without paying for a
  * fresh adversarial run every time. */
 const LOG_ONLY = process.argv.includes("--log-only");
@@ -102,15 +102,15 @@ interface Persona {
 }
 
 /** Applies to every message a persona sends AND any longer content it
- * generates (e.g. a postmortem) — without this, personas write in
+ * generates (e.g. a postmortem): without this, personas write in
  * recognizably "AI voice" (heavy em-dash use, unnaturally balanced clause
  * structure, over-polished phrasing), which means the resulting feedback
  * measures how an AI performs a roleplay, not how a real person would
  * experience the sim. That's the whole validity of playtesting with these
  * personas at stake, not a cosmetic nitpick.
  *
- * Built on WRITING_STYLE_CORE (src/lib/agents/prompts.ts) — the same
- * constant every NPC and evaluator prompt uses — rather than its own
+ * Built on WRITING_STYLE_CORE (src/lib/agents/prompts.ts), the same
+ * constant every NPC and evaluator prompt uses, rather than its own
  * separately-hand-written copy. That duplication (a near-identical but not
  * quite identical instruction in half a dozen places) is exactly why the
  * em-dash tell kept resurfacing after prompt-by-prompt patches: one spot
@@ -197,7 +197,7 @@ interface Decision {
 }
 
 /**
- * Asks the persona what it actually does at one decision point — its
+ * Asks the persona what it actually does at one decision point: its
  * reasoning and whether it responds. This is the "thought-process capture."
  * Deliberately does NOT ask for the actual message text in the same call:
  * cramming a full (sometimes long, e.g. postmortem-length) message inside a
@@ -208,7 +208,7 @@ interface Decision {
 async function personaDecision(persona: Persona, transcript: string, eventLabel: string, instruction: string): Promise<Decision> {
   const response = await anthropic.messages.create({
     model: PERSONA_MODEL,
-    // Was 500 — measurably too low for a verbose persona (e.g. adversarial)
+    // Was 500: measurably too low for a verbose persona (e.g. adversarial)
     // whose internal reasoning eats into this budget before the JSON is
     // even written, truncating mid-object and silently falling back to
     // willRespond:false. Same root cause already fixed elsewhere in this
@@ -245,7 +245,7 @@ async function personaDecision(persona: Persona, transcript: string, eventLabel:
 }
 
 /** Free-form persona output for things that aren't a "respond or not"
- * decision — a forced final message, or the out-of-character experience notes. */
+ * decision: a forced final message, or the out-of-character experience notes. */
 async function personaFreeform(persona: Persona, transcript: string, instruction: string): Promise<string> {
   const response = await anthropic.messages.create({
     model: PERSONA_MODEL,
@@ -344,7 +344,7 @@ async function callStudyAreas(
   }
 }
 
-// Mirrors CS_TEMPLATE_KEYWORDS in simStore.ts — a cheap pre-filter so
+// Mirrors CS_TEMPLATE_KEYWORDS in simStore.ts: a cheap pre-filter so
 // ordinary chatter never triggers the real evaluator. Broadened after a live
 // playtest miss (see the comment there): a well-written draft slipped
 // through the original narrower list, silently skipping Feature A entirely.
@@ -422,26 +422,26 @@ interface RunResult {
   crossFunctionalLoading: boolean;
   playtesterNotes: string;
   reasoningLog: PlaytestReasoningEntry[];
-  /** Taskflow board state at end of run — record-only (this headless driver
+  /** Taskflow board state at end of run: record-only (this headless driver
    * has no UI to click ← / →), but included so a reviewer can see whether
    * the board tracked the incident narrative correctly. */
   tickets: TicketRecord[];
-  /** Built cheaply off the same data already gathered above — see
-   * buildDayOutcome in dayOutcome.ts. `tickets` is passed as `[]` to the
+  /** Built cheaply off the same data already gathered above (see
+   * buildDayOutcome in dayOutcome.ts). `tickets` is passed as `[]` to the
    * builder since this headless driver's TicketRecord (unlike the real
    * Taskflow store's Ticket) tracks no id/assigneeId, so fixTicketAssigneeId
-   * always comes back null here — an honest reflection of what this script
+   * always comes back null here: an honest reflection of what this script
    * tracks, not a bug to fix as part of this pass. */
   outcome: DayOutcome;
   runIndex: number;
   runsTotal: number;
   generatedAt: string;
-  /** Full message transcript (every channel/DM, every sender) — kept on the
+  /** Full message transcript (every channel/DM, every sender), kept on the
    * record itself, not just internal to runOnePlaytest, so a later pass
    * (synthesizeAdversarialReport) can use it as evidence without re-running
    * the sim. Not shown in the Reviews app UI, this is a diagnostic-only field. */
   transcript: { senderId: string; channel: string; content: string; sentAtSimMinutes: number }[];
-  /** Ask Claude question/answer pairs from this run — same reasoning as
+  /** Ask Claude question/answer pairs from this run, same reasoning as
    * `transcript`: needed as evidence for the adversarial audit's
    * ask-claude-boundary attempts, which the reasoning log alone can't show
    * (it captures intent, not what Ask Claude actually answered). */
@@ -491,7 +491,7 @@ async function runOnePlaytest(persona: Persona, runIndex: number, runsTotal: num
       if (e.applyEffect) stateBag = { ...stateBag, ...e.applyEffect(stateBag) };
     }
 
-    // Feature C hooks — mirrors simStore.ts's advanceClock exactly (see the
+    // Feature C hooks: mirrors simStore.ts's advanceClock exactly (see the
     // comment there): seed an investigation ticket off Priya's escalation,
     // resolve it into "done" once Raj diagnoses, and resolve whatever fix
     // ticket the tradeoff decision seeded once resolution fires.
@@ -519,13 +519,13 @@ async function runOnePlaytest(persona: Persona, runIndex: number, runsTotal: num
     messages.push(playerMsg);
     console.log(`  [you -> ${channel}] ${content.slice(0, 90)}${content.length > 90 ? "…" : ""}`);
 
-    // The postmortem is the player's own closing beat — no NPC should
+    // The postmortem is the player's own closing beat: no NPC should
     // preempt or compete with it (this used to happen: Raj would sometimes
     // generate his own full postmortem here). Also covers this message's
     // own trailing +3min advance crossing the postmortem trigger, same as
     // the real app's guard.
     const postmortemAlreadyDue = day1ScenarioEvents.some((e) => e.id === "postmortem-prompt" && e.triggerTimeMinutes <= clock + 3);
-    // Snapshot BEFORE this message can clear anything — mirrors the real
+    // Snapshot BEFORE this message can clear anything: mirrors the real
     // app's fix: this message satisfying its own channel's pending event
     // (the common case) shouldn't erase the tiebreak signal before routing
     // even runs.
@@ -540,7 +540,7 @@ async function runOnePlaytest(persona: Persona, runIndex: number, runsTotal: num
       (firedEventIds.has("postmortem-prompt") || postmortemAlreadyDue) &&
       content.length >= 120;
 
-    // Generic, event-id-based acknowledgment tracking — mirrors the real
+    // Generic, event-id-based acknowledgment tracking: mirrors the real
     // app: any requiresResponse event whose satisfyingChannels() includes
     // this channel gets credited, regardless of which channel it was
     // originally posted in (see src/lib/sim/acknowledgment.ts).
@@ -558,7 +558,7 @@ async function runOnePlaytest(persona: Persona, runIndex: number, runsTotal: num
     const gradingEventId = respondedNow.find((e) => e.channel !== channel)?.channel ?? channel;
     if (isPostmortemSubmission) stateBag = { ...stateBag, postmortemSubmitted: true };
 
-    // Feature A — CS template. Mirrors simStore.ts's Feature A block,
+    // Feature A: CS template. Mirrors simStore.ts's Feature A block,
     // including the dm_priya-after-ask channel+timing signal (keyword
     // matching alone missed real drafts live twice) and excluding the
     // postmortem submission itself: a postmortem that happens to mention
@@ -592,7 +592,7 @@ async function runOnePlaytest(persona: Persona, runIndex: number, runsTotal: num
       }
     }
 
-    // Feature B — rollback vs. patch-forward tradeoff. Mirrors simStore.ts's
+    // Feature B: rollback vs. patch-forward tradeoff. Mirrors simStore.ts's
     // Feature B block, including seeding the same Taskflow fix ticket.
     if (channel === "incidents" && firedEventIds.has("raj-tradeoff-offer") && stateBag.tradeoffChoice === null) {
       const offerEvent = day1ScenarioEvents.find((e) => e.id === "raj-tradeoff-offer");
@@ -609,7 +609,7 @@ async function runOnePlaytest(persona: Persona, runIndex: number, runsTotal: num
               scores: { tone: 0, speed: 0, completeness: 0, strategicThinking: 0 },
               feedback: tradeoffResult.hasReasoning
                 ? tradeoffResult.note
-                : `${tradeoffResult.note} You picked a side but didn't say what you were trading off to get there. Naming the tradeoff you're accepting is the actual PM move here, not just the pick.`,
+                : `${tradeoffResult.note} You picked a side but didn't say what you were trading off to get there. The PM move is naming the tradeoff you're accepting, not only picking.`,
             };
           }
           tickets.push({
@@ -643,7 +643,7 @@ async function runOnePlaytest(persona: Persona, runIndex: number, runsTotal: num
           eventId: gradingEventId,
           scores: { tone: result.tone, speed: result.speed, completeness: result.completeness, strategicThinking: result.strategicThinking },
           feedback: result.feedback,
-          // C2: mirror simStore — capture the claims ledger so headless
+          // C2: mirror simStore, capture the claims ledger so headless
           // playtest scorecards also reflect the attribution signal.
           ...(Array.isArray(result.claims) ? { claims: result.claims } : {}),
         };
@@ -665,7 +665,7 @@ async function runOnePlaytest(persona: Persona, runIndex: number, runsTotal: num
           .filter((m) => m.channel === channel)
           .slice(-12)
           .map((m) => ({ senderId: m.senderId, content: m.content }));
-        // Mirrors simStore.ts's own Derek-grounding wiring exactly — this
+        // Mirrors simStore.ts's own Derek-grounding wiring exactly: this
         // driver hits the real /api/agents/reply route, so it needs to send
         // the same context or the adversarial persona would be testing
         // against a version of Derek the real app doesn't actually run.
@@ -691,7 +691,7 @@ async function runOnePlaytest(persona: Persona, runIndex: number, runsTotal: num
    * reasoning regardless, and if it doesn't respond, advance time (letting
    * any scripted escalation/follow-up fire naturally) and ask again. This
    * is how responseTime ends up reflecting genuine hesitation rather than a
-   * hard-coded delay — a persona that stalls literally responds later.
+   * hard-coded delay: a persona that stalls literally responds later.
    */
   async function engageOrWait(
     eventLabel: string,
@@ -707,8 +707,8 @@ async function runOnePlaytest(persona: Persona, runIndex: number, runsTotal: num
 
       const forced = isFinal && opts.forceOnFinalStall && !decision.willRespond;
       if (decision.willRespond || forced) {
-        // Separate call for the actual message text — see personaDecision's
-        // doc comment for why this isn't crammed into the same JSON blob.
+        // Separate call for the actual message text (see personaDecision's
+        // doc comment for why this isn't crammed into the same JSON blob).
         const messageInstruction = decision.willRespond
           ? `Based on your own reasoning just now ("${decision.reasoning}"), write the actual message you'd send. ${instruction}`
           : instruction;
@@ -724,7 +724,7 @@ async function runOnePlaytest(persona: Persona, runIndex: number, runsTotal: num
     return null;
   }
 
-  // --- Onboarding: Sam chat (not part of the formal reasoning log — this
+  // --- Onboarding: Sam chat (not part of the formal reasoning log: this
   // is a "decision point" in spirit, but the log exists specifically to
   // find incident-response guidance gaps, so we keep it to the incident). ---
   const samOpener =
@@ -741,7 +741,7 @@ async function runOnePlaytest(persona: Persona, runIndex: number, runsTotal: num
 
   // --- Day 1 timeline ---
   fireDue();
-  clock = Math.max(clock, 555); // 9:15 AM — Priya's escalation
+  clock = Math.max(clock, 555); // 9:15 AM: Priya's escalation
   fireDue();
   await engageOrWait(
     "Priya posted an urgent escalation in #incidents about a payment issue",
@@ -751,7 +751,7 @@ async function runOnePlaytest(persona: Persona, runIndex: number, runsTotal: num
     { maxStalls: 2, forceOnFinalStall: false }
   );
 
-  clock = Math.max(clock, 566); // 9:26 AM — Priya asks for a CS-facing template
+  clock = Math.max(clock, 566); // 9:26 AM: Priya asks for a CS-facing template
   fireDue();
   await engageOrWait(
     "Priya DM'd asking if you could send her something to hand her team to tell customers",
@@ -761,17 +761,17 @@ async function runOnePlaytest(persona: Persona, runIndex: number, runsTotal: num
     { maxStalls: 2, forceOnFinalStall: false }
   );
 
-  clock = Math.max(clock, 578); // 9:38 AM — Raj offers the rollback vs. patch-forward tradeoff
+  clock = Math.max(clock, 578); // 9:38 AM: Raj offers the rollback vs. patch-forward tradeoff
   fireDue();
   await engageOrWait(
     "Raj laid out two real ways to fix the issue in #incidents: rollback (fast, but also reverts a seller-side payout-speed improvement) vs. patch-forward (slower, keeps that improvement live), and asked which you want",
     "incidents",
     "Raj just gave you two real options to fix the issue: roll back (fast, ~10 min, but also reverts a payout-speed improvement sellers have had for a week) or patch forward (slower, ~30 min, but that improvement stays live). Pick one and reply in #incidents with your choice and your actual reasoning for it.",
     true,
-    { maxStalls: 1, forceOnFinalStall: true } // this is the real scored decision — must land somewhere
+    { maxStalls: 1, forceOnFinalStall: true } // this is the real scored decision: must land somewhere
   );
 
-  clock = Math.max(clock, 675); // 11:15 AM — Theo's ambient #random beat (not graded, purely optional)
+  clock = Math.max(clock, 675); // 11:15 AM: Theo's ambient #random beat (not graded, purely optional)
   fireDue();
   await engageOrWait(
     "Theo (a junior engineer) posted a mundane, unrelated question in #random asking where the bathroom is",
@@ -781,7 +781,7 @@ async function runOnePlaytest(persona: Persona, runIndex: number, runsTotal: num
     { maxStalls: 1, forceOnFinalStall: false }
   );
 
-  clock = Math.max(clock, 750); // 12:30 PM — Maya's low-stakes design-review question
+  clock = Math.max(clock, 750); // 12:30 PM: Maya's low-stakes design-review question
   fireDue();
   await engageOrWait(
     "Maya (a backend engineer) DM'd in #design-review asking a low-stakes design call on Theo's wishlist ticket",
@@ -791,7 +791,7 @@ async function runOnePlaytest(persona: Persona, runIndex: number, runsTotal: num
     { maxStalls: 2, forceOnFinalStall: false }
   );
 
-  clock = Math.max(clock, 810); // 1:30 PM — Derek's escalation
+  clock = Math.max(clock, 810); // 1:30 PM: Derek's escalation
   fireDue();
   await engageOrWait(
     "Derek (VP of Product) DM'd asking for a recap, blast radius and what happened, before his afternoon sync with the CEO",
@@ -801,7 +801,7 @@ async function runOnePlaytest(persona: Persona, runIndex: number, runsTotal: num
     { maxStalls: 2, forceOnFinalStall: false }
   );
 
-  // Ask Claude interaction — persona-specific angle. new-to-product probes
+  // Ask Claude interaction: persona-specific angle. new-to-product probes
   // it the way a real novice would (genuine jargon questions); adversarial
   // instead tries to push it past its own stated "concepts only" boundary.
   // Other personas skip this step entirely, same as before.
@@ -825,7 +825,7 @@ async function runOnePlaytest(persona: Persona, runIndex: number, runsTotal: num
     }
   }
 
-  clock = Math.max(clock, 855); // 2:15 PM — Theo's second ambient #random beat (not graded, purely optional)
+  clock = Math.max(clock, 855); // 2:15 PM: Theo's second ambient #random beat (not graded, purely optional)
   fireDue();
   await engageOrWait(
     "Theo posted a second mundane, unrelated message in #random about a lunch order",
@@ -835,7 +835,7 @@ async function runOnePlaytest(persona: Persona, runIndex: number, runsTotal: num
     { maxStalls: 1, forceOnFinalStall: false }
   );
 
-  clock = Math.max(clock, 930); // 3:30 PM — postmortem
+  clock = Math.max(clock, 930); // 3:30 PM: postmortem
   fireDue();
   const postmortemText = await engageOrWait(
     "System asked for a short incident postmortem in #incidents, closing out Day 1",
@@ -845,7 +845,7 @@ async function runOnePlaytest(persona: Persona, runIndex: number, runsTotal: num
     { maxStalls: 2, forceOnFinalStall: true } // must land somewhere so the run has a real endpoint
   );
 
-  // Mirrors DayScorecard's FollowUpTicketPrompt — gives the persona one
+  // Mirrors DayScorecard's FollowUpTicketPrompt: gives the persona one
   // chance to turn their own "what I'd do differently" into a Taskflow
   // ticket, same as a real player sees at the end-of-day scorecard.
   if (postmortemText) {
@@ -957,7 +957,7 @@ async function synthesizeGuidance(noviceRuns: RunResult[]): Promise<GuidanceOppo
     .join("\n\n");
 
   // Bumped from 1200 after finding the same-shaped truncation bug in
-  // auditAdversarialRun below — same model, same "reasons internally before
+  // auditAdversarialRun below: same model, same "reasons internally before
   // answering" behavior eating into the output budget on a genuinely
   // complex synthesis task. This call hasn't been observed failing at 1200
   // in practice (novice logs tend to produce fewer findings), but the risk
@@ -1004,12 +1004,12 @@ const ADVERSARIAL_TARGETS = ["evaluator-groundedness", "npc-character", "ask-cla
 const ADVERSARIAL_VERDICTS = ["held", "gamed", "unclear"] as const;
 
 /**
- * Audits ONE adversarial run — separate calls per run (rather than pooling
+ * Audits ONE adversarial run: separate calls per run (rather than pooling
  * every run into one giant prompt, the way synthesizeGuidance does for the
  * novice persona) because the evidence here is a full message transcript
  * plus evaluator feedback per run, which gets large and risks the model
  * blending evidence across runs. Fed the run's own transcript, coaching
- * notes, Ask Claude exchanges, AND reasoning log together — the reasoning
+ * notes, Ask Claude exchanges, AND reasoning log together: the reasoning
  * log alone only shows intent, not whether the attempt actually worked.
  */
 async function auditAdversarialRun(run: RunResult): Promise<Omit<AdversarialAttempt, "runIndex">[]> {
@@ -1034,14 +1034,14 @@ async function auditAdversarialRun(run: RunResult): Promise<Omit<AdversarialAtte
     askClaudeBlock || "(none)",
   ].join("\n");
 
-  // 6000, not a smaller round number — live-verified this call needs real
+  // 6000, not a smaller round number: live-verified this call needs real
   // headroom: claude-opus-5 spends a meaningful chunk of its output budget
   // on internal reasoning even without thinking explicitly requested, and
   // this prompt asks for several full {attempt, target, verdict, evidence}
   // objects with quoted evidence, not a short summary. At max_tokens 2000
   // this measurably truncated mid-JSON (stop_reason "max_tokens", ~1700 of
   // 2000 output tokens spent on thinking) and silently produced zero
-  // attempts via the parse-failure fallback below — not a hypothetical risk.
+  // attempts via the parse-failure fallback below: not a hypothetical risk.
   const response = await anthropic.messages.create({
     model: PERSONA_MODEL,
     max_tokens: 6000,
@@ -1164,7 +1164,7 @@ function hasAdversarialEntries(logPath: string): boolean {
 }
 
 /** Finds the earliest playtests/baseline-* directory (by name) that has an
- * adversarial-gaming-report.json — generic over any future baseline
+ * adversarial-gaming-report.json: generic over any future baseline
  * snapshot, not hardcoded to today's date. Used only to seed the persistent
  * log the first time this script ever writes to it, so pre-existing
  * findings show up as "still-open"/"confirmed-fixed" against later runs
@@ -1196,7 +1196,7 @@ function isOwnFindingId(id: string): boolean {
 
 /** updateFindingsLog (findings-log.ts, not modified here) treats any
  * existing log entry absent from the `current` list it's given as newly
- * fixed — correct when one caller owns the whole log, but this log is
+ * fixed: correct when one caller owns the whole log, but this log is
  * shared with scenario-audit.ts's own event-id-based findings. Calling it
  * directly against the real shared path would either (a) silently mark
  * every scenario-audit finding "confirmed-fixed" the moment this script
@@ -1204,13 +1204,13 @@ function isOwnFindingId(id: string): boolean {
  * own pt-adv-/pt-guidance- current list, or (b) if scenario-audit's entries
  * were included in `current` just to dodge that, force every one of them to
  * "still-open" regardless of their real status (updateFindingsLog has no
- * "leave this id untouched" outcome for an id it's given) — both tried and
+ * "leave this id untouched" outcome for an id it's given); both tried and
  * confirmed broken while building this.
  *
  * So this reconciles our OWN namespace only: it copies just our own entries
  * out to a scratch file, calls the real (unmodified, tested)
- * updateFindingsLog against that scratch copy — reusing its actual
- * reconciliation logic rather than a hand-rolled duplicate — then splices
+ * updateFindingsLog against that scratch copy (reusing its actual
+ * reconciliation logic rather than a hand-rolled duplicate), then splices
  * the result back into the real log alongside scenario-audit's entries,
  * which never leave the file and are never passed to updateFindingsLog at
  * all. scenario-audit.ts's own read/write path is completely unaffected. */
@@ -1242,7 +1242,7 @@ function updateOwnFindingsInSharedLog(logPath: string, current: CurrentFinding[]
 
 /** Reconciles this run's adversarial attempts + guidance findings against
  * the persistent cross-run log at scenario-audit-findings-log.json (the
- * same file scenario-audit.ts uses — see updateOwnFindingsInSharedLog for
+ * same file scenario-audit.ts uses, see updateOwnFindingsInSharedLog for
  * why this can't call updateFindingsLog on that path directly) and prints
  * the summary table. */
 async function updatePersistentFindingsLog(attempts: AdversarialAttempt[], guidance: GuidanceOpportunity[], runLabel: string) {

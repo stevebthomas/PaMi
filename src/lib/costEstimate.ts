@@ -1,7 +1,7 @@
 /**
  * Approximate $/1M-token rates for the models this app actually calls at
  * runtime, used only to turn real token counts into a rough running-cost
- * estimate for the session cost tracker. Deliberately not exact — the
+ * estimate for the session cost tracker. Deliberately not exact: the
  * token counts themselves ARE exact (straight off the API response's
  * `usage` field, see extractUsage in anthropic.ts); only this conversion
  * to dollars is approximate. Update if pricing changes; this is a local

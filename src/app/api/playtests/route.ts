@@ -4,7 +4,7 @@ import path from "node:path";
 
 /**
  * Serves the JSON files written by `npm run playtest` (scripts/playtest.ts)
- * to the Reviews app. There's no database behind this — the script writes
+ * to the Reviews app. There's no database behind this: the script writes
  * files to the playtests/ directory and this route just reads them back,
  * same "client-first, no real persistence yet" pattern as the rest of the
  * app's data.
@@ -16,8 +16,8 @@ export async function GET() {
   }
 
   // guidance-opportunities.json and adversarial-gaming-report.json are
-  // diagnostic artifacts, not PlaytestRecord/PlaytestAggregateRecord-shaped
-  // — excluded here the same way, so they never end up misrendered as a run
+  // diagnostic artifacts, not PlaytestRecord/PlaytestAggregateRecord-shaped:
+  // excluded here the same way, so they never end up misrendered as a run
   // card in the Reviews app.
   const files = fs
     .readdirSync(dir)

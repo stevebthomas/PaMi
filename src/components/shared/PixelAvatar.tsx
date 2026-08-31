@@ -5,7 +5,7 @@ import { AGENT_NAMES, type AgentId } from "@/lib/sim/types";
  * 'H' hair, 'S' skin, 'E' eye (ink), 'A' accent (shirt/collar, matches that
  * person's existing brand color so this stays visually tied to their
  * channel/DM accent elsewhere in the app), 'T' a second accent detail
- * (Derek's tie knot). Only the five roleplay personas get a sprite —
+ * (Derek's tie knot). Only the five roleplay personas get a sprite:
  * system/player/assistant intentionally keep the plain letter-square
  * treatment, since they aren't characters being portrayed.
  */

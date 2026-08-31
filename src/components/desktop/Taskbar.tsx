@@ -14,7 +14,7 @@ const APPS: { id: AppId; label: string; enabled: boolean }[] = [
   { id: "docs", label: "Docs", enabled: true },
 ];
 
-/** Bottom dock, purely for opening/switching apps — system controls
+/** Bottom dock, purely for opening/switching apps: system controls
  * (difficulty, +15m, battery, clock) live in StatusBar at the top instead,
  * matching how real desktop OSes split a top menu/status bar from a bottom
  * app dock. */
@@ -31,7 +31,7 @@ export function Taskbar({
 
   return (
     <div className="flex h-16 shrink-0 items-center justify-center border-t-2 border-ink bg-bg-taskbar px-3">
-      {/* Dock: centered row of app icons, macOS-style — a small dot marks
+      {/* Dock: centered row of app icons, macOS-style. A small dot marks
           which apps are currently open, matching that convention. */}
       <div className="flex items-end gap-2.5">
         {APPS.map((app) => (

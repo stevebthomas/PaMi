@@ -1,9 +1,9 @@
 /**
- * Curated, hand-vetted study resources matched to session topics — mirrors
+ * Curated, hand-vetted study resources matched to session topics: mirrors
  * the study_resources table in supabase/schema.sql. Read from here directly
  * rather than a live DB query, since nothing in this app has a working
  * Supabase write/session path yet (see project notes). Grow this list by
- * hand as new scenario days introduce new topics — never generate entries
+ * hand as new scenario days introduce new topics: never generate entries
  * live, that's the whole point of curating them.
  */
 export interface StudyResourceLink {

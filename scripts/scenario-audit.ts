@@ -1,8 +1,8 @@
 /**
- * Scenario ambiguity audit — a one-time STATIC design-review pass over the
+ * Scenario ambiguity audit: a one-time STATIC design-review pass over the
  * Day 1 scenario script and the ambient systems that react to it (unread
  * badges, escalating DM follow-ups, mood shifts, reactive-agent routing).
- * No AI persona roleplay, no playthrough — this reads the actual scenario
+ * No AI persona roleplay, no playthrough. This reads the actual scenario
  * data and implementation source and reasons about where a real player
  * could plausibly be confused about whether/who to respond to, then pairs
  * each finding with a concrete, buildable suggestion for the ambient
@@ -44,7 +44,7 @@ function readSource(relPath: string): string {
 }
 
 // The scenario script itself, plus every real-code system that reacts to
-// (or fails to react to) the player during it — feeding the actual
+// (or fails to react to) the player during it: feeding the actual
 // implementation, not a hand-summarized description, is what lets the
 // model catch integration-level gaps (e.g. a state flag that only updates
 // for one of two channels a reasonable reply could land in).
@@ -64,7 +64,7 @@ For each scripted message/event in the timeline, assess: would a reasonable pers
 Read the surrounding systems as real implementation, not flavor text. In particular:
 - Trace which state flags actually gate later behavior (escalation follow-ups, scoring) and whether the channel(s) that flip that flag match every channel a reasonable player might plausibly reply in.
 - Trace the reactive-routing default: when a player's reply doesn't clearly match either NPC's keywords in a shared channel, who actually answers — and does that match who a reasonable player would expect to hear back from, given who raised the point?
-- Note that the unread badge is purely "seen vs. not seen" (clears on opening the channel) — consider whether that's the same thing as "the player has actually acted," and where those two could diverge.
+- The unread badge is purely "seen vs. not seen" (clears on opening the channel). Consider whether that's the same thing as "the player has actually acted," and where those two could diverge.
 
 For each ambiguous moment you flag, respond with:
 1. "id": a stable, kebab-case tracking key, built as exactly: the scripted event's own literal id from day1-scenario.ts (e.g. "priya-heads-up-dm", "raj-diagnosis") + a hyphen + ONE short category tag picked from this fixed list, whichever fits best: "ack-gap" (the acknowledgment/response expectation itself is unclear), "routing-ambiguity" (unclear who should answer, or a reply could get misrouted), "silent-resolution" (a status update could create a false sense the situation is already handled), "badge-mismatch" (the unread/seen state diverges from "the player actually acted"), "deadline-unclear" (no felt urgency or consequence for missing a window), "state-flag-gap" (a state flag's gating condition doesn't cover every plausible reply channel). If truly none of these categories fit, use "other" as the tag. This exact-format id (event id + fixed category, e.g. "priya-heads-up-dm-ack-gap") is compared across separate runs of this same audit to tell whether an issue is new or recurring — do NOT invent your own free-text descriptor here, use only these categories so the same underlying issue produces the same id on a re-run. If two distinct issues on the SAME event need the same category, add a numeral suffix (e.g. "-2").
@@ -139,7 +139,7 @@ async function main() {
     throw err;
   }
 
-  // Defensive fallback only — the prompt asks for a stable id on every
+  // Defensive fallback only: the prompt asks for a stable id on every
   // finding, but if the model ever omits one, derive something from the
   // event text rather than let cross-run matching silently break.
   findings.forEach((f, i) => {
@@ -157,7 +157,7 @@ async function main() {
   const confidenceOrder: Record<Finding["confidence"], number> = { high: 0, medium: 1, low: 2 };
   findings.sort((a, b) => confidenceOrder[a.confidence] - confidenceOrder[b.confidence]);
 
-  // Cross-run tracking — see scripts/lib/findings-log.ts. `current` and
+  // Cross-run tracking: see scripts/lib/findings-log.ts. `current` and
   // `findings` stay index-aligned so the status info zips back onto each
   // finding's full detail below.
   const runLabel = new Date().toISOString();

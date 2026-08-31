@@ -11,7 +11,7 @@ export function MessageList() {
   const messages = useSimStore((s) => s.messages).filter((m) => m.channel === activeChannel);
   const pendingReplyFrom = useSimStore((s) => s.pendingReplyFrom);
   // Only show the indicator when the pending reply actually belongs to the
-  // channel currently on screen — otherwise switching channels mid-reply
+  // channel currently on screen: otherwise switching channels mid-reply
   // would show "X is typing" somewhere X isn't actually replying.
   const pendingReplyChannel = useSimStore((s) => s.pendingReplyChannel);
   const openDocRequest = useDocsStore((s) => s.openDocRequest);
@@ -32,7 +32,7 @@ export function MessageList() {
         // System-voice messages (the 8:30 welcome, the 9:00 standup digest,
         // resolution updates, the postmortem prompt, Derek-DM notification
         // lines) are the sim's own narrator/ambient voice, not a coworker
-        // typing — give them a visually distinct treatment so the register
+        // typing: give them a visually distinct treatment so the register
         // reads differently at a glance. Keyed strictly on senderId ===
         // "system" so NPC dialogue and player messages stay pixel-identical
         // to before.
@@ -60,7 +60,7 @@ export function MessageList() {
               ) : (
                 <p className="whitespace-pre-wrap text-body leading-snug text-ink">{m.content}</p>
               )}
-              {/* Doc chip(s) — open in the in-sim Docs app, never a real
+              {/* Doc chip(s): open in the in-sim Docs app, never a real
                   download. Covers both the singular `attachment` field and
                   the plural `attachments` field (merged into one list here),
                   rendered ONLY when a chip's docId resolves in SIM_DOCS, so a

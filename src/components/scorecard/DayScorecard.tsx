@@ -8,7 +8,7 @@ import { AppIcon } from "@/components/shared/AppIcon";
 import { ScorecardDetail } from "./ScorecardDetail";
 
 /** Same fetch-wrapper-in-the-component pattern HROrientationChat.tsx uses
- * for Sam's replies — this is a one-off, view-local suggestion, not a
+ * for Sam's replies: this is a one-off, view-local suggestion, not a
  * simStore mutation, so it doesn't need a store action. */
 async function requestFollowUpTicketSuggestion(postmortemText: string): Promise<string | null> {
   try {
@@ -29,13 +29,13 @@ async function requestFollowUpTicketSuggestion(postmortemText: string): Promise<
 }
 
 /** Small, optional prompt letting the player turn their own "what I'd do
- * differently" into an actual Taskflow ticket — so that recommendation
+ * differently" into an actual Taskflow ticket, so that recommendation
  * leads somewhere instead of just sitting in the postmortem text. Only
  * shown when there's a real postmortem to draw from. The title is
  * pre-filled from the postmortem itself (see requestFollowUpTicketSuggestion)
  * so closing this loop is one continuous action, not a re-typing chore.
- * Also gives commClarity a small bump and adds a coaching note when used —
- * see recordFollowUpTicket — since actually tracking a recommendation is a
+ * Also gives commClarity a small bump and adds a coaching note when used
+ * (see recordFollowUpTicket), since actually tracking a recommendation is a
  * real follow-through signal, not a decorative click. */
 function FollowUpTicketPrompt({ day, postmortemText, completedAtSimMinutes }: { day: number; postmortemText: string; completedAtSimMinutes: number }) {
   const addTicket = useTaskflowStore((s) => s.addTicket);
@@ -74,7 +74,7 @@ function FollowUpTicketPrompt({ day, postmortemText, completedAtSimMinutes }: { 
     recordFollowUpTicket(day, trimmed);
     // Creating this ticket IS the meaningful action (unlike the
     // tradeoff-decision ticket, which advances time on its later move, not
-    // its auto-seeded creation) — advance once here. Naturally single-fire:
+    // its auto-seeded creation), advance once here. Naturally single-fire:
     // `added` below immediately hides this control after one use, and that
     // same replacement state is what carries the visible confirmation.
     advanceClock(TIME_ADVANCE_MINUTES);

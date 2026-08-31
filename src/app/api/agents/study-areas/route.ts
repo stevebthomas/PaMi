@@ -18,7 +18,7 @@ interface StudyAreasResult {
  * Identifies which curated study_resources topics (plus at most a couple of
  * freeform ones) are worth the player reviewing, based on their Ask Claude
  * questions and the coaching notes from their incident performance. Returns
- * topic KEYS, not prose — the caller looks those up against the curated
+ * topic KEYS, not prose: the caller looks those up against the curated
  * resource list so links/descriptions are always ours, never invented here.
  */
 export async function POST(request: Request) {

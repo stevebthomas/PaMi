@@ -18,7 +18,7 @@ function BatteryIndicator({ level }: { level: number }) {
 }
 
 /** Top status bar, matching how real desktop OSes separate the menu/status
- * bar (top) from the app dock (bottom) — system controls live here, the
+ * bar (top) from the app dock (bottom): system controls live here, the
  * dock (Taskbar) is purely for opening/switching apps. */
 export function StatusBar() {
   const clockMinutes = useSimStore((s) => s.clockMinutes);
@@ -27,13 +27,13 @@ export function StatusBar() {
   const advanceClock = useSimStore((s) => s.advanceClock);
   const difficulty = useSimStore((s) => s.difficulty);
   const setDifficulty = useSimStore((s) => s.setDifficulty);
-  // Reuses dayComplete rather than re-deriving the end-of-day boundary here —
+  // Reuses dayComplete rather than re-deriving the end-of-day boundary here:
   // it's true either from a real postmortem submission or the hard
   // end-of-day cutoff in advanceClock, and "+15m" should stop either way.
   const dayComplete = useSimStore((s) => s.dayComplete);
   // While an NPC reply is in flight, +15m can race sendPlayerMessage's own
   // awaits (see the pendingReplyFrom/pendingReplyChannel comment in
-  // simStore.ts) — disable it the same way MessageInput's Send button
+  // simStore.ts), disable it the same way MessageInput's Send button
   // already does (QA finding #12c).
   const pendingReplyFrom = useSimStore((s) => s.pendingReplyFrom);
   const skipDisabled = dayComplete || Boolean(pendingReplyFrom);

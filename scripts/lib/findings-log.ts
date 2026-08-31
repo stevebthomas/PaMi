@@ -1,12 +1,12 @@
 /**
- * Generic, persistent cross-run findings tracker — reusable by any
+ * Generic, persistent cross-run findings tracker: reusable by any
  * diagnostic script (scenario-audit.ts today; nothing here is specific to
  * its finding shape). A "finding" is anything a diagnostic run flags that's
  * worth tracking over time: does it keep coming back, or has it gone away?
  *
  * Deliberately dumb on purpose: this module does no LLM calls and no fuzzy
  * matching. It matches findings ACROSS RUNS purely by the `id` the caller
- * supplies — the caller (and, upstream of it, the analysis prompt) is
+ * supplies: the caller (and, upstream of it, the analysis prompt) is
  * responsible for giving a finding a short, stable, semantically-meaningful
  * id so that flagging the same underlying issue again naturally produces
  * the same id again. That's a prompting concern, not this module's.
@@ -17,19 +17,19 @@ export type FindingStatus = "new" | "still-open" | "confirmed-fixed";
 
 export interface FindingsLogEntry {
   id: string;
-  /** One-line, human-readable description — what the "at a glance" table
+  /** One-line, human-readable description: what the "at a glance" table
    * and summary line show. Updated to the latest run's wording each time
    * the finding is seen again, so stale phrasing doesn't linger. */
   summary: string;
   status: FindingStatus;
   /** True only on the run where a previously confirmed-fixed finding came
-   * back — lets the report call out a regression distinctly from an
+   * back: lets the report call out a regression distinctly from an
    * ordinary "still open" continuation. */
   regressed: boolean;
   firstSeenRun: string;
   lastSeenRun: string;
   /** How many runs have flagged this (consecutive "new"/"still-open" runs
-   * plus any regressions) — NOT incremented for confirmed-fixed runs. */
+   * plus any regressions); NOT incremented for confirmed-fixed runs. */
   timesSeen: number;
   history: { run: string; status: FindingStatus }[];
 }
@@ -45,15 +45,15 @@ export interface CurrentFinding {
 
 export interface FindingsLogUpdate {
   log: FindingsLog;
-  /** This run's findings, each annotated with its resolved status/history —
+  /** This run's findings, each annotated with its resolved status/history:
    * same order as the `current` array passed in, for the caller to zip back
    * up with its own richer per-finding detail when rendering a report. */
   currentAnnotated: (CurrentFinding & { status: FindingStatus; regressed: boolean; timesSeen: number; firstSeenRun: string })[];
   /** Findings that were open as of the previous run but are absent from
-   * `current` this time — i.e. newly confirmed fixed this run. */
+   * `current` this time: i.e. newly confirmed fixed this run. */
   newlyFixed: FindingsLogEntry[];
   /** Every entry still sitting at confirmed-fixed after this run (includes
-   * ones fixed in earlier runs, not just this one) — for an optional
+   * ones fixed in earlier runs, not just this one); for an optional
    * "previously fixed" appendix. */
   allFixed: FindingsLogEntry[];
 }
@@ -134,7 +134,7 @@ const STATUS_LABEL: Record<FindingStatus, string> = {
 };
 
 /** Renders the "at a glance" summary table shared by any diagnostic script
- * using this module — still-open/new first (the stuff worth reading),
+ * using this module: still-open/new first (the stuff worth reading),
  * confirmed-fixed last. */
 export function renderFindingsSummaryTable(update: FindingsLogUpdate): string {
   const rows = update.currentAnnotated

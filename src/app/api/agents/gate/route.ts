@@ -8,7 +8,7 @@ interface GateRequestBody {
   playerMessage: string;
   /** Which persona is replying (or just replied) to playerMessage. */
   primaryAgentId: AgentId;
-  /** That persona's own reply text, if it's already been generated — Stage B
+  /** That persona's own reply text, if it's already been generated: Stage B
    * runs after the primary reply resolves (see the latency note in
    * sendPlayerMessage), so this is almost always present. */
   primaryReply: string;
@@ -23,7 +23,7 @@ interface GateResult {
 const VALID_AGENTS: AgentId[] = ["raj", "priya", "derek", "sam"];
 
 /**
- * Stage B of the cross-functional gate — a cheap Haiku-tier classifier,
+ * Stage B of the cross-functional gate: a cheap Haiku-tier classifier,
  * only called when Stage A (src/lib/sim/crossFunctionalGate.ts, free,
  * client-side) didn't already decide "no." Deliberately minimal context:
  * just the player's message and the primary persona's reply, not the full

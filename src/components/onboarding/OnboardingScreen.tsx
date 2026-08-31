@@ -6,8 +6,8 @@ import { Wallpaper } from "../desktop/Wallpaper";
  * button that starts the day) next to Sam's live chat on the right. Both
  * are visible at once so the player can read and ask questions in either
  * order, as much or as little as they want, before starting. Renders the
- * same Wallpaper as the main desktop (at dayProgress 0, its sunrise state)
- * — the sky/mountain/sun art lives in that one shared component now, not
+ * same Wallpaper as the main desktop (at dayProgress 0, its sunrise state):
+ * the sky/mountain/sun art lives in that one shared component now, not
  * in the pixel-desktop-bg CSS class, so it has to be rendered explicitly
  * here too or this screen loses its background entirely. */
 export function OnboardingScreen({ onStart }: { onStart: (name: string) => void }) {
