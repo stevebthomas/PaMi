@@ -1,4 +1,4 @@
-import { SkipForward } from "lucide-react";
+import { Hourglass, SkipForward } from "lucide-react";
 import { useSimStore, formatSimTime } from "@/store/simStore";
 import { getBatteryLevel, getDayProgress } from "@/lib/sim/timeOfDay";
 
@@ -11,6 +11,7 @@ function BatteryIndicator({ level }: { level: number }) {
   const fill = level > 0.5 ? "bg-status-success" : level > 0.2 ? "bg-status-pending" : "bg-status-failed";
   return (
     <div className="flex items-center gap-1.5" title={`~${pct}% of the day left`}>
+      <Hourglass className="h-3 w-3 text-text-secondary" strokeWidth={2} aria-hidden="true" />
       <div className="h-1.5 w-16 overflow-hidden rounded-full border border-border-hairline bg-muted">
         <div className={`h-full rounded-full ${fill}`} style={{ width: `${pct}%` }} />
       </div>
