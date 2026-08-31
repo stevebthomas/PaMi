@@ -26,10 +26,14 @@ function AssigneePicker({ ticket, onAssign }: { ticket: Ticket; onAssign: (id: A
   const [open, setOpen] = useState(false);
 
   return (
-    <div className="relative">
+    <div className="relative min-w-0">
       <button
         onClick={() => setOpen((o) => !o)}
-        className={`pixel-border px-1.5 py-0.5 text-caption ${
+        // block + w-full lets this chip shrink with its flex-1 min-w-0
+        // wrapper in TicketCard's bottom row (instead of forcing the row
+        // wider than the card); truncate is the fallback for when the
+        // chip's name genuinely doesn't fit next to the move buttons.
+        className={`pixel-border block w-full truncate px-1.5 py-0.5 text-left text-caption ${
           ticket.assigneeId ? "bg-accent-taskflow text-white" : "bg-bg-window text-ink-soft"
         }`}
         title="Assign this ticket"
@@ -111,17 +115,32 @@ function TicketCard({ ticket, onTimeAdvance }: { ticket: Ticket; onTimeAdvance: 
         ticket.kind === "story" ? "border-l-4 border-l-accent-taskflow bg-accent-taskflow/10" : "bg-white"
       }`}
     >
-      <div className="mb-1 font-semibold leading-snug">{ticket.title}</div>
-      {ticket.description && <div className="mb-1 leading-snug text-ink-soft">{ticket.description}</div>}
+      <div className="mb-1 break-words font-semibold leading-snug">{ticket.title}</div>
+      {/* FIRST casualty on a narrow card: hidden below an arbitrary @[12rem]
+          (192px) COLUMN width, via the @container on each column in
+          TaskflowApp. Tailwind's nearest preset (@xs = 20rem/320px) over-fired:
+          it hid descriptions even at the default window (700px, ~215px
+          columns). 12rem sits between the default 215px columns (description
+          shows) and the window-floor ~150px columns (description hides). */}
+      {ticket.description && (
+        <div className="mb-1 hidden leading-snug text-ink-soft @[12rem]:block">{ticket.description}</div>
+      )}
       {reporter && <div className="mb-2 text-caption text-ink-soft">Reported by {reporter}</div>}
-      <div className="flex items-center justify-between gap-1">
-        <span className="text-caption text-ink-soft">{formatSimTime(ticket.createdAtSimMinutes)}</span>
-        <div className="flex items-center gap-1">
-          <AssigneePicker ticket={ticket} onAssign={(id) => assignTicket(ticket.id, id, clockMinutes)} />
+      {/* Bottom row is the one that must never clip, all the way to the
+          window floor: flex-wrap is the last-resort escape hatch (timestamp
+          can drop to its own line), the assignee chip is the only flexible,
+          truncatable element (min-w-0 flex-1), and the move buttons are
+          shrink-0 so they always render at full, clickable size. */}
+      <div className="flex flex-wrap items-center gap-1">
+        <span className="shrink-0 text-caption text-ink-soft">{formatSimTime(ticket.createdAtSimMinutes)}</span>
+        <div className="flex min-w-0 flex-1 items-center justify-end gap-1">
+          <div className="min-w-0 flex-1">
+            <AssigneePicker ticket={ticket} onAssign={(id) => assignTicket(ticket.id, id, clockMinutes)} />
+          </div>
           <button
             onClick={() => left && handleMove(left)}
             disabled={!left}
-            className="pixel-border bg-bg-window px-1.5 py-0.5 text-caption font-pixel text-ink disabled:cursor-not-allowed disabled:opacity-30"
+            className="pixel-border shrink-0 bg-bg-window px-1.5 py-0.5 text-caption font-pixel text-ink disabled:cursor-not-allowed disabled:opacity-30"
             title={left ? `Move to ${left}` : undefined}
           >
             ←
@@ -129,7 +148,7 @@ function TicketCard({ ticket, onTimeAdvance }: { ticket: Ticket; onTimeAdvance: 
           <button
             onClick={() => right && handleMove(right)}
             disabled={!right}
-            className="pixel-border bg-bg-window px-1.5 py-0.5 text-caption font-pixel text-ink disabled:cursor-not-allowed disabled:opacity-30"
+            className="pixel-border shrink-0 bg-bg-window px-1.5 py-0.5 text-caption font-pixel text-ink disabled:cursor-not-allowed disabled:opacity-30"
             title={right ? `Move to ${right}` : undefined}
           >
             →
@@ -215,11 +234,18 @@ export function TaskflowApp() {
 
       <div className="pixel-scrollbar grid min-h-0 flex-1 grid-cols-3 gap-2 overflow-y-auto bg-[#dfd6bd] p-2">
         {COLUMNS.map((col) => (
-          <div key={col.status} className="flex min-h-0 flex-col">
+          // min-w-0 on both this grid item and the flex-col children below is
+          // what actually fixes the clipping: without it, a grid/flex item's
+          // default min-width is its content's min-content size, so a card
+          // whose bottom row doesn't fit was forcing the column (and the
+          // buttons riding along with it) wider than the 1fr track, clipped
+          // by the window's own edge instead of reflowing. @container keys
+          // the description breakpoint below to this column's actual width.
+          <div key={col.status} className="@container flex min-h-0 min-w-0 flex-col">
             <div className="mb-2 font-pixel text-caption text-ink-soft">
               {col.label} ({tickets.filter((t) => t.status === col.status).length})
             </div>
-            <div className="pixel-scrollbar min-h-0 flex-1 overflow-y-auto">
+            <div className="pixel-scrollbar min-h-0 min-w-0 flex-1 overflow-y-auto">
               {tickets
                 .filter((t) => t.status === col.status)
                 .map((t) => (
