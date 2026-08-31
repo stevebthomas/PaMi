@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useTaskflowStore, TIME_ADVANCE_MINUTES, type Ticket, type TicketStatus } from "@/store/taskflowStore";
 import { useSimStore, formatSimTime } from "@/store/simStore";
 import { ASSIGNABLE_TEAM, reporterLabel, rosterName, type AssigneeId } from "@/lib/sim/types";
@@ -152,6 +152,8 @@ export function TaskflowApp() {
   const clockMinutes = useSimStore((s) => s.clockMinutes);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
+  const titleRef = useRef<HTMLInputElement>(null);
+  const canAdd = title.trim().length > 0;
   // Owned here, not on the individual TicketCard: see the long comment on
   // TicketCard's handleMove for why a per-card confirmation silently never
   // rendered. TaskflowApp stays mounted regardless of which column any
@@ -161,7 +163,10 @@ export function TaskflowApp() {
 
   function handleAdd() {
     const trimmedTitle = title.trim();
-    if (!trimmedTitle) return;
+    if (!trimmedTitle) {
+      titleRef.current?.focus();
+      return;
+    }
     addTicket(trimmedTitle, description.trim(), clockMinutes, "todo", { reporterId: "player" });
     setTitle("");
     setDescription("");
@@ -176,6 +181,7 @@ export function TaskflowApp() {
     <div className="flex h-full min-h-0 w-full flex-col">
       <div className="flex shrink-0 flex-col gap-2 border-b-2 border-ink bg-white p-3">
         <input
+          ref={titleRef}
           value={title}
           onChange={(e) => setTitle(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && handleAdd()}
@@ -192,7 +198,9 @@ export function TaskflowApp() {
           />
           <button
             onClick={handleAdd}
-            className="pixel-border bg-accent-taskflow px-3 py-1 text-label font-pixel text-white hover:-translate-y-0.5"
+            disabled={!canAdd}
+            title={canAdd ? "Add ticket" : "Give the ticket a title first."}
+            className="pixel-border bg-accent-taskflow px-3 py-1 text-label font-pixel text-white hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:translate-y-0"
           >
             + ADD
           </button>
