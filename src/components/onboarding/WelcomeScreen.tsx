@@ -29,25 +29,25 @@ export function WelcomeScreen({ onStart }: { onStart: (name: string) => void }) 
   }
 
   return (
-    <div className="pixel-border flex h-full flex-col overflow-hidden bg-bg-window p-6">
-      <div className="min-h-0 flex-1 overflow-y-auto pixel-scrollbar">
-        <div className="mb-1 font-pixel text-caption text-ink-soft">BAZAARLOOP</div>
-        <h1 className="mb-4 font-pixel text-body leading-relaxed text-ink">NEW HIRE ORIENTATION</h1>
+    <div className="flex h-full flex-col overflow-hidden rounded-lg border border-border-hairline bg-surface p-6">
+      <div className="min-h-0 flex-1 overflow-y-auto">
+        <div className="mb-1 text-caption font-semibold tracking-wide text-text-secondary">BAZAARLOOP</div>
+        <h1 className="mb-4 text-heading font-bold tracking-tight text-text-primary">New Hire Orientation</h1>
 
-        <div className="mb-3 text-body leading-relaxed text-ink">
+        <div className="mb-3 text-body leading-relaxed text-text-primary">
           <span className="font-semibold">The company: </span>
           BazaarLoop is a marketplace where people buy and sell secondhand goods, think a mix of
           Etsy and eBay, built for a younger, mobile-first audience.
         </div>
 
-        <div className="mb-4 text-body leading-relaxed text-ink">
+        <div className="mb-4 text-body leading-relaxed text-text-primary">
           <span className="font-semibold">Your role: </span>
           You&apos;re the Product Manager for Buyer Experience. Everything from search to checkout
           is your surface area.
         </div>
 
-        <div className="mb-2 font-pixel text-caption text-ink-soft">HOW THIS WORKS</div>
-        <ul className="mb-4 list-disc pl-4 text-label leading-snug text-ink">
+        <div className="mb-2 text-label font-semibold uppercase tracking-wide text-text-secondary">How this works</div>
+        <ul className="mb-4 list-disc pl-4 text-label leading-snug text-text-primary">
           <li>Apps open as windows from the taskbar at the bottom. Move them around, close them, reopen them anytime.</li>
           <li>Chattr is where you talk to your coworkers, in channels and DMs. Most of your day happens there.</li>
           <li>Pulse shows live platform data like checkout success and traffic.</li>
@@ -55,27 +55,27 @@ export function WelcomeScreen({ onStart }: { onStart: (name: string) => void }) 
           <li>Ask Claude explains any term or acronym that trips you up, no judgment.</li>
         </ul>
 
-        <div className="mb-2 font-pixel text-caption text-ink-soft">YOUR TEAM</div>
+        <div className="mb-2 text-label font-semibold uppercase tracking-wide text-text-secondary">Your team</div>
         <div className="mb-4 grid grid-cols-3 gap-3">
           {TEAM.map((person) => (
-            <div key={person.name} className="pixel-border bg-white p-3">
+            <div key={person.name} className="rounded-lg border border-border-hairline bg-surface p-3">
               <PixelAvatar agentId={person.agentId} sizeClassName="mb-2 h-9 w-9" />
-              <div className="text-body font-semibold text-ink">{person.name}</div>
-              <div className="mb-1 text-label text-ink-soft">{person.title}</div>
-              <div className="text-label leading-snug text-ink">{person.blurb}</div>
+              <div className="text-body font-semibold text-text-primary">{person.name}</div>
+              <div className="mb-1 text-label text-text-secondary">{person.title}</div>
+              <div className="text-label leading-snug text-text-primary">{person.blurb}</div>
             </div>
           ))}
         </div>
 
-        <p className="text-body italic leading-relaxed text-ink-soft">
+        <p className="text-body italic leading-relaxed text-text-secondary">
           It&apos;s Monday morning. Nothing on your calendar is guaranteed to go as planned. Your
           job today: handle whatever comes up.
         </p>
       </div>
 
       <div className="mt-4">
-        <label htmlFor="player-name" className="mb-1 block font-pixel text-caption text-ink-soft">
-          YOUR NAME
+        <label htmlFor="player-name" className="mb-1 block text-caption font-semibold uppercase tracking-wide text-text-secondary">
+          Your name
         </label>
         <input
           id="player-name"
@@ -84,16 +84,16 @@ export function WelcomeScreen({ onStart }: { onStart: (name: string) => void }) 
           onChange={(e) => setName(e.target.value)}
           onKeyDown={handleKeyDown}
           placeholder="Type your name…"
-          className="pixel-border w-full max-w-xs bg-white px-2 py-1.5 text-body text-ink outline-none"
+          className="w-full max-w-xs rounded-md border border-border-hairline bg-surface px-3 py-2 text-body text-text-primary outline-none placeholder:text-text-secondary focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/30"
         />
       </div>
 
       <button
         onClick={handleStart}
         disabled={!trimmedName}
-        className="pixel-border mt-3 self-start bg-accent-chattr px-6 py-3 font-pixel text-label text-white hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-40"
+        className="mt-3 self-start rounded-md bg-primary px-6 py-3 text-body font-medium text-primary-foreground transition-colors hover:bg-primary/80 disabled:cursor-not-allowed disabled:opacity-50"
       >
-        START YOUR DAY →
+        Start your day
       </button>
     </div>
   );

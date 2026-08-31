@@ -80,31 +80,31 @@ export function HROrientationChat() {
   }
 
   return (
-    <div className="pixel-border flex h-full flex-col overflow-hidden bg-bg-window">
-      <div className="flex items-center gap-2 border-b-2 border-ink bg-accent-chattr/40 px-3 py-2">
+    <div className="flex h-full flex-col overflow-hidden rounded-lg border border-border-hairline bg-surface">
+      <div className="flex items-center gap-2 border-b border-border-hairline bg-muted px-3 py-2">
         <PixelAvatar agentId="sam" sizeClassName="h-7 w-7" />
         <div>
-          <div className="font-pixel text-label text-ink">SAM</div>
-          <div className="text-label text-ink-soft">{AGENT_TITLES.sam}</div>
+          <div className="text-label font-semibold text-text-primary">Sam</div>
+          <div className="text-label text-text-secondary">{AGENT_TITLES.sam}</div>
         </div>
       </div>
 
-      <div className="pixel-scrollbar min-h-0 flex-1 overflow-y-auto p-3">
+      <div className="min-h-0 flex-1 overflow-y-auto p-3">
         {messages.map((m) => (
           <div key={m.id} className="mb-3 flex gap-2">
             <PixelAvatar agentId={m.senderId} sizeClassName="h-8 w-8" />
             <div className="min-w-0">
-              <div className="text-body font-semibold text-ink">
+              <div className="text-body font-semibold text-text-primary">
                 {m.senderId === "sam" ? "Sam" : "You"}
               </div>
-              <p className="whitespace-pre-wrap text-body leading-snug text-ink">{m.content}</p>
+              <p className="whitespace-pre-wrap text-body leading-snug text-text-primary">{m.content}</p>
             </div>
           </div>
         ))}
         {pending && (
-          <div className="mb-3 flex items-center gap-2 text-label italic text-ink-soft">
+          <div className="mb-3 flex items-center gap-2 text-label italic text-text-secondary">
             <PixelAvatar agentId="sam" sizeClassName="h-6 w-6" />
-            <div className="pixel-border flex items-center bg-white px-2 py-1.5">
+            <div className="flex items-center rounded-md border border-border-hairline bg-surface px-2 py-1.5">
               <TypingDots />
             </div>
           </div>
@@ -112,19 +112,19 @@ export function HROrientationChat() {
         <div ref={bottomRef} />
       </div>
 
-      <div className="flex items-end gap-2 border-t-2 border-ink bg-bg-window p-2">
+      <div className="flex items-end gap-2 border-t border-border-hairline bg-surface p-2">
         <textarea
           value={value}
           onChange={(e) => setValue(e.target.value)}
           onKeyDown={handleKeyDown}
           rows={2}
           placeholder="Ask Sam anything…"
-          className="pixel-border flex-1 resize-none bg-white px-2 py-1.5 text-body text-ink outline-none"
+          className="flex-1 resize-none rounded-md border border-border-hairline bg-surface px-3 py-2 text-body text-text-primary outline-none placeholder:text-text-secondary focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/30"
         />
         <button
           onClick={handleSend}
           disabled={!value.trim() || pending}
-          className="pixel-border bg-accent-chattr px-3 py-2 text-label font-pixel text-white disabled:cursor-not-allowed disabled:opacity-40"
+          className="shrink-0 rounded-md bg-primary px-3 py-2 text-body font-medium text-primary-foreground transition-colors hover:bg-primary/80 disabled:cursor-not-allowed disabled:opacity-50"
         >
           Send
         </button>
