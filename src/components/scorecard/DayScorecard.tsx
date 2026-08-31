@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { Plus, X } from "lucide-react";
 import { useSimStore } from "@/store/simStore";
 import { useTaskflowStore, TIME_ADVANCE_MINUTES } from "@/store/taskflowStore";
 import { useCostStore } from "@/store/costStore";
@@ -60,9 +61,9 @@ function FollowUpTicketPrompt({ day, postmortemText, completedAtSimMinutes }: { 
 
   if (added) {
     return (
-      <div className="mt-4 pixel-border bg-white p-3 text-label text-ink-soft">
+      <div className="mt-4 rounded-[var(--radius-card)] border border-border-hairline bg-surface p-3 text-label text-text-secondary">
         Added to Taskflow.{" "}
-        <span className="font-pixel text-caption text-accent-pulse">LOGGED, +{TIME_ADVANCE_MINUTES} MIN</span>
+        <span className="font-medium text-accent-green">Advanced the clock {TIME_ADVANCE_MINUTES} min.</span>
       </div>
     );
   }
@@ -82,10 +83,10 @@ function FollowUpTicketPrompt({ day, postmortemText, completedAtSimMinutes }: { 
   }
 
   return (
-    <div className="mt-4 pixel-border bg-white p-3">
-      <div className="mb-2 flex items-center gap-2">
-        <AppIcon id="taskflow" sizeClassName="h-5 w-5" />
-        <div className="font-pixel text-caption text-ink-soft">TURN A &ldquo;WHAT I&apos;D DO DIFFERENTLY&rdquo; INTO A TICKET?</div>
+    <div className="mt-4 rounded-[var(--radius-card)] border border-border-hairline bg-surface p-3">
+      <div className="mb-2 flex items-center gap-2 text-text-secondary">
+        <AppIcon id="taskflow" sizeClassName="h-4 w-4" />
+        <div className="text-caption font-semibold tracking-wide">TURN A &ldquo;WHAT I&apos;D DO DIFFERENTLY&rdquo; INTO A TICKET?</div>
       </div>
       <div className="flex gap-2">
         <input
@@ -93,13 +94,14 @@ function FollowUpTicketPrompt({ day, postmortemText, completedAtSimMinutes }: { 
           onChange={(e) => setTitle(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && handleAdd()}
           placeholder={suggesting ? "Pulling a suggestion from your postmortem…" : "e.g. Set up Stripe webhook monitoring"}
-          className="pixel-border flex-1 bg-white px-2 py-1 text-label text-ink outline-none"
+          className="flex-1 rounded-[var(--radius-control)] border border-border-hairline bg-canvas px-2.5 py-1.5 text-body text-text-primary outline-none placeholder:text-text-secondary focus:border-accent-green"
         />
         <button
           onClick={handleAdd}
-          className="pixel-border bg-accent-taskflow px-3 py-1 text-label font-pixel text-white hover:-translate-y-0.5"
+          className="inline-flex shrink-0 items-center gap-1 rounded-[var(--radius-control)] bg-accent-green px-3 py-1.5 text-label font-medium text-primary-foreground transition-opacity hover:opacity-90"
         >
-          + ADD
+          <Plus className="size-3.5" aria-hidden />
+          Add
         </button>
       </div>
     </div>
@@ -112,31 +114,31 @@ export function DayScorecard({ onClose }: { onClose: () => void }) {
   if (!record) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
-      <div className="pixel-border flex max-h-[85vh] w-full max-w-md flex-col overflow-hidden bg-bg-window">
-        <div className="flex shrink-0 items-center justify-between border-b-2 border-ink px-5 py-3">
-          <div>
-            <div className="font-pixel text-body text-ink">DAY {record.day} COMPLETE</div>
-            <div className="text-label text-ink-soft">Scorecard: {record.scenarioLabel}</div>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+      <div className="flex max-h-[85vh] w-full max-w-md flex-col overflow-hidden rounded-[var(--radius-card)] border border-border-hairline bg-surface shadow-lg">
+        <div className="flex shrink-0 items-center justify-between gap-3 border-b border-border-hairline px-5 py-4">
+          <div className="min-w-0">
+            <div className="text-subheading font-semibold tracking-tight text-text-primary">Day {record.day} complete</div>
+            <div className="mt-0.5 text-label text-text-secondary">Scorecard: {record.scenarioLabel}</div>
           </div>
           <button
             type="button"
             onClick={onClose}
             aria-label="Close scorecard"
-            className="flex h-5 w-5 shrink-0 items-center justify-center border-2 border-ink bg-bg-window text-label leading-none text-ink hover:bg-accent-danger hover:text-white"
+            className="flex size-7 shrink-0 items-center justify-center rounded-[var(--radius-control)] border border-border-hairline bg-surface text-text-secondary hover:bg-muted hover:text-text-primary"
           >
-            ×
+            <X className="size-4" aria-hidden />
           </button>
         </div>
 
-        <div className="pixel-scrollbar min-h-0 flex-1 overflow-y-auto p-5">
+        <div className="min-h-0 flex-1 overflow-y-auto bg-canvas p-5">
           <ScorecardDetail record={record} />
 
           {record.postmortemText && (
             <FollowUpTicketPrompt day={record.day} postmortemText={record.postmortemText} completedAtSimMinutes={record.completedAtSimMinutes} />
           )}
 
-          <div className="mt-4 text-center text-label text-ink-soft">
+          <div className="mt-4 text-center text-label text-text-secondary">
             Days 2-5 aren&apos;t built yet, this is the Day 1 proof of concept. Find this scorecard
             again anytime in Reviews.
           </div>

@@ -261,6 +261,26 @@ body {
   animation: dock-bounce 0.5s ease-out;
 }
 
+/* Scorecard category-bar fill — the one sanctioned celebratory microinteraction
+   (see DESIGN.md "The scorecard"). Each bar's colored fill is sized to its
+   score via inline width; this grows it in from the left on mount by animating
+   scaleX 0 -> 1. transform-origin keeps the growth left-anchored; `both` fill
+   mode holds scaleX(0) through any per-row stagger delay and pins the final
+   state. Guarded by prefers-reduced-motion: with motion reduced the animation
+   is simply not applied, so the fill renders at its full width immediately. */
+.animate-scorecard-fill {
+  transform-origin: left center;
+}
+@media (prefers-reduced-motion: no-preference) {
+  @keyframes scorecard-fill {
+    from { transform: scaleX(0); }
+    to { transform: scaleX(1); }
+  }
+  .animate-scorecard-fill {
+    animation: scorecard-fill 0.7s ease-out both;
+  }
+}
+
 /* Busy pointer during an app launch — applied to <body> by docsStore while a
    launch animation is in flight, and always reverted when the window opens.
    The descendant selector makes it win over elements' own cursors. */

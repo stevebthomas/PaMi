@@ -1,52 +1,64 @@
 import type { CategoryExplanation, DayScorecardRecord, PlaytestAggregateRecord, PlaytestRecord, ScorecardCategory } from "@/lib/sim/types";
 import { CHANNELS } from "@/lib/sim/types";
 import { formatSimTime } from "@/store/simStore";
+import { cn } from "@/lib/utils";
 
 /** One score bar and, when present, the evidence-backed explanation shown
  * directly beneath it (subtask C1). `explanation` is undefined for records
  * that predate the feature / playtests (the flat coaching-notes list renders
  * separately in that fallback case); `explanationLoading` shows a placeholder
- * while the day-end summarizer is still in flight. */
+ * while the day-end summarizer is still in flight. `index` only staggers the
+ * fill animation; it carries no scoring meaning. */
 function Bar({
   label,
   score,
   loading,
   explanation,
   explanationLoading,
+  index = 0,
 }: {
   label: string;
   score: number;
   loading?: boolean;
   explanation?: CategoryExplanation | null;
   explanationLoading?: boolean;
+  index?: number;
 }) {
   const pct = Math.max(0, Math.min(100, score * 10));
-  const color = score >= 7 ? "bg-accent-pulse" : score >= 4 ? "bg-accent-taskflow" : "bg-accent-danger";
+  // Same score bands as before (>=7 / >=4), now mapped onto the DESIGN.md
+  // status tokens: strong reads accent-green, mid reads status-pending amber,
+  // low reads status-failed red.
+  const fill = score >= 7 ? "bg-accent-green" : score >= 4 ? "bg-status-pending" : "bg-status-failed";
   return (
-    <div className="mb-3">
-      <div className="mb-1 flex items-center justify-between text-label text-ink">
-        <span>{label}</span>
-        <span className="font-pixel text-label">{loading ? "…" : `${score.toFixed(1)}/10`}</span>
+    <div className="mb-4">
+      <div className="mb-1.5 flex items-baseline justify-between gap-2">
+        <span className="text-body text-text-primary">{label}</span>
+        <span className="text-label font-semibold tabular-nums text-text-secondary">
+          {loading ? "…" : `${score.toFixed(1)}/10`}
+        </span>
       </div>
-      <div className="pixel-border h-3 w-full bg-white">
+      <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
         {loading ? (
-          <div className="h-full w-full animate-pulse bg-ink-soft/30" />
+          <div className="h-full w-full animate-pulse rounded-full bg-muted-foreground/40" />
         ) : (
-          <div className={`h-full ${color}`} style={{ width: `${pct}%` }} />
+          <div
+            className={cn("h-full rounded-full animate-scorecard-fill", fill)}
+            style={{ width: `${pct}%`, animationDelay: `${index * 80}ms` }}
+          />
         )}
       </div>
       {explanationLoading && !explanation && (
-        <p className="mt-1 text-label italic text-ink-soft">Working out why this landed here…</p>
+        <p className="mt-1.5 text-label italic text-text-secondary">Working out why this landed here…</p>
       )}
       {explanation && explanation.explanation && (
-        <div className="mt-1 text-label text-ink">
+        <div className="mt-1.5 text-label text-text-primary">
           <p className="leading-snug">{explanation.explanation}</p>
           {explanation.quotes.length > 0 && (
-            <div className="mt-1 space-y-1">
+            <div className="mt-1.5 space-y-1">
               {explanation.quotes.map((q, i) => (
                 <p
                   key={i}
-                  className="border-l-2 border-ink-soft pl-2 italic leading-snug text-ink-soft"
+                  className="border-l-2 border-border-hairline pl-2.5 italic leading-snug text-text-secondary"
                 >
                   &ldquo;{q}&rdquo;
                 </p>
@@ -101,10 +113,15 @@ export function ScorecardDetail({ record }: { record: DayScorecardRecord | Playt
 
   return (
     <>
-      <div className="pixel-border mb-4 bg-white p-3 text-center">
-        <div className="text-label text-ink-soft">Overall</div>
-        <div className="font-pixel text-display text-ink">{crossFunctionalLoading ? "…" : record.overall.toFixed(1)} / 10</div>
-        {crossFunctionalLoading && <div className="mt-1 text-label italic text-ink-soft">still grading coordination…</div>}
+      <div className="mb-5 rounded-[var(--radius-card)] border border-border-hairline bg-surface p-4">
+        <div className="text-label text-text-secondary">Overall</div>
+        <div className="mt-1.5 flex items-baseline gap-1.5">
+          <span className="text-5xl font-semibold leading-none tracking-tight tabular-nums text-text-primary">
+            {crossFunctionalLoading ? "…" : record.overall.toFixed(1)}
+          </span>
+          <span className="text-heading font-medium tabular-nums text-text-secondary">/10</span>
+        </div>
+        {crossFunctionalLoading && <div className="mt-2 text-label italic text-text-secondary">still grading coordination…</div>}
       </div>
 
       <Bar
@@ -112,24 +129,28 @@ export function ScorecardDetail({ record }: { record: DayScorecardRecord | Playt
         score={record.scores.responseTime}
         explanation={useExplanations ? explanationFor("responseTime") : null}
         explanationLoading={useExplanations && explanationsLoading}
+        index={0}
       />
       <Bar
         label="Triage quality"
         score={record.scores.triageQuality}
         explanation={useExplanations ? explanationFor("triageQuality") : null}
         explanationLoading={useExplanations && explanationsLoading}
+        index={1}
       />
       <Bar
         label="Communication clarity"
         score={record.scores.commClarity}
         explanation={useExplanations ? explanationFor("commClarity") : null}
         explanationLoading={useExplanations && explanationsLoading}
+        index={2}
       />
       <Bar
         label="Stakeholder management"
         score={record.scores.stakeholderMgmt}
         explanation={useExplanations ? explanationFor("stakeholderMgmt") : null}
         explanationLoading={useExplanations && explanationsLoading}
+        index={3}
       />
       <Bar
         label="Cross-functional coordination"
@@ -137,11 +158,12 @@ export function ScorecardDetail({ record }: { record: DayScorecardRecord | Playt
         loading={crossFunctionalLoading}
         explanation={useExplanations ? explanationFor("crossFunctional") : null}
         explanationLoading={useExplanations && explanationsLoading}
+        index={4}
       />
 
       {postmortemText && (
-        <div className="pixel-border mt-4 bg-white p-3 text-label text-ink">
-          <div className="mb-1 font-pixel text-caption text-ink-soft">YOUR POSTMORTEM</div>
+        <div className="mt-4 rounded-[var(--radius-card)] border border-border-hairline bg-surface p-3 text-label text-text-primary">
+          <div className="mb-1.5 text-caption font-semibold tracking-wide text-text-secondary">YOUR POSTMORTEM</div>
           <p className="whitespace-pre-wrap leading-snug">{postmortemText}</p>
         </div>
       )}
@@ -154,13 +176,13 @@ export function ScorecardDetail({ record }: { record: DayScorecardRecord | Playt
           isn't silently lost. */}
       {useExplanations && coachingNotes && coachingNotes.some((e) => e.messageId === "follow-up-ticket") && (
         <div className="mt-4">
-          <div className="mb-1 font-pixel text-caption text-ink-soft">FOLLOW-THROUGH</div>
+          <div className="mb-1.5 text-caption font-semibold tracking-wide text-text-secondary">FOLLOW-THROUGH</div>
           <div className="space-y-2">
             {coachingNotes
               .filter((e) => e.messageId === "follow-up-ticket")
               .map((entry) => (
-                <div key={entry.id} className="pixel-border bg-white p-3 text-label text-ink">
-                  <div className="mb-1 text-label text-ink-soft">
+                <div key={entry.id} className="rounded-[var(--radius-card)] border border-border-hairline bg-surface p-3 text-label text-text-primary">
+                  <div className="mb-1 text-label text-text-secondary">
                     {entry.label
                       ? `${entry.label}, ${formatSimTime(entry.sentAtSimMinutes)}`
                       : `Day 1 wrap-up, ${formatSimTime(entry.sentAtSimMinutes)}`}
@@ -174,11 +196,11 @@ export function ScorecardDetail({ record }: { record: DayScorecardRecord | Playt
 
       {!useExplanations && coachingNotes && coachingNotes.length > 0 && (
         <div className="mt-4">
-          <div className="mb-1 font-pixel text-caption text-ink-soft">COACHING NOTES</div>
+          <div className="mb-1.5 text-caption font-semibold tracking-wide text-text-secondary">COACHING NOTES</div>
           <div className="space-y-2">
             {coachingNotes.map((entry) => (
-              <div key={entry.id} className="pixel-border bg-white p-3 text-label text-ink">
-                <div className="mb-1 text-label text-ink-soft">
+              <div key={entry.id} className="rounded-[var(--radius-card)] border border-border-hairline bg-surface p-3 text-label text-text-primary">
+                <div className="mb-1 text-label text-text-secondary">
                   {entry.label
                     ? `${entry.label}, ${formatSimTime(entry.sentAtSimMinutes)}`
                     : entry.messageContent
@@ -186,7 +208,7 @@ export function ScorecardDetail({ record }: { record: DayScorecardRecord | Playt
                       : `Day 1 wrap-up, ${formatSimTime(entry.sentAtSimMinutes)}`}
                 </div>
                 {entry.messageContent && (
-                  <p className="mb-2 border-l-2 border-ink-soft pl-2 italic leading-snug text-ink-soft">
+                  <p className="mb-2 border-l-2 border-border-hairline pl-2.5 italic leading-snug text-text-secondary">
                     &ldquo;{truncate(entry.messageContent, 140)}&rdquo;
                   </p>
                 )}
@@ -198,14 +220,14 @@ export function ScorecardDetail({ record }: { record: DayScorecardRecord | Playt
       )}
 
       {studyAreasLoading && (
-        <div className="mt-4 text-center text-label italic text-ink-soft">
+        <div className="mt-4 text-center text-label italic text-text-secondary">
           Thinking about what&apos;s worth exploring next…
         </div>
       )}
 
       {studyAreas && !studyAreasLoading && studyAreas.length > 0 && (
-        <div className="pixel-border mt-4 bg-white p-3 text-label text-ink" style={{ borderColor: "var(--accent-help)" }}>
-          <div className="mb-2 font-pixel text-caption text-accent-help">AREAS TO STUDY</div>
+        <div className="mt-4 rounded-[var(--radius-card)] border border-border-hairline bg-surface p-3 text-label text-text-primary">
+          <div className="mb-2 text-caption font-semibold tracking-wide text-text-secondary">AREAS TO STUDY</div>
           <ul className="space-y-2">
             {studyAreas.map((area, i) => (
               <li key={i}>
@@ -219,7 +241,7 @@ export function ScorecardDetail({ record }: { record: DayScorecardRecord | Playt
                         href={r.url}
                         target="_blank"
                         rel="noreferrer"
-                        className="block text-accent-help underline decoration-dotted hover:text-ink"
+                        className="block text-accent-green underline decoration-dotted hover:text-text-primary"
                       >
                         {r.source}: {r.title}
                       </a>
@@ -234,20 +256,20 @@ export function ScorecardDetail({ record }: { record: DayScorecardRecord | Playt
 
       {studyAreas && !studyAreasLoading && studyAreas.length === 0 && (
         noEngagement ? (
-          <div className="mt-4 text-center text-label italic text-ink-soft">
+          <div className="mt-4 text-center text-label italic text-text-secondary">
             Nothing to study yet. Areas to study are drawn from what you actually did and asked
             today, and there was no engagement to draw from.
           </div>
         ) : (
-          <div className="mt-4 text-center text-label italic text-ink-soft">
+          <div className="mt-4 text-center text-label italic text-text-secondary">
             Nothing flagged to study today. Nice work staying oriented.
           </div>
         )
       )}
 
       {playtesterNotes && (
-        <div className="pixel-border mt-4 bg-white p-3 text-label text-ink" style={{ borderColor: "var(--accent-reviews)" }}>
-          <div className="mb-1 font-pixel text-caption text-accent-reviews">PLAYTESTER NOTES</div>
+        <div className="mt-4 rounded-[var(--radius-card)] border border-border-hairline bg-surface p-3 text-label text-text-primary">
+          <div className="mb-1.5 text-caption font-semibold tracking-wide text-text-secondary">PLAYTESTER NOTES</div>
           <p className="leading-snug">{playtesterNotes}</p>
         </div>
       )}
