@@ -24,21 +24,48 @@ function adjacent(status: TicketStatus, direction: -1 | 1): TicketStatus | null 
  * means the picker closes, which is what a move should do anyway. */
 function AssigneePicker({ ticket, onAssign }: { ticket: Ticket; onAssign: (id: AssigneeId | null) => void }) {
   const [open, setOpen] = useState(false);
+  const label = ticket.assigneeId ? rosterName(ticket.assigneeId) : "Unassigned";
+  // Compact-tier glyph: the assignee's first initial, or an en dash for
+  // unassigned (a plain "U" would misread as someone's actual initial).
+  const compactGlyph = ticket.assigneeId ? label.charAt(0).toUpperCase() : "–";
+  const chipColorClass = ticket.assigneeId ? "bg-accent-taskflow text-white" : "bg-bg-window text-ink-soft";
 
   return (
-    <div className="relative min-w-0">
+    // flex + justify-end keeps whichever tier is visible hugging the move
+    // buttons (instead of drifting left inside the flex-1 wrapper below),
+    // so the gap-1 spacing to the arrows stays consistent at every width.
+    // min-w-0 is gated to the full tier (@[12rem]:min-w-0), not applied
+    // unconditionally: the compact button is a fixed, non-shrinking size,
+    // so letting an ancestor claim "I can go to 0" below 12rem was a lie —
+    // it fooled TicketCard's outer row into skipping its flex-wrap escape
+    // valve (the row's hypothetical min size looked like ~0), so instead
+    // of wrapping, the compact chip's real content just overflowed this
+    // zeroed box and painted over the timestamp next to it. See TicketCard.
+    <div className="relative flex justify-end @[12rem]:min-w-0">
       <button
         onClick={() => setOpen((o) => !o)}
-        // block + w-full lets this chip shrink with its flex-1 min-w-0
-        // wrapper in TicketCard's bottom row (instead of forcing the row
-        // wider than the card); truncate is the fallback for when the
-        // chip's name genuinely doesn't fit next to the move buttons.
-        className={`pixel-border block w-full truncate px-1.5 py-0.5 text-left text-caption ${
-          ticket.assigneeId ? "bg-accent-taskflow text-white" : "bg-bg-window text-ink-soft"
-        }`}
-        title="Assign this ticket"
+        // Full-tier chip: >=12rem column width, matching the description's
+        // @[12rem]:block breakpoint below (this is the same tier where a
+        // description already fits, so a roster name does too). min-w is a
+        // floor against being squashed thin; truncate (nowrap+ellipsis) is
+        // only a fallback for a name that still overflows at this width,
+        // never the mid-word sliver the single-chip version produced below
+        // 12rem.
+        className={`pixel-border hidden w-full min-w-[3.5rem] truncate px-1.5 py-0.5 text-left text-caption @[12rem]:block ${chipColorClass}`}
+        title={label}
       >
-        {ticket.assigneeId ? rosterName(ticket.assigneeId) : "Unassigned"}
+        {label}
+      </button>
+      <button
+        onClick={() => setOpen((o) => !o)}
+        // Compact-tier chip: below 12rem, a fixed roughly-square button
+        // (same pixel-border styling/click behavior) replaces the full chip
+        // instead of letting it truncate to an unreadable sliver that
+        // collided with the ← button.
+        className={`pixel-border inline-flex shrink-0 items-center justify-center px-1.5 py-0.5 text-caption @[12rem]:hidden ${chipColorClass}`}
+        title={label}
+      >
+        {compactGlyph}
       </button>
       {open && (
         <div className="pixel-border absolute bottom-full right-0 z-10 mb-1 w-32 bg-white p-1 text-ink shadow-lg">
@@ -129,12 +156,31 @@ function TicketCard({ ticket, onTimeAdvance }: { ticket: Ticket; onTimeAdvance: 
       {/* Bottom row is the one that must never clip, all the way to the
           window floor: flex-wrap is the last-resort escape hatch (timestamp
           can drop to its own line), the assignee chip is the only flexible,
-          truncatable element (min-w-0 flex-1), and the move buttons are
-          shrink-0 so they always render at full, clickable size. */}
+          truncatable element, and the move buttons are shrink-0 so they
+          always render at full, clickable size.
+          The timestamp itself is two-tier, same @[12rem] breakpoint as the
+          description/chip above: below 12rem the AM/PM suffix drops
+          ("9:15"), since a fixed-size compact chip plus two arrow buttons
+          leaves too little room for "9:15 AM" to coexist without wrapping.
+          min-w-0 on the two wrappers below is now gated to @[12rem] too
+          (was unconditional): applied below 12rem it let these wrappers
+          claim a false "can shrink to 0" to the flex-wrap algorithm even
+          though the compact chip inside can't actually shrink, so instead
+          of wrapping, the chip's real size just overflowed the zeroed box
+          and painted over the timestamp next to it. Gating it keeps that
+          truncation behavior for the full chip at >=12rem, while letting
+          the compact chip's real minimum size be seen below 12rem so this
+          row's flex-wrap genuinely engages (timestamp onto its own line)
+          instead of overlapping if content still doesn't fit on one line. */}
       <div className="flex flex-wrap items-center gap-1">
-        <span className="shrink-0 text-caption text-ink-soft">{formatSimTime(ticket.createdAtSimMinutes)}</span>
-        <div className="flex min-w-0 flex-1 items-center justify-end gap-1">
-          <div className="min-w-0 flex-1">
+        <span className="shrink-0 text-caption text-ink-soft @[12rem]:hidden" title={formatSimTime(ticket.createdAtSimMinutes)}>
+          {formatSimTime(ticket.createdAtSimMinutes).replace(/ (AM|PM)$/, "")}
+        </span>
+        <span className="hidden shrink-0 text-caption text-ink-soft @[12rem]:inline">
+          {formatSimTime(ticket.createdAtSimMinutes)}
+        </span>
+        <div className="flex flex-1 items-center justify-end gap-1 @[12rem]:min-w-0">
+          <div className="flex-1 @[12rem]:min-w-0">
             <AssigneePicker ticket={ticket} onAssign={(id) => assignTicket(ticket.id, id, clockMinutes)} />
           </div>
           <button
