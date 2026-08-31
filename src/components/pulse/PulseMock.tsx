@@ -110,6 +110,17 @@ const toneBadge: Record<Tone, string> = {
   red: "bg-status-failed/10 text-status-failed",
   neutral: "bg-muted text-text-secondary",
 };
+// Semantic top-edge: a 2px colored top border that carries the SAME tone the
+// card already computes. Neutral tiles get no colored edge (empty string) — the
+// plain hairline stays — so green/red is spent only where the metric is
+// actually signaling, per DESIGN.md. Rendered alongside the base rounded border
+// so the corners follow the card radius (no square poke).
+const toneEdge: Record<Tone, string> = {
+  green: "border-t-2 border-t-accent-green",
+  amber: "border-t-2 border-t-status-pending",
+  red: "border-t-2 border-t-status-failed",
+  neutral: "",
+};
 
 /** Compact metric tile for progressively-disclosed secondary stats. */
 function StatTile({
@@ -124,7 +135,7 @@ function StatTile({
   tone?: Tone;
 }) {
   return (
-    <div className="rounded-[var(--radius-control)] border border-border-hairline bg-surface p-3">
+    <div className={cn("rounded-[var(--radius-control)] border border-border-hairline bg-surface p-3", toneEdge[tone])}>
       <div className="text-[11px] leading-snug text-text-secondary">{label}</div>
       <div className={cn("mt-1.5 text-xl leading-none font-semibold tabular-nums", toneText[tone])}>{value}</div>
       {caption && <div className="mt-1.5 font-mono text-[10px] tabular-nums text-text-secondary">{caption}</div>}
@@ -227,6 +238,10 @@ export function PulseMock() {
   const heroState: HeroState = !incidentActive || resolved ? "healthy" : recovering ? "recovering" : "incident";
   const heroTone: Tone = heroState === "incident" ? "red" : "green";
   const sparklineColorVar = heroState === "incident" ? "--color-status-failed" : "--color-accent-green";
+  // The hero always carries the top-edge in its computed status tone (red while
+  // the incident is degrading, accent-green otherwise) — it is the primary
+  // metric, so its edge is never neutral.
+  const heroEdge = toneEdge[heroTone];
 
   // Both derived from the SAME model/inputs as the success-rate stat, floored
   // to the refresh cadence for a believable "data as of" stamp.
@@ -249,7 +264,7 @@ export function PulseMock() {
   return (
     <div className="@container h-full w-full overflow-y-auto bg-canvas p-4 text-text-primary">
       {/* Primary metric: checkout success rate leads, sparkline sits with it. */}
-      <section className="mb-4 rounded-[var(--radius-card)] border border-border-hairline bg-surface p-4">
+      <section className={cn("mb-4 rounded-[var(--radius-card)] border border-border-hairline bg-surface p-4", heroEdge)}>
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
             <div className="flex items-center gap-2 text-[11px] text-text-secondary">

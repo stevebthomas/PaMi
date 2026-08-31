@@ -7,10 +7,12 @@ import { Bar, BarChart, Cell, ResponsiveContainer, Tooltip, XAxis } from "rechar
  * the hood, styled with the token system, no gridlines/axes chrome).
  *
  * recharts fits here because this is a plain categorical bar series with no
- * fixed-domain / custom-interpolation demands (unlike RateSparkline). Kept
- * deliberately monochrome per DESIGN.md — volume is not a good/bad signal, so
- * the accent green is NOT spent on it; bars are neutral warm-gray and the one
- * in-progress day is dimmed rather than recolored.
+ * fixed-domain / custom-interpolation demands (unlike RateSparkline). Past days
+ * stay neutral warm-gray; the single in-progress ("today") bar is accent-green
+ * so it reads at a glance as the current period. This is wayfinding, not
+ * valuation — volume is still not a good/bad signal, and the green marks WHICH
+ * bar is now rather than praising the number. The green bar carries a slightly
+ * reduced opacity to keep its "partial / still filling" character.
  */
 
 type Datum = { label: string; value: number; muted?: boolean };
@@ -59,7 +61,11 @@ export function WeeklyAttemptsBarChart({
           />
           <Bar dataKey="value" radius={[3, 3, 0, 0]} isAnimationActive={false}>
             {data.map((d) => (
-              <Cell key={d.label} fill="var(--color-chart-2)" fillOpacity={d.muted ? 0.4 : 1} />
+              <Cell
+                key={d.label}
+                fill={d.muted ? "var(--color-accent-green)" : "var(--color-chart-2)"}
+                fillOpacity={d.muted ? 0.85 : 1}
+              />
             ))}
           </Bar>
         </BarChart>

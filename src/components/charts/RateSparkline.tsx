@@ -202,7 +202,8 @@ export function RateSparkline({
         >
           <defs>
             <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" style={{ stopColor: lineColor, stopOpacity: 0.16 }} />
+              <stop offset="0%" style={{ stopColor: lineColor, stopOpacity: 0.18 }} />
+              <stop offset="55%" style={{ stopColor: lineColor, stopOpacity: 0.05 }} />
               <stop offset="100%" style={{ stopColor: lineColor, stopOpacity: 0 }} />
             </linearGradient>
           </defs>

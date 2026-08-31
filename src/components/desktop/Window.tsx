@@ -25,7 +25,7 @@ export function Window({
   return (
     <div className="flex h-full w-full flex-col overflow-hidden rounded-lg border border-border-hairline bg-surface shadow-lg">
       <div
-        className={`flex items-center justify-between border-b border-border-hairline px-3 py-2 ${
+        className={`flex items-center justify-between border-b border-border-hairline bg-gradient-to-b from-canvas to-[color-mix(in_srgb,var(--accent-green)_4%,var(--canvas))] px-3 py-2 ${
           draggable ? "cursor-grab touch-none select-none active:cursor-grabbing" : ""
         }`}
         onPointerDown={onTitleBarPointerDown}
