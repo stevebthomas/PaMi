@@ -1,14 +1,13 @@
 import type { Metadata } from "next";
-import { Press_Start_2P, Inter } from "next/font/google";
+import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 
-const pixelFont = Press_Start_2P({
+const pixelFont = Geist_Mono({
   variable: "--font-pixel",
   subsets: ["latin"],
-  weight: "400",
 });
 
-const inter = Inter({
+const bodyFont = Geist({
   variable: "--font-body",
   subsets: ["latin"],
 });
@@ -22,7 +21,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html
       lang="en"
-      className={`${pixelFont.variable} ${inter.variable} h-full antialiased`}
+      className={`${pixelFont.variable} ${bodyFont.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">{children}</body>
     </html>
