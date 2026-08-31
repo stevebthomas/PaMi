@@ -4,6 +4,7 @@ import { useRef, useState } from "react";
 import { useTaskflowStore, TIME_ADVANCE_MINUTES, type Ticket, type TicketStatus } from "@/store/taskflowStore";
 import { useSimStore, formatSimTime } from "@/store/simStore";
 import { ASSIGNABLE_TEAM, reporterLabel, rosterName, type AssigneeId } from "@/lib/sim/types";
+import { ChevronLeft, ChevronRight, Clock } from "lucide-react";
 
 const COLUMNS: { status: TicketStatus; label: string }[] = [
   { status: "todo", label: "TO DO" },
@@ -28,7 +29,9 @@ function AssigneePicker({ ticket, onAssign }: { ticket: Ticket; onAssign: (id: A
   // Compact-tier glyph: the assignee's first initial, or an en dash for
   // unassigned (a plain "U" would misread as someone's actual initial).
   const compactGlyph = ticket.assigneeId ? label.charAt(0).toUpperCase() : "–";
-  const chipColorClass = ticket.assigneeId ? "bg-accent-taskflow text-white" : "bg-bg-window text-ink-soft";
+  const chipColorClass = ticket.assigneeId
+    ? "bg-muted text-text-primary"
+    : "border border-border-hairline bg-transparent text-text-secondary";
 
   return (
     // flex + justify-end keeps whichever tier is visible hugging the move
@@ -51,7 +54,7 @@ function AssigneePicker({ ticket, onAssign }: { ticket: Ticket; onAssign: (id: A
         // only a fallback for a name that still overflows at this width,
         // never the mid-word sliver the single-chip version produced below
         // 12rem.
-        className={`pixel-border hidden w-full min-w-[3.5rem] truncate px-1.5 py-0.5 text-left text-caption @[12rem]:block ${chipColorClass}`}
+        className={`hidden w-full min-w-[3.5rem] truncate rounded-full px-2 py-0.5 text-left text-label @[12rem]:block ${chipColorClass}`}
         title={label}
       >
         {label}
@@ -59,23 +62,23 @@ function AssigneePicker({ ticket, onAssign }: { ticket: Ticket; onAssign: (id: A
       <button
         onClick={() => setOpen((o) => !o)}
         // Compact-tier chip: below 12rem, a fixed roughly-square button
-        // (same pixel-border styling/click behavior) replaces the full chip
+        // (same chip styling/click behavior) replaces the full chip
         // instead of letting it truncate to an unreadable sliver that
         // collided with the ← button.
-        className={`pixel-border inline-flex shrink-0 items-center justify-center px-1.5 py-0.5 text-caption @[12rem]:hidden ${chipColorClass}`}
+        className={`inline-flex shrink-0 items-center justify-center rounded-full px-1.5 py-0.5 text-label @[12rem]:hidden ${chipColorClass}`}
         title={label}
       >
         {compactGlyph}
       </button>
       {open && (
-        <div className="pixel-border absolute bottom-full right-0 z-10 mb-1 w-32 bg-white p-1 text-ink shadow-lg">
+        <div className="absolute bottom-full right-0 z-10 mb-1 w-32 rounded-lg border border-border-hairline bg-surface p-1 text-text-primary shadow-md">
           {ticket.assigneeId && (
             <button
               onClick={() => {
                 onAssign(null);
                 setOpen(false);
               }}
-              className="block w-full px-1.5 py-1 text-left text-caption text-ink-soft hover:bg-bg-window"
+              className="block w-full rounded-md px-1.5 py-1 text-left text-label text-text-secondary hover:bg-muted"
             >
               Unassign
             </button>
@@ -87,10 +90,10 @@ function AssigneePicker({ ticket, onAssign }: { ticket: Ticket; onAssign: (id: A
                 onAssign(member.id);
                 setOpen(false);
               }}
-              className="block w-full px-1.5 py-1 text-left text-caption hover:bg-bg-window"
+              className="block w-full rounded-md px-1.5 py-1 text-left text-label hover:bg-muted"
             >
               {member.name}
-              <span className="ml-1 text-ink-soft">{member.title}</span>
+              <span className="ml-1 text-text-secondary">{member.title}</span>
             </button>
           ))}
         </div>
@@ -99,7 +102,15 @@ function AssigneePicker({ ticket, onAssign }: { ticket: Ticket; onAssign: (id: A
   );
 }
 
-function TicketCard({ ticket, onTimeAdvance }: { ticket: Ticket; onTimeAdvance: () => void }) {
+function TicketCard({
+  ticket,
+  displayId,
+  onTimeAdvance,
+}: {
+  ticket: Ticket;
+  displayId: string;
+  onTimeAdvance: () => void;
+}) {
   const moveTicket = useTaskflowStore((s) => s.moveTicket);
   const creditTicketTime = useTaskflowStore((s) => s.creditTicketTime);
   const assignTicket = useTaskflowStore((s) => s.assignTicket);
@@ -138,10 +149,11 @@ function TicketCard({ ticket, onTimeAdvance }: { ticket: Ticket; onTimeAdvance: 
 
   return (
     <div
-      className={`pixel-border mb-2 p-2 text-label text-ink ${
-        ticket.kind === "story" ? "border-l-4 border-l-accent-taskflow bg-accent-taskflow/10" : "bg-white"
+      className={`mb-2 rounded-lg border border-border-hairline bg-surface p-2 text-label text-text-primary ${
+        ticket.kind === "story" ? "border-l-2 border-l-status-pending" : ""
       }`}
     >
+      <div className="mb-0.5 font-mono text-[10px] text-text-secondary">{displayId}</div>
       <div className="mb-1 break-words font-semibold leading-snug">{ticket.title}</div>
       {/* FIRST casualty on a narrow card: hidden below an arbitrary @[12rem]
           (192px) COLUMN width, via the @container on each column in
@@ -150,9 +162,9 @@ function TicketCard({ ticket, onTimeAdvance }: { ticket: Ticket; onTimeAdvance: 
           columns). 12rem sits between the default 215px columns (description
           shows) and the window-floor ~150px columns (description hides). */}
       {ticket.description && (
-        <div className="mb-1 hidden leading-snug text-ink-soft @[12rem]:block">{ticket.description}</div>
+        <div className="mb-1 hidden leading-snug text-text-secondary @[12rem]:block">{ticket.description}</div>
       )}
-      {reporter && <div className="mb-2 text-caption text-ink-soft">Reported by {reporter}</div>}
+      {reporter && <div className="mb-2 text-label text-text-secondary">Reported by {reporter}</div>}
       {/* Bottom row is the one that must never clip, all the way to the
           window floor: flex-wrap is the last-resort escape hatch (timestamp
           can drop to its own line), the assignee chip is the only flexible,
@@ -173,10 +185,13 @@ function TicketCard({ ticket, onTimeAdvance }: { ticket: Ticket; onTimeAdvance: 
           row's flex-wrap genuinely engages (timestamp onto its own line)
           instead of overlapping if content still doesn't fit on one line. */}
       <div className="flex flex-wrap items-center gap-1">
-        <span className="shrink-0 text-caption text-ink-soft @[12rem]:hidden" title={formatSimTime(ticket.createdAtSimMinutes)}>
+        <span
+          className="shrink-0 font-mono text-label tabular-nums text-text-secondary @[12rem]:hidden"
+          title={formatSimTime(ticket.createdAtSimMinutes)}
+        >
           {formatSimTime(ticket.createdAtSimMinutes).replace(/ (AM|PM)$/, "")}
         </span>
-        <span className="hidden shrink-0 text-caption text-ink-soft @[12rem]:inline">
+        <span className="hidden shrink-0 font-mono text-label tabular-nums text-text-secondary @[12rem]:inline">
           {formatSimTime(ticket.createdAtSimMinutes)}
         </span>
         <div className="flex flex-1 items-center justify-end gap-1 @[12rem]:min-w-0">
@@ -186,18 +201,18 @@ function TicketCard({ ticket, onTimeAdvance }: { ticket: Ticket; onTimeAdvance: 
           <button
             onClick={() => left && handleMove(left)}
             disabled={!left}
-            className="pixel-border shrink-0 bg-bg-window px-1.5 py-0.5 text-caption font-pixel text-ink disabled:cursor-not-allowed disabled:opacity-30"
+            className="shrink-0 rounded-md border border-border-hairline bg-surface px-1.5 py-0.5 text-text-secondary hover:bg-muted disabled:cursor-not-allowed disabled:opacity-30"
             title={left ? `Move to ${left}` : undefined}
           >
-            ←
+            <ChevronLeft className="size-3.5" />
           </button>
           <button
             onClick={() => right && handleMove(right)}
             disabled={!right}
-            className="pixel-border shrink-0 bg-bg-window px-1.5 py-0.5 text-caption font-pixel text-ink disabled:cursor-not-allowed disabled:opacity-30"
+            className="shrink-0 rounded-md border border-border-hairline bg-surface px-1.5 py-0.5 text-text-secondary hover:bg-muted disabled:cursor-not-allowed disabled:opacity-30"
             title={right ? `Move to ${right}` : undefined}
           >
-            →
+            <ChevronRight className="size-3.5" />
           </button>
         </div>
       </div>
@@ -244,14 +259,14 @@ export function TaskflowApp() {
 
   return (
     <div className="flex h-full min-h-0 w-full flex-col">
-      <div className="flex shrink-0 flex-col gap-2 border-b-2 border-ink bg-white p-3">
+      <div className="flex shrink-0 flex-col gap-2 border-b border-border-hairline bg-surface p-2">
         <input
           ref={titleRef}
           value={title}
           onChange={(e) => setTitle(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && handleAdd()}
           placeholder="New ticket title…"
-          className="pixel-border bg-white px-2 py-1 text-label text-ink outline-none"
+          className="rounded-md border border-border-hairline bg-surface px-2 py-1 text-label text-text-primary outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/30"
         />
         <div className="flex gap-2">
           <input
@@ -259,26 +274,27 @@ export function TaskflowApp() {
             onChange={(e) => setDescription(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && handleAdd()}
             placeholder="Short description (optional)…"
-            className="pixel-border flex-1 bg-white px-2 py-1 text-label text-ink outline-none"
+            className="flex-1 rounded-md border border-border-hairline bg-surface px-2 py-1 text-label text-text-primary outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/30"
           />
           <button
             onClick={handleAdd}
             disabled={!canAdd}
             title={canAdd ? "Add ticket" : "Give the ticket a title first."}
-            className="pixel-border bg-accent-taskflow px-3 py-1 text-label font-pixel text-white hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:translate-y-0"
+            className="rounded-md bg-primary px-3 py-1 text-label font-medium text-primary-foreground disabled:cursor-not-allowed disabled:opacity-40"
           >
-            + ADD
+            + Add
           </button>
         </div>
       </div>
 
       {timeAdvanceNotice && (
-        <div className="shrink-0 border-b-2 border-ink bg-accent-pulse px-3 py-1.5 text-center font-pixel text-label text-white">
-          LOGGED, +{TIME_ADVANCE_MINUTES} MIN
+        <div className="flex shrink-0 items-center justify-center gap-1.5 border-b border-border-hairline bg-surface px-3 py-1.5 text-center text-label text-text-secondary">
+          <Clock className="size-3.5" />
+          Logged, +<span className="tabular-nums">{TIME_ADVANCE_MINUTES}</span> min
         </div>
       )}
 
-      <div className="pixel-scrollbar grid min-h-0 flex-1 grid-cols-3 gap-2 overflow-y-auto bg-[#dfd6bd] p-2">
+      <div className="grid min-h-0 flex-1 grid-cols-3 gap-2 overflow-y-auto bg-canvas p-2">
         {COLUMNS.map((col) => (
           // min-w-0 on both this grid item and the flex-col children below is
           // what actually fixes the clipping: without it, a grid/flex item's
@@ -288,14 +304,19 @@ export function TaskflowApp() {
           // by the window's own edge instead of reflowing. @container keys
           // the description breakpoint below to this column's actual width.
           <div key={col.status} className="@container flex min-h-0 min-w-0 flex-col">
-            <div className="mb-2 font-pixel text-caption text-ink-soft">
-              {col.label} ({tickets.filter((t) => t.status === col.status).length})
+            <div className="mb-2 text-label font-semibold uppercase tracking-wide text-text-secondary">
+              {col.label} (<span className="tabular-nums">{tickets.filter((t) => t.status === col.status).length}</span>)
             </div>
-            <div className="pixel-scrollbar min-h-0 min-w-0 flex-1 overflow-y-auto">
+            <div className="min-h-0 min-w-0 flex-1 overflow-y-auto">
               {tickets
                 .filter((t) => t.status === col.status)
                 .map((t) => (
-                  <TicketCard key={t.id} ticket={t} onTimeAdvance={handleTimeAdvance} />
+                  <TicketCard
+                    key={t.id}
+                    ticket={t}
+                    displayId={`TF-${tickets.findIndex((x) => x.id === t.id) + 1}`}
+                    onTimeAdvance={handleTimeAdvance}
+                  />
                 ))}
             </div>
           </div>
