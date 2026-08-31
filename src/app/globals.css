@@ -249,21 +249,16 @@ body {
   border: 2px solid var(--ink);
 }
 
-/* Retro dock-launch bounce — the app icon hops a few snappy times over the
-   Docs launch window (~0.9s), like a classic OS dock icon while its app opens.
-   Purely decorative; see docsStore's LAUNCH_MS. */
+/* Dock-launch pulse — one restrained lift + settle while an app opens, in
+   place of the old retro multi-hop. Plays once near the start of the Docs
+   launch window and then rests. Purely decorative; see docsStore's LAUNCH_MS. */
 @keyframes dock-bounce {
-  0% { transform: translateY(0); }
-  15% { transform: translateY(-9px); }
-  30% { transform: translateY(0); }
-  45% { transform: translateY(-6px); }
-  60% { transform: translateY(0); }
-  78% { transform: translateY(-3px); }
-  90% { transform: translateY(0); }
-  100% { transform: translateY(0); }
+  0% { transform: translateY(0) scale(1); }
+  45% { transform: translateY(-4px) scale(1.04); }
+  100% { transform: translateY(0) scale(1); }
 }
 .animate-dock-bounce {
-  animation: dock-bounce 0.9s ease-out;
+  animation: dock-bounce 0.5s ease-out;
 }
 
 /* Busy pointer during an app launch — applied to <body> by docsStore while a

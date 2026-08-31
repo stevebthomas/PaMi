@@ -30,34 +30,45 @@ export function Taskbar({
   const docsLaunching = useDocsStore((s) => s.launching);
 
   return (
-    <div className="flex h-16 shrink-0 items-center justify-center border-t-2 border-ink bg-bg-taskbar px-3">
+    <div className="flex h-14 shrink-0 items-center justify-center border-t border-border-hairline bg-surface px-3">
       {/* Dock: centered row of app icons, macOS-style. A small dot marks
           which apps are currently open, matching that convention. */}
-      <div className="flex items-end gap-2.5">
-        {APPS.map((app) => (
-          <button
-            key={app.id}
-            disabled={!app.enabled}
-            onClick={() => app.enabled && onSelectApp(app.id)}
-            className={`group relative flex flex-col items-center gap-1 transition-transform ${
-              app.enabled ? "cursor-pointer hover:-translate-y-1.5" : "cursor-not-allowed opacity-40"
-            }`}
-            title={app.enabled ? app.label : `${app.label}, coming in a later phase`}
-          >
-            <div className={`relative ${app.id === "docs" && docsLaunching ? "animate-dock-bounce" : ""}`}>
-              <AppIcon id={app.id} sizeClassName="h-9 w-9" />
-              {app.id === "chattr" && pendingCount > 0 && (
-                <span className="absolute -right-1.5 -top-1.5 flex h-4 min-w-4 items-center justify-center border-2 border-ink bg-accent-danger px-1 text-caption leading-none text-white">
-                  {pendingCount}
-                </span>
-              )}
-            </div>
-            <div className={`h-1 w-1 rounded-none ${openApps.has(app.id) ? "bg-ink-soft" : "bg-transparent"}`} />
-            <span className="pointer-events-none absolute -top-7 hidden whitespace-nowrap border-2 border-ink bg-bg-window px-1.5 py-0.5 text-caption font-pixel text-ink group-hover:block">
-              {app.label}
-            </span>
-          </button>
-        ))}
+      <div className="flex items-end gap-1.5">
+        {APPS.map((app) => {
+          const isOpen = openApps.has(app.id);
+          return (
+            <button
+              key={app.id}
+              disabled={!app.enabled}
+              onClick={() => app.enabled && onSelectApp(app.id)}
+              className={`group relative flex flex-col items-center gap-1 ${
+                app.enabled ? "cursor-pointer" : "cursor-not-allowed opacity-40"
+              }`}
+              title={app.enabled ? app.label : `${app.label}, coming in a later phase`}
+            >
+              <div
+                className={`relative flex h-10 w-10 items-center justify-center rounded-md transition-colors ${
+                  app.id === "docs" && docsLaunching ? "animate-dock-bounce" : ""
+                } ${
+                  isOpen
+                    ? "border border-border-hairline bg-surface text-text-primary"
+                    : "text-text-secondary group-hover:bg-muted"
+                }`}
+              >
+                <AppIcon id={app.id} sizeClassName="h-5 w-5" />
+                {app.id === "chattr" && pendingCount > 0 && (
+                  <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-accent-green px-1 text-caption leading-none tabular-nums text-white">
+                    {pendingCount}
+                  </span>
+                )}
+              </div>
+              <div className={`h-1 w-1 rounded-full ${isOpen ? "bg-accent-green" : "bg-transparent"}`} />
+              <span className="pointer-events-none absolute -top-7 hidden whitespace-nowrap rounded-md border border-border-hairline bg-surface px-1.5 py-0.5 text-caption text-text-primary shadow-md group-hover:block">
+                {app.label}
+              </span>
+            </button>
+          );
+        })}
       </div>
     </div>
   );

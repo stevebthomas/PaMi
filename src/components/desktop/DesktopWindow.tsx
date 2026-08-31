@@ -16,7 +16,6 @@ const RESIZE_MARGIN = 16;
 export function DesktopWindow({
   id,
   title,
-  accentClassName,
   headerRight,
   containerRef,
   minSize,
@@ -24,7 +23,6 @@ export function DesktopWindow({
 }: {
   id: AppId;
   title: string;
-  accentClassName: string;
   headerRight?: ReactNode;
   containerRef: RefObject<HTMLDivElement | null>;
   /** Per-app resize floor (Desktop's APP_MIN_SIZE); the desk bounds supply the
@@ -132,8 +130,7 @@ export function DesktopWindow({
     >
       <Window
         title={title}
-        icon={<AppIcon id={id} sizeClassName="h-5 w-5" />}
-        accentClassName={accentClassName}
+        icon={<AppIcon id={id} sizeClassName="h-4 w-4" />}
         headerRight={headerRight}
         onTitleBarPointerDown={handlePointerDown}
         onTitleBarPointerMove={handlePointerMove}
@@ -153,9 +150,9 @@ export function DesktopWindow({
         onPointerDown={handleResizeDown}
         onPointerMove={handleResizeMove}
         onPointerUp={handleResizeUp}
-        className="absolute bottom-0 right-0 z-10 flex h-4 w-4 cursor-nwse-resize touch-none items-end justify-end p-0.5 text-ink-soft"
+        className="absolute bottom-0 right-0 z-10 flex h-4 w-4 cursor-nwse-resize touch-none items-end justify-end p-0.5 text-text-secondary"
       >
-        <svg viewBox="0 0 8 8" shapeRendering="crispEdges" className="h-2.5 w-2.5" aria-hidden="true">
+        <svg viewBox="0 0 8 8" className="h-2.5 w-2.5" aria-hidden="true">
           <rect x={6} y={2} width={1} height={1} fill="currentColor" />
           <rect x={4} y={4} width={1} height={1} fill="currentColor" />
           <rect x={6} y={4} width={1} height={1} fill="currentColor" />

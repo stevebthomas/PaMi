@@ -1,18 +1,20 @@
+import { SkipForward } from "lucide-react";
 import { useSimStore, formatSimTime } from "@/store/simStore";
 import { getBatteryLevel, getDayProgress } from "@/lib/sim/timeOfDay";
 
-/** Laptop-style battery icon that drains toward the 6:00 PM hard end-of-day
- * boundary, so the clock's stakes are felt, not just stated in a corner. */
+/** Day-progress meter that drains toward the 6:00 PM hard end-of-day
+ * boundary, so the clock's stakes are felt, not just stated in a corner. The
+ * fill carries urgency via status tokens (comfortable -> warning -> critical)
+ * on a muted, hairline, rounded-full track. */
 function BatteryIndicator({ level }: { level: number }) {
   const pct = Math.round(level * 100);
-  const color = level > 0.5 ? "bg-accent-pulse" : level > 0.2 ? "bg-accent-taskflow" : "bg-accent-danger";
+  const fill = level > 0.5 ? "bg-status-success" : level > 0.2 ? "bg-status-pending" : "bg-status-failed";
   return (
     <div className="flex items-center gap-1.5" title={`~${pct}% of the day left`}>
-      <div className="flex h-4 w-8 items-center border-2 border-ink bg-bg-window p-[1.5px]">
-        <div className={`h-full ${color}`} style={{ width: `${pct}%` }} />
+      <div className="h-1.5 w-16 overflow-hidden rounded-full border border-border-hairline bg-muted">
+        <div className={`h-full rounded-full ${fill}`} style={{ width: `${pct}%` }} />
       </div>
-      <div className="h-2 w-[3px] bg-ink" />
-      <span className="font-pixel text-caption text-ink">{pct}%</span>
+      <span className="font-mono text-caption tabular-nums text-text-secondary">{pct}%</span>
     </div>
   );
 }
@@ -39,12 +41,12 @@ export function StatusBar() {
   const skipDisabled = dayComplete || Boolean(pendingReplyFrom);
 
   return (
-    <div className="flex h-9 shrink-0 items-center justify-between border-b-2 border-ink bg-bg-taskbar px-3">
-      <div className="font-pixel text-caption text-ink-soft">BAZAARLOOP</div>
+    <div className="flex h-9 shrink-0 items-center justify-between border-b border-border-hairline bg-surface px-3">
+      <div className="text-label font-semibold tracking-wide text-text-secondary">BAZAARLOOP</div>
       <div className="flex items-center gap-3">
         <button
           onClick={() => setDifficulty(difficulty === "easy" ? "standard" : "easy")}
-          className="pixel-border bg-bg-window px-2 py-1 text-caption font-pixel text-ink hover:-translate-y-0.5"
+          className="rounded-full bg-muted px-2.5 py-1 text-caption font-medium text-text-secondary hover:text-text-primary"
           title="Toggle the easy-difficulty fact checklist in Chattr"
         >
           {difficulty === "easy" ? "EASY" : "STANDARD"}
@@ -52,8 +54,8 @@ export function StatusBar() {
         <button
           onClick={() => !skipDisabled && advanceClock(15)}
           disabled={skipDisabled}
-          className={`pixel-border bg-bg-window px-2 py-1 text-caption font-pixel text-ink ${
-            skipDisabled ? "cursor-not-allowed opacity-40" : "hover:-translate-y-0.5"
+          className={`flex items-center gap-1 rounded-md border border-border-hairline bg-surface px-2 py-1 text-caption font-mono text-text-primary ${
+            skipDisabled ? "cursor-not-allowed opacity-40" : "hover:bg-muted"
           }`}
           title={
             dayComplete
@@ -63,10 +65,11 @@ export function StatusBar() {
                 : "Nothing to do right now? Skip ahead 15 simulated minutes."
           }
         >
-          ⏭ +15m
+          <SkipForward className="h-3 w-3" strokeWidth={2} aria-hidden="true" />
+          +15m
         </button>
         <BatteryIndicator level={batteryLevel} />
-        <div className="pixel-border bg-bg-window px-3 py-1 text-label font-pixel text-ink">
+        <div className="font-mono text-label tabular-nums text-text-primary">
           Day {day} · {formatSimTime(clockMinutes)}
         </div>
       </div>

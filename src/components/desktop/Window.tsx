@@ -1,9 +1,9 @@
+import { X } from "lucide-react";
 import type { PointerEventHandler, ReactNode } from "react";
 
 export function Window({
   title,
   icon,
-  accentClassName,
   headerRight,
   onTitleBarPointerDown,
   onTitleBarPointerMove,
@@ -13,7 +13,6 @@ export function Window({
 }: {
   title: string;
   icon?: ReactNode;
-  accentClassName: string;
   headerRight?: ReactNode;
   onTitleBarPointerDown?: PointerEventHandler<HTMLDivElement>;
   onTitleBarPointerMove?: PointerEventHandler<HTMLDivElement>;
@@ -24,18 +23,18 @@ export function Window({
   const draggable = Boolean(onTitleBarPointerDown);
 
   return (
-    <div className="pixel-border flex h-full w-full flex-col overflow-hidden bg-bg-window">
+    <div className="flex h-full w-full flex-col overflow-hidden rounded-lg border border-border-hairline bg-surface shadow-lg">
       <div
-        className={`flex items-center justify-between border-b-2 border-ink px-3 py-2 ${accentClassName} ${
+        className={`flex items-center justify-between border-b border-border-hairline px-3 py-2 ${
           draggable ? "cursor-grab touch-none select-none active:cursor-grabbing" : ""
         }`}
         onPointerDown={onTitleBarPointerDown}
         onPointerMove={onTitleBarPointerMove}
         onPointerUp={onTitleBarPointerUp}
       >
-        <div className="flex items-center gap-2">
+        <div className="flex min-w-0 items-center gap-2 text-text-secondary">
           {icon}
-          <span className="font-pixel text-label text-ink">{title}</span>
+          <span className="truncate text-label font-semibold text-text-primary">{title}</span>
         </div>
         <div className="flex items-center gap-3">
           {headerRight}
@@ -48,9 +47,9 @@ export function Window({
               }}
               onPointerDown={(e) => e.stopPropagation()}
               aria-label={`Close ${title}`}
-              className="flex h-4 w-4 items-center justify-center border-2 border-ink bg-bg-window text-label leading-none text-ink hover:bg-accent-danger hover:text-white"
+              className="-mr-1 flex h-6 w-6 items-center justify-center rounded-md text-text-secondary hover:bg-muted hover:text-text-primary"
             >
-              ×
+              <X className="h-4 w-4" strokeWidth={2} aria-hidden="true" />
             </button>
           )}
         </div>

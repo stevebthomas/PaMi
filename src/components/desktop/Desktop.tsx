@@ -149,7 +149,7 @@ export function Desktop() {
   // onboarding. Uses the same background as the real screens so it reads as a
   // brief load, not a white flash.
   if (phase === "loading") {
-    return <div className="pixel-desktop-bg h-dvh w-full" />;
+    return <div className="h-dvh w-full bg-canvas" />;
   }
 
   if (phase === "onboarding") {
@@ -172,7 +172,7 @@ export function Desktop() {
   const ambientTint = getAmbientTint(dayProgress);
 
   return (
-    <div className="pixel-desktop-bg flex h-dvh w-full flex-col">
+    <div className="flex h-dvh w-full flex-col bg-canvas">
       <StatusBar />
       <div ref={containerRef} className="relative min-h-0 flex-1 overflow-hidden p-4">
         <Wallpaper dayProgress={dayProgress} />
@@ -184,7 +184,6 @@ export function Desktop() {
           <DesktopWindow
             id="chattr"
             title="CHATTR"
-            accentClassName="bg-accent-chattr/40"
             headerRight={<DmHeaderBadge />}
             containerRef={containerRef}
             minSize={APP_MIN_SIZE.chattr}
@@ -193,7 +192,7 @@ export function Desktop() {
           </DesktopWindow>
         )}
         {windows.pulse && (
-          <DesktopWindow id="pulse" title="PULSE" accentClassName="bg-accent-pulse/40" containerRef={containerRef} minSize={APP_MIN_SIZE.pulse}>
+          <DesktopWindow id="pulse" title="PULSE" containerRef={containerRef} minSize={APP_MIN_SIZE.pulse}>
             <PulseMock />
           </DesktopWindow>
         )}
@@ -201,7 +200,6 @@ export function Desktop() {
           <DesktopWindow
             id="askClaude"
             title="ASK CLAUDE"
-            accentClassName="bg-accent-help/40"
             containerRef={containerRef}
             minSize={APP_MIN_SIZE.askClaude}
           >
@@ -212,7 +210,6 @@ export function Desktop() {
           <DesktopWindow
             id="reviews"
             title="REVIEWS"
-            accentClassName="bg-accent-reviews/40"
             containerRef={containerRef}
             minSize={APP_MIN_SIZE.reviews}
           >
@@ -220,22 +217,22 @@ export function Desktop() {
           </DesktopWindow>
         )}
         {windows.notes && (
-          <DesktopWindow id="notes" title="NOTES" accentClassName="bg-accent-notes/40" containerRef={containerRef} minSize={APP_MIN_SIZE.notes}>
+          <DesktopWindow id="notes" title="NOTES" containerRef={containerRef} minSize={APP_MIN_SIZE.notes}>
             <NotesApp />
           </DesktopWindow>
         )}
         {windows.taskflow && (
-          <DesktopWindow id="taskflow" title="TASKFLOW" accentClassName="bg-accent-taskflow/40" containerRef={containerRef} minSize={APP_MIN_SIZE.taskflow}>
+          <DesktopWindow id="taskflow" title="TASKFLOW" containerRef={containerRef} minSize={APP_MIN_SIZE.taskflow}>
             <TaskflowApp />
           </DesktopWindow>
         )}
         {windows.office && (
-          <DesktopWindow id="office" title="OFFICE" accentClassName="bg-accent-office/40" containerRef={containerRef} minSize={APP_MIN_SIZE.office}>
+          <DesktopWindow id="office" title="OFFICE" containerRef={containerRef} minSize={APP_MIN_SIZE.office}>
             <OfficeApp />
           </DesktopWindow>
         )}
         {windows.docs && (
-          <DesktopWindow id="docs" title="DOCS" accentClassName="bg-accent-docs/40" containerRef={containerRef} minSize={APP_MIN_SIZE.docs}>
+          <DesktopWindow id="docs" title="DOCS" containerRef={containerRef} minSize={APP_MIN_SIZE.docs}>
             <DocsApp />
           </DesktopWindow>
         )}
