@@ -214,41 +214,6 @@ body {
   font-family: var(--font-pixel), ui-monospace, "SF Mono", "Cascadia Code", Menlo, Consolas, monospace;
 }
 
-/* Hard-edged pixel bevel, no blur — light on top/left, dark on bottom/right */
-.pixel-border {
-  border: 2px solid var(--ink);
-  box-shadow:
-    inset 2px 2px 0 rgba(255, 255, 255, 0.5),
-    inset -2px -2px 0 rgba(0, 0, 0, 0.25),
-    4px 4px 0 rgba(0, 0, 0, 0.35);
-  image-rendering: pixelated;
-}
-
-/* Base color + a faint crosshatch texture behind everything. The actual
-   sky/sun/mountain scene is no longer painted here — it's rendered as a
-   real <svg> by Wallpaper.tsx, because the sun needs to live in the exact
-   same coordinate space as the mountain polygons to stay geometrically
-   locked to them (see that file's comment). This class just supplies the
-   texture and fallback color behind that SVG and around its edges. */
-.pixel-desktop-bg {
-  background-image:
-    repeating-linear-gradient(45deg, rgba(255, 255, 255, 0.025) 0 2px, transparent 2px 16px),
-    repeating-linear-gradient(-45deg, rgba(255, 255, 255, 0.02) 0 2px, transparent 2px 16px);
-  background-color: #1f1147;
-  image-rendering: pixelated;
-}
-
-.pixel-scrollbar::-webkit-scrollbar {
-  width: 10px;
-}
-.pixel-scrollbar::-webkit-scrollbar-track {
-  background: rgba(0, 0, 0, 0.15);
-}
-.pixel-scrollbar::-webkit-scrollbar-thumb {
-  background: var(--ink-soft);
-  border: 2px solid var(--ink);
-}
-
 /* Dock-launch pulse — one restrained lift + settle while an app opens, in
    place of the old retro multi-hop. Plays once near the start of the Docs
    launch window and then rests. Purely decorative; see docsStore's LAUNCH_MS. */
