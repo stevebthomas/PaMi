@@ -11,15 +11,15 @@ export function NotesApp() {
   const setNotesText = useSimStore((s) => s.setNotesText);
 
   return (
-    <div className="flex h-full min-h-0 w-full flex-col">
-      <div className="shrink-0 border-b-2 border-ink bg-accent-notes/40 px-3 py-1.5 text-label text-ink-soft">
+    <div className="flex h-full min-h-0 w-full flex-col bg-canvas">
+      <div className="shrink-0 border-b border-border-hairline px-3 py-1.5 text-label text-text-secondary">
         Private. Only you see this
       </div>
       <textarea
         value={notesText}
         onChange={(e) => setNotesText(e.target.value)}
         placeholder="Jot down whatever you want to remember as the day unfolds…"
-        className="pixel-notes-paper pixel-scrollbar h-full min-h-0 w-full flex-1 resize-none px-3 py-2 text-body leading-6 text-ink outline-none"
+        className="notes-paper h-full min-h-0 w-full flex-1 resize-none px-3 py-2 text-body leading-6 text-text-primary outline-none placeholder:text-text-secondary"
       />
     </div>
   );

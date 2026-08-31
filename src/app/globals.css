@@ -271,15 +271,18 @@ body {
 
 /* Faint ruled-paper texture for Notes — enough to feel like a designed
    surface instead of a bare <textarea>, subtle enough not to fight with
-   whatever the player is actually typing. */
-.pixel-notes-paper {
-  background-color: #fffdf6;
+   whatever the player is actually typing. Built from the DESIGN.md surface
+   token and a color-mix'd tint of the text-primary token (rather than a
+   hardcoded #fffdf6 + rgba ink) so the rule lines stay legible in both
+   light and dark mode. */
+.notes-paper {
+  background-color: var(--surface);
   background-image: repeating-linear-gradient(
     to bottom,
     transparent,
     transparent 23px,
-    rgba(36, 31, 51, 0.08) 23px,
-    rgba(36, 31, 51, 0.08) 24px
+    color-mix(in srgb, var(--text-primary) 8%, transparent) 23px,
+    color-mix(in srgb, var(--text-primary) 8%, transparent) 24px
   );
   background-attachment: local;
   line-height: 24px;

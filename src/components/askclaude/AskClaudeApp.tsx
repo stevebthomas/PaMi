@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, type KeyboardEvent } from "react";
+import { Bot, Send, User } from "lucide-react";
 import { useSimStore } from "@/store/simStore";
 import { TypingDots } from "@/components/shared/TypingDots";
 
@@ -30,31 +31,35 @@ export function AskClaudeApp() {
   }
 
   return (
-    <div className="flex h-full min-h-0 w-full flex-col">
-      <div className="pixel-scrollbar min-h-0 flex-1 overflow-y-auto p-3">
+    <div className="flex h-full min-h-0 w-full flex-col bg-canvas">
+      <div className="min-h-0 flex-1 overflow-y-auto p-3">
         {messages.map((m) => (
           <div key={m.id} className="mb-3 flex gap-2">
             <div
-              className={`pixel-border flex h-8 w-8 shrink-0 items-center justify-center text-label font-pixel text-white ${
-                m.senderId === "assistant" ? "bg-[#5b5470]" : "bg-[#34c3a3]"
+              className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${
+                m.senderId === "assistant" ? "bg-primary text-primary-foreground" : "bg-muted text-text-primary"
               }`}
             >
-              {m.senderId === "assistant" ? "?" : "Y"}
+              {m.senderId === "assistant" ? (
+                <Bot className="size-4" aria-hidden />
+              ) : (
+                <User className="size-4" aria-hidden />
+              )}
             </div>
             <div className="min-w-0">
-              <div className="text-body font-semibold text-ink">
+              <div className="text-body font-semibold text-text-primary">
                 {m.senderId === "assistant" ? "Ask Claude" : "You"}
               </div>
-              <p className="whitespace-pre-wrap text-body leading-snug text-ink">{m.content}</p>
+              <p className="whitespace-pre-wrap text-body leading-snug text-text-primary">{m.content}</p>
             </div>
           </div>
         ))}
         {pending && (
-          <div className="mb-3 flex items-center gap-2 text-label italic text-ink-soft">
-            <div className="pixel-border flex h-6 w-6 shrink-0 items-center justify-center bg-[#5b5470] text-caption font-pixel text-white">
-              ?
+          <div className="mb-3 flex items-center gap-2 text-label italic text-text-secondary">
+            <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground">
+              <Bot className="size-3.5" aria-hidden />
             </div>
-            <div className="pixel-border flex items-center bg-white px-2 py-1.5">
+            <div className="flex items-center rounded-md border border-border-hairline bg-surface px-2 py-1.5">
               <TypingDots />
             </div>
           </div>
@@ -62,20 +67,21 @@ export function AskClaudeApp() {
         <div ref={bottomRef} />
       </div>
 
-      <div className="flex items-end gap-2 border-t-2 border-ink bg-bg-window p-2">
+      <div className="flex items-end gap-2 border-t border-border-hairline bg-surface p-2">
         <textarea
           value={value}
           onChange={(e) => setValue(e.target.value)}
           onKeyDown={handleKeyDown}
           rows={2}
           placeholder="What does this term mean?"
-          className="pixel-border flex-1 resize-none bg-white px-2 py-1.5 text-body text-ink outline-none"
+          className="flex-1 resize-none rounded-md border border-border-hairline bg-surface px-3 py-2 text-body text-text-primary outline-none placeholder:text-text-secondary focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/30"
         />
         <button
           onClick={handleSend}
           disabled={!value.trim() || pending}
-          className="pixel-border bg-accent-help px-3 py-2 text-label font-pixel text-white disabled:cursor-not-allowed disabled:opacity-40"
+          className="flex shrink-0 items-center gap-1.5 rounded-md bg-primary px-3 py-2 text-body font-medium text-primary-foreground transition-colors hover:bg-primary/80 disabled:cursor-not-allowed disabled:opacity-50"
         >
+          <Send className="size-4" aria-hidden />
           Send
         </button>
       </div>
