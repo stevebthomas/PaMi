@@ -32,7 +32,7 @@ function GenericAvatar({ hair, skin, accent }: { hair: string; skin: string; acc
     return null;
   };
   return (
-    <div className="pixel-border h-8 w-8 shrink-0 overflow-hidden bg-white">
+    <div className="h-8 w-8 shrink-0 overflow-hidden rounded-full border border-border-hairline bg-surface">
       <svg viewBox="0 0 8 8" shapeRendering="crispEdges" className="h-full w-full">
         {grid.map((row, y) =>
           row.split("").map((ch, x) => {
@@ -52,8 +52,8 @@ function GenericAvatar({ hair, skin, accent }: { hair: string; skin: string; acc
 function AvailabilityBadge({ available }: { available: boolean }) {
   return (
     <span
-      className={`shrink-0 rounded px-1.5 py-0.5 text-caption font-pixel leading-none ${
-        available ? "bg-[#5fae6f] text-white" : "bg-black/10 text-ink-soft"
+      className={`shrink-0 rounded-full px-1.5 py-0.5 text-caption font-medium leading-none ${
+        available ? "bg-accent-green/10 text-accent-green" : "bg-muted text-text-secondary"
       }`}
     >
       {available ? "Available" : "Heads down"}
@@ -112,8 +112,8 @@ function DeskCard({
             : undefined
         }
         title={titleOverride ?? (available ? `Message ${name} in Chattr` : `${name} is heads down`)}
-        className={`pixel-border flex items-start gap-2 bg-white p-2 text-label text-ink ${
-          available ? "cursor-pointer hover:bg-[#f4f0e4]" : "cursor-default"
+        className={`flex items-start gap-2 rounded-lg border border-border-hairline bg-surface p-2 text-label text-text-primary ${
+          available ? "cursor-pointer hover:bg-muted" : "cursor-default"
         }`}
       >
         {avatar}
@@ -122,21 +122,21 @@ function DeskCard({
           <div className="mb-1 mt-0.5">
             <AvailabilityBadge available={available} />
           </div>
-          <div className="line-clamp-2 leading-snug text-ink-soft">{task}</div>
+          <div className="line-clamp-2 leading-snug text-text-secondary">{task}</div>
         </div>
       </div>
 
       {/* Hover overlay: full text + timestamp, no clamp, no reflow. */}
       <div className="pointer-events-none absolute left-0 top-0 z-30 hidden w-full group-hover:block">
-        <div className="pixel-border flex items-start gap-2 bg-white p-2 text-label text-ink shadow-[6px_6px_0_rgba(0,0,0,0.35)]">
+        <div className="flex items-start gap-2 rounded-lg border border-border-hairline bg-surface p-2 text-label text-text-primary shadow-md">
           {avatar}
           <div className="min-w-0 flex-1">
             <div className="font-semibold leading-snug">{name}</div>
             <div className="mb-1 mt-0.5">
               <AvailabilityBadge available={available} />
             </div>
-            <div className="leading-snug text-ink-soft">{task}</div>
-            <div className="mt-1 font-pixel text-caption text-ink-soft">{timestamp}</div>
+            <div className="leading-snug text-text-secondary">{task}</div>
+            <div className="mt-1 font-mono text-caption tabular-nums text-text-secondary">{timestamp}</div>
           </div>
         </div>
       </div>
@@ -202,9 +202,9 @@ function EngineeringRoom() {
 
   return (
     <div className="@container flex h-full min-h-0 flex-col">
-      <div className="shrink-0 border-b-2 border-ink bg-white px-3 py-2">
-        <div className="font-pixel text-label text-ink">ENGINEERING</div>
-        <div className="text-label text-ink-soft">
+      <div className="shrink-0 border-b border-border-hairline bg-surface px-3 py-2">
+        <div className="text-label font-semibold uppercase tracking-wide text-text-secondary">ENGINEERING</div>
+        <div className="text-label text-text-secondary">
           {incidentResolved
             ? "Raj's squad. Jordan and Chen pulled onto the incident fix, the rest untouched."
             : "Raj's squad of 5, each on their own work."}
@@ -214,7 +214,7 @@ function EngineeringRoom() {
           (@xs = 20rem/320px), so when the office window is in its 2-column
           layout and each room is only ~220px, desk cards stack instead of
           crushing side by side. */}
-      <div className="pixel-scrollbar grid min-h-0 flex-1 grid-cols-1 gap-2 overflow-y-auto bg-[#dfd6bd] p-2 content-start @xs:grid-cols-2">
+      <div className="grid min-h-0 flex-1 grid-cols-1 gap-2 overflow-y-auto bg-canvas p-2 content-start @xs:grid-cols-2">
         {ENGINEERS.map((eng) => {
           // availableIds holds DmContactIds; an engineer is available only if
           // their id is one, so the cast in onOpen is sound.
@@ -275,11 +275,11 @@ function DesignRoom() {
 
   return (
     <div className="@container flex h-full min-h-0 flex-col">
-      <div className="shrink-0 border-b-2 border-ink bg-white px-3 py-2">
-        <div className="font-pixel text-label text-ink">DESIGN</div>
-        <div className="text-label text-ink-soft">Maya, on the redesign.</div>
+      <div className="shrink-0 border-b border-border-hairline bg-surface px-3 py-2">
+        <div className="text-label font-semibold uppercase tracking-wide text-text-secondary">DESIGN</div>
+        <div className="text-label text-text-secondary">Maya, on the redesign.</div>
       </div>
-      <div className="pixel-scrollbar grid min-h-0 flex-1 grid-cols-1 gap-2 overflow-y-auto bg-[#dfd6bd] p-2 content-start @xs:grid-cols-2">
+      <div className="grid min-h-0 flex-1 grid-cols-1 gap-2 overflow-y-auto bg-canvas p-2 content-start @xs:grid-cols-2">
         <DeskCard
           avatar={<GenericAvatar hair="#3a2e28" skin="#c98a5e" accent="#c46fa1" />}
           name="Maya"
@@ -300,9 +300,11 @@ function DesignRoom() {
 
 function PlaceholderRoom({ label }: { label: string }) {
   return (
-    <div className="flex h-full min-h-0 flex-col items-center justify-center gap-2 bg-[#dfd6bd] p-4 text-center">
-      <div className="font-pixel text-label text-ink-soft">{label}</div>
-      <div className="pixel-border bg-white px-3 py-1.5 text-label text-ink-soft">Work in progress</div>
+    <div className="flex h-full min-h-0 flex-col items-center justify-center gap-2 bg-canvas p-4 text-center">
+      <div className="text-label font-semibold uppercase tracking-wide text-text-secondary">{label}</div>
+      <div className="rounded-lg border border-border-hairline bg-surface px-3 py-1.5 text-label text-text-secondary">
+        Work in progress
+      </div>
     </div>
   );
 }
@@ -323,16 +325,16 @@ export function OfficeApp() {
   // point of the resize work (the old `md:grid-cols-2` keyed off the viewport,
   // so a narrow office window still tried to show two columns).
   return (
-    <div className="@container h-full min-h-0 w-full overflow-hidden">
-      <div className="pixel-scrollbar grid h-full min-h-0 w-full grid-cols-1 gap-2 overflow-y-auto p-2 @md:grid-cols-2">
-        <div className="pixel-border min-h-[300px] overflow-hidden">
+    <div className="@container h-full min-h-0 w-full overflow-hidden bg-canvas">
+      <div className="grid h-full min-h-0 w-full grid-cols-1 gap-2 overflow-y-auto p-2 @md:grid-cols-2">
+        <div className="min-h-[300px] overflow-hidden rounded-lg border border-border-hairline">
           <EngineeringRoom />
         </div>
-        <div className="pixel-border min-h-[140px] overflow-hidden">
+        <div className="min-h-[140px] overflow-hidden rounded-lg border border-border-hairline">
           <DesignRoom />
         </div>
         {PLACEHOLDER_ROOMS.map((label) => (
-          <div key={label} className="pixel-border min-h-[140px] overflow-hidden">
+          <div key={label} className="min-h-[140px] overflow-hidden rounded-lg border border-border-hairline">
             <PlaceholderRoom label={label} />
           </div>
         ))}

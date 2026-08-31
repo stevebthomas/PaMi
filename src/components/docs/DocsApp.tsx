@@ -29,8 +29,8 @@ export function DocsApp() {
 
     if (tiles.length === 0) {
       return (
-        <div className="flex h-full min-h-0 w-full items-center justify-center p-6">
-          <p className="text-body text-ink-soft">
+        <div className="flex h-full min-h-0 w-full items-center justify-center bg-canvas p-6">
+          <p className="text-body text-text-secondary">
             No documents yet. Files people send you will show up here.
           </p>
         </div>
@@ -38,7 +38,7 @@ export function DocsApp() {
     }
 
     return (
-      <div className="@container pixel-scrollbar h-full min-h-0 w-full overflow-y-auto p-4">
+      <div className="@container h-full min-h-0 w-full overflow-y-auto bg-canvas p-4">
         {/* Tile columns track the DOCS WINDOW width, not the viewport: 1-up when
             very narrow, 2-up past @2xs (18rem), 3-up past @lg (32rem). */}
         <div className="grid grid-cols-1 gap-3 @2xs:grid-cols-2 @lg:grid-cols-3">
@@ -50,10 +50,10 @@ export function DocsApp() {
                 setActiveDoc(d.id);
                 recordDocOpened(d.id);
               }}
-              className="pixel-border flex flex-col items-center gap-2 bg-white px-2 py-3 text-center hover:-translate-y-0.5"
+              className="flex flex-col items-center gap-2 rounded-lg border border-border-hairline bg-surface px-2 py-3 text-center hover:bg-muted"
             >
               <AppIcon id="docs" sizeClassName="h-8 w-8" />
-              <span className="text-label text-ink">{d.filename}</span>
+              <span className="text-label text-text-primary">{d.filename}</span>
             </button>
           ))}
         </div>
@@ -62,17 +62,17 @@ export function DocsApp() {
   }
 
   return (
-    <div className="flex h-full min-h-0 w-full flex-col">
-      <div className="flex shrink-0 items-center border-b border-ink/10 px-3 py-2">
+    <div className="flex h-full min-h-0 w-full flex-col bg-surface">
+      <div className="flex shrink-0 items-center border-b border-border-hairline px-3 py-2">
         <button
           type="button"
           onClick={closeDoc}
-          className="pixel-border bg-white px-2 py-1 text-label text-ink hover:-translate-y-0.5"
+          className="rounded-md border border-border-hairline bg-surface px-2 py-1 text-label text-text-primary hover:bg-muted"
         >
           ← Library
         </button>
       </div>
-      <div className="pixel-scrollbar min-h-0 flex-1 overflow-y-auto px-5 py-4 text-body leading-relaxed text-ink">
+      <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4 text-body leading-relaxed text-text-primary">
         {/* Cap line length so a wide docs window doesn't stretch prose to an
             unreadable measure; centered within the wider column. */}
         <div className="mx-auto max-w-[65ch]">{renderMarkdown(doc.markdown)}</div>
@@ -143,14 +143,14 @@ function renderMarkdown(markdown: string): ReactNode {
 
     if (line === "---") {
       flushParagraph();
-      blocks.push(<hr key={`b${blocks.length}`} className="my-4 border-t-2 border-ink/20" />);
+      blocks.push(<hr key={`b${blocks.length}`} className="my-4 border-t border-border-hairline" />);
       continue;
     }
 
     if (line.startsWith("## ")) {
       flushParagraph();
       blocks.push(
-        <h2 key={`b${blocks.length}`} className="mb-2 mt-4 font-pixel text-body text-ink">
+        <h2 key={`b${blocks.length}`} className="mb-2 mt-4 text-body font-semibold text-text-primary">
           {renderInline(line.slice(3))}
         </h2>
       );
@@ -160,7 +160,7 @@ function renderMarkdown(markdown: string): ReactNode {
     if (line.startsWith("# ")) {
       flushParagraph();
       blocks.push(
-        <h1 key={`b${blocks.length}`} className="mb-3 font-pixel text-subheading text-ink">
+        <h1 key={`b${blocks.length}`} className="mb-3 text-subheading font-semibold text-text-primary">
           {renderInline(line.slice(2))}
         </h1>
       );
