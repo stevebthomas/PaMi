@@ -41,7 +41,7 @@ import { getIncidentTimeline } from "@/lib/sim/incidentTimeline";
 import { formatSimClock } from "@/lib/sim/timeOfDay";
 import { satisfyingChannels } from "@/lib/sim/acknowledgment";
 import { stageAShouldSkip, isValidSecondAgent } from "@/lib/sim/crossFunctionalGate";
-import { computeScorecard, buildStudyAreas, mergeCoordinationScore } from "@/lib/sim/scorecard";
+import { computeScorecard, buildStudyAreas, mergeCoordinationScore, analyzeAttributions, injectAttributionStudyTopic } from "@/lib/sim/scorecard";
 import { buildDayOutcome } from "@/lib/sim/dayOutcome";
 import { deriveSessionObservations } from "@/lib/sim/sessionObservations";
 import { INCIDENT_START_MINUTES, dashboardReadingAt } from "@/lib/sim/pulseMetrics";
@@ -1760,6 +1760,20 @@ export const useSimStore = create<SimState>((set, get) => ({
     const nothingToStudy = noEngagement && helpQueries.length === 0;
     const needsStudyLookup = !nothingToStudy && (helpQueries.length > 0 || coachingNotes.length > 0);
 
+    // C2 deterministic study-topic injection (see injectAttributionStudyTopic).
+    // Re-derive the same attribution findings computeScorecard used (read-only:
+    // this re-run consumes findings, it never re-scores or re-penalizes). If any
+    // is unverified, the Cat-4 topic must surface in Areas to Study no matter
+    // what the LLM matcher returns, AND even when the study-areas call is skipped
+    // entirely: an unverified attribution IS a signal. So when the lookup is
+    // skipped we seed studyAreas synchronously with the injected topic (empty
+    // otherwise, preserving the "nothing to study" empty state); when the lookup
+    // runs, the injection is applied to the model's picks in its .then below.
+    const attributionFindings = analyzeAttributions(evaluations, messages);
+    const seededStudyAreas = needsStudyLookup
+      ? []
+      : buildStudyAreas(injectAttributionStudyTopic([], attributionFindings), []);
+
     // C1: a zero-engagement day has nothing to explain or quote, so it skips
     // the five-category summarizer entirely and keeps its single presence note
     // (shown via the coachingNotes fallback in ScorecardDetail). Every other
@@ -1778,7 +1792,7 @@ export const useSimStore = create<SimState>((set, get) => ({
       // zero-engagement day instead of the cheerful "nice work staying
       // oriented" empty state (which would be a lie here).
       noEngagement: nothingToStudy,
-      studyAreas: [],
+      studyAreas: seededStudyAreas,
       studyAreasLoading: needsStudyLookup,
       crossFunctionalLoading: true,
       // Filled in async once the summarizer resolves (fired after the
@@ -1862,7 +1876,13 @@ export const useSimStore = create<SimState>((set, get) => ({
         helpQueries,
         coachingNotes.map((c) => c.feedback)
       ).then(({ matchedTopicKeys, additionalTopics }) => {
-        const studyAreas = buildStudyAreas(matchedTopicKeys, additionalTopics);
+        // C2 injection at the seam where the LLM's picks meet buildStudyAreas:
+        // guarantee the Cat-4 topic when an unverified attribution occurred,
+        // deduped against whatever the model already returned.
+        const studyAreas = buildStudyAreas(
+          injectAttributionStudyTopic(matchedTopicKeys, attributionFindings),
+          additionalTopics
+        );
         set((s) => ({
           dayRecords: s.dayRecords.map((r) => (r.day === day ? { ...r, studyAreas, studyAreasLoading: false } : r)),
         }));

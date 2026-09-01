@@ -717,6 +717,35 @@ export function validateQuotes(rawQuotes: unknown, playerMessages: string[]): st
   return valid;
 }
 
+/** The curated topicKey (in STUDY_RESOURCES) for the Category-4 "confirmed
+ * fact vs. speculation" study area. Named here rather than inline so the
+ * deterministic C2 injection below and the data file can't silently drift
+ * apart on the string. */
+export const CONFIRMED_VS_SPECULATION_TOPIC_KEY = "confirmed_vs_speculation";
+
+/**
+ * Deterministic C2 -> study-topic injection (user-confirmed design). When the
+ * day's attribution check (analyzeAttributions) produced ANY finding whose
+ * verdict isn't "verified" (i.e. "plausible" or "never-spoke"), the Cat-4
+ * confirmed-vs-speculation topic must appear in Areas to Study, regardless of
+ * what the LLM matcher picked. This is read-only consumption of the existing
+ * findings: it never touches scoring, penalties, or the findings themselves
+ * (those live in computeScorecard). It only guarantees the study topic is
+ * present, prepending it (a guaranteed-relevant, deterministically-derived
+ * signal leads) and deduping against the LLM's own picks so it never doubles
+ * up. Given an empty matched list (the case where the study-areas API was
+ * skipped entirely) it still surfaces the topic when findings warrant it.
+ */
+export function injectAttributionStudyTopic(
+  matchedTopicKeys: string[],
+  attributionFindings: AttributionFinding[]
+): string[] {
+  const hasUnverified = attributionFindings.some((f) => f.verdict !== "verified");
+  if (!hasUnverified) return matchedTopicKeys;
+  if (matchedTopicKeys.includes(CONFIRMED_VS_SPECULATION_TOPIC_KEY)) return matchedTopicKeys;
+  return [CONFIRMED_VS_SPECULATION_TOPIC_KEY, ...matchedTopicKeys];
+}
+
 /** Turns AI-returned topic keys/labels into the actual curated bullets.
  * Real descriptions and links come from our own data, never from the model.
  * Shared by the app's store and the standalone playtest script. */
