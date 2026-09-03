@@ -10,7 +10,7 @@ import { Wallpaper } from "../desktop/Wallpaper";
  * component owns the desktop's background treatment, so it has to be
  * rendered explicitly here too or this screen loses its background
  * entirely. */
-export function OnboardingScreen({ onStart }: { onStart: (name: string) => void }) {
+export function OnboardingScreen({ onStart }: { onStart: (name: string, avatarId: string) => void }) {
   return (
     <div className="relative flex h-dvh w-full items-center justify-center bg-canvas p-4">
       <Wallpaper dayProgress={0} />

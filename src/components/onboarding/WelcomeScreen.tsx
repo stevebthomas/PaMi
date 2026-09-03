@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, type KeyboardEvent } from "react";
-import { PixelAvatar } from "@/components/shared/PixelAvatar";
+import { PixelAvatar, PLAYER_SPRITES, SpriteIcon } from "@/components/shared/PixelAvatar";
 import type { AgentId } from "@/lib/sim/types";
 
 const TEAM: { agentId: AgentId; name: string; title: string; blurb: string }[] = [
@@ -12,13 +12,15 @@ const TEAM: { agentId: AgentId; name: string; title: string; blurb: string }[] =
 
 /** The static recap panel: company/role summary, team cards, and the button
  * that actually starts Day 1. Meant to sit side by side with the Sam chat. */
-export function WelcomeScreen({ onStart }: { onStart: (name: string) => void }) {
+export function WelcomeScreen({ onStart }: { onStart: (name: string, avatarId: string) => void }) {
   const [name, setName] = useState("");
+  // Pre-selected so "Start your day" never blocks on picking an avatar.
+  const [avatarId, setAvatarId] = useState(PLAYER_SPRITES[0].id);
   const trimmedName = name.trim();
 
   function handleStart() {
     if (!trimmedName) return;
-    onStart(trimmedName);
+    onStart(trimmedName, avatarId);
   }
 
   function handleKeyDown(e: KeyboardEvent<HTMLInputElement>) {
@@ -74,6 +76,37 @@ export function WelcomeScreen({ onStart }: { onStart: (name: string) => void }) 
       </div>
 
       <div className="mt-4">
+        <div id="player-avatar-label" className="mb-1 block text-caption font-semibold uppercase tracking-wide text-text-secondary">
+          Pick your avatar
+        </div>
+        <div role="radiogroup" aria-labelledby="player-avatar-label" className="mb-3 flex gap-2">
+          {PLAYER_SPRITES.map((option, i) => {
+            const selected = option.id === avatarId;
+            return (
+              <button
+                key={option.id}
+                type="button"
+                role="radio"
+                aria-checked={selected}
+                aria-label={`Avatar option ${i + 1}`}
+                onClick={() => setAvatarId(option.id)}
+                className={`rounded-full outline-none transition-shadow ${
+                  selected
+                    ? "ring-2 ring-accent-green ring-offset-2 ring-offset-surface"
+                    : "ring-1 ring-border-hairline hover:ring-text-secondary"
+                }`}
+              >
+                <SpriteIcon
+                  sprite={option.sprite}
+                  bgClassName={option.bgClassName}
+                  sizeClassName="h-10 w-10"
+                  label={`Avatar option ${i + 1}`}
+                />
+              </button>
+            );
+          })}
+        </div>
+
         <label htmlFor="player-name" className="mb-1 block text-caption font-semibold uppercase tracking-wide text-text-secondary">
           Your name
         </label>

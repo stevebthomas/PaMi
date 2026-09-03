@@ -1,10 +1,11 @@
 "use client";
 
 import { useEffect, useRef, useState, type KeyboardEvent } from "react";
-import { Bot, Send, User } from "lucide-react";
+import { Bot, Send } from "lucide-react";
 import { useSimStore } from "@/store/simStore";
 import { TypingDots } from "@/components/shared/TypingDots";
 import { renderInline } from "@/components/shared/renderInline";
+import { PixelAvatar } from "@/components/shared/PixelAvatar";
 
 export function AskClaudeApp() {
   const messages = useSimStore((s) => s.askClaudeMessages);
@@ -36,17 +37,13 @@ export function AskClaudeApp() {
       <div className="min-h-0 flex-1 overflow-y-auto p-3">
         {messages.map((m) => (
           <div key={m.id} className="mb-3 flex gap-2">
-            <div
-              className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${
-                m.senderId === "assistant" ? "bg-primary text-primary-foreground" : "bg-muted text-text-primary"
-              }`}
-            >
-              {m.senderId === "assistant" ? (
+            {m.senderId === "assistant" ? (
+              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground">
                 <Bot className="size-4" aria-hidden />
-              ) : (
-                <User className="size-4" aria-hidden />
-              )}
-            </div>
+              </div>
+            ) : (
+              <PixelAvatar agentId="player" sizeClassName="h-8 w-8" />
+            )}
             <div className="min-w-0">
               <div className="text-body font-semibold text-text-primary">
                 {m.senderId === "assistant" ? "Ask Claude" : "You"}
