@@ -22,7 +22,7 @@ import { cn } from "@/lib/utils";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { RateSparkline } from "../charts/RateSparkline";
 import { WeeklyAttemptsBarChart } from "../charts/WeeklyAttemptsBarChart";
-import { Activity, AlertTriangle, BarChart3, CheckCircle2, CreditCard, GitBranch, TrendingUp, type LucideIcon } from "lucide-react";
+import { Activity, AlertCircle, AlertTriangle, BarChart3, CheckCircle2, CreditCard, GitBranch, TrendingUp, type LucideIcon } from "lucide-react";
 
 /** Live checkout success-rate stat plus its history so far today: the one
  * real consequence of Feature B's rollback-vs-patch-forward decision.
@@ -185,25 +185,35 @@ function PaymentMethodBreakdown({ rows, freshness }: { rows: PaymentMethodBreakd
   );
 }
 
-type HeroState = "healthy" | "recovering" | "incident";
+type HeroState = "healthy" | "elevated" | "recovering" | "incident";
 type StatusBadge = { label: string; tone: Tone; Icon: LucideIcon };
 
-/** Single computed status chip for the checkout-rate card, gated on the SAME
- * fired-event trigger the failed-checkouts card uses: incidentStartMinutes is
- * null until "priya-incidents-escalation" fires, so this badge and the
- * failed-checkouts card can never disagree about whether an incident is live.
+/** Single computed status chip for the checkout-rate card.
  *
- * Precedence: fully recovered/resolved beats "recovering" beats "active".
- * isBaseline/resolutionFired is checked first because isRecoveringAt's window
- * ends once the curve is back at baseline, and a plain fallback to "Incident
- * active" after that window would wrongly re-declare the incident live. */
+ * Two regimes:
+ *  - BEFORE the escalation fires (incidentStartMinutes null): the overnight
+ *    Apple Pay degradation is already quietly underway, so the rate opens below
+ *    baseline. That is NOT a declared incident (red is reserved for a real
+ *    declared failure, per DESIGN.md), so it reads as an amber "Elevated
+ *    failures" heads-up. Only a genuinely at-baseline rate here shows no chip.
+ *  - AFTER escalation fires: gated on the SAME trigger the failed-checkouts card
+ *    uses, so this badge and that card can never disagree about whether an
+ *    incident is live. Precedence: fully recovered/resolved beats "recovering"
+ *    beats "active". isBaseline/resolutionFired is checked first because
+ *    isRecoveringAt's window ends once the curve is back at baseline, and a
+ *    plain fallback to "Incident active" after that window would wrongly
+ *    re-declare the incident live. */
 function checkoutStatusBadge(
   incidentStartMinutes: number | null,
   recovering: boolean,
   isBaseline: boolean,
   resolutionFired: boolean,
 ): StatusBadge | null {
-  if (incidentStartMinutes === null) return null;
+  if (incidentStartMinutes === null) {
+    // Pre-escalation: amber heads-up while the overnight degradation shows,
+    // nothing once the rate is genuinely at baseline.
+    return isBaseline ? null : { label: "Elevated failures", tone: "amber", Icon: AlertCircle };
+  }
   if (isBaseline || resolutionFired) return { label: "Back to baseline", tone: "green", Icon: CheckCircle2 };
   if (recovering) return { label: "Recovering", tone: "amber", Icon: TrendingUp };
   return { label: "Incident active", tone: "red", Icon: AlertTriangle };
@@ -230,14 +240,33 @@ export function PulseMock() {
   // Hero state drives the big-number color and the sparkline line color. Per
   // the DESIGN.md brief for this surface: accent green reads for both healthy
   // AND recovering (recovery is "trending back to success"), status-red only
-  // while the incident is actively degrading. The distinct "recovering vs
-  // resolved" nuance is not lost — it is carried by the status badge, which is
-  // where status-amber (pending/warning) earns its place. See report notes.
+  // while the incident is actively DECLARED and degrading. The overnight
+  // degradation that is already underway at login (before the 9:15 escalation
+  // fires) is a real-but-undeclared dip: it reads status-amber "elevated," never
+  // green (it is not fully healthy) and never red (nothing is declared yet). The
+  // distinct "recovering vs resolved" nuance is not lost — it is carried by the
+  // status badge, which is where status-amber (pending/warning) earns its place.
   const incidentActive = incidentStartMinutes !== null;
   const resolved = isBaseline || resolutionFired;
-  const heroState: HeroState = !incidentActive || resolved ? "healthy" : recovering ? "recovering" : "incident";
-  const heroTone: Tone = heroState === "incident" ? "red" : "green";
-  const sparklineColorVar = heroState === "incident" ? "--color-status-failed" : "--color-accent-green";
+  const heroState: HeroState = incidentActive
+    ? resolved
+      ? "healthy"
+      : recovering
+        ? "recovering"
+        : "incident"
+    : isBaseline
+      ? "healthy"
+      : "elevated";
+  const heroTone: Tone = heroState === "incident" ? "red" : heroState === "elevated" ? "amber" : "green";
+  const sparklineColorVar =
+    heroState === "incident"
+      ? "--color-status-failed"
+      : heroState === "elevated"
+        ? "--color-status-pending"
+        : "--color-accent-green";
+  // Status-tone background for the live "pulse" dot, so it tracks the hero tone
+  // (red incident / amber elevated / green healthy) instead of only red-vs-green.
+  const heroDotBg = heroTone === "red" ? "bg-status-failed" : heroTone === "amber" ? "bg-status-pending" : "bg-accent-green";
   // The hero always carries the top-edge in its computed status tone (red while
   // the incident is degrading, accent-green otherwise) — it is the primary
   // metric, so its edge is never neutral.
@@ -269,8 +298,8 @@ export function PulseMock() {
           <div className="min-w-0">
             <div className="flex items-center gap-2 text-[11px] text-text-secondary">
               <span className="relative flex h-1.5 w-1.5">
-                <span className={cn("absolute inline-flex h-full w-full animate-ping rounded-full opacity-60", heroTone === "red" ? "bg-status-failed" : "bg-accent-green")} />
-                <span className={cn("relative inline-flex h-1.5 w-1.5 rounded-full", heroTone === "red" ? "bg-status-failed" : "bg-accent-green")} />
+                <span className={cn("absolute inline-flex h-full w-full animate-ping rounded-full opacity-60", heroDotBg)} />
+                <span className={cn("relative inline-flex h-1.5 w-1.5 rounded-full", heroDotBg)} />
               </span>
               Checkout success rate
             </div>

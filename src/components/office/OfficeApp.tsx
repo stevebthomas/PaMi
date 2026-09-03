@@ -244,8 +244,15 @@ const MAYA_TASK_BEFORE = "Heads-down on the listing wireframes.";
 const MAYA_TASK_AFTER = "Wants a call on the save-for-later interaction for Theo's ticket.";
 /** Sim-minute Maya started today's wireframe work: used for the "since" hover
  * timestamp before her question fires (matches the engineer taskStartMinutes
- * convention). Picked to read naturally against her 12:30 PM (750) event. */
-const MAYA_TASK_START_MINUTES = 540; // 9:00 AM
+ * convention). The Office is viewable from the sim's day-start clock (510,
+ * 8:30 AM: simStore's initial clockMinutes), and nothing pins Maya's morning
+ * wireframe work to a specific later minute (the 9:00 AM standup line just
+ * says "heads-down ... this morning"), so it reads as already-in-progress at
+ * login and must be <= 510 or the hover can show a "since" time later than
+ * the clock right at day start (the same class of bug fixed on Jordan/Chen/
+ * Theo in worldCanon.ts's ENGINEERS). Was 540 (9:00 AM); fixed at 490
+ * (8:10 AM), before login. */
+const MAYA_TASK_START_MINUTES = 490; // 8:10 AM
 /** The event id gating Maya's blurb switch: see day1-scenario.ts. */
 const MAYA_DESIGN_QUESTION_EVENT_ID = "maya-design-question";
 

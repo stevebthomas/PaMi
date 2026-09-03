@@ -242,18 +242,43 @@ export interface DayAttempts {
  * justifications live there). It is imported and re-exported above; this module
  * only consumes it. */
 
-/** Attempts accumulated in sim time so far today, a pure function of the
- * clock. Zero at day start (8:30), growing linearly at ATTEMPT_VOLUME_PER_MINUTE.
- * A flat intraday rate is used deliberately: it makes the 9:15 rate equal the
- * daily average equal the anchor above, so the ticket fact, the live counters,
- * and the 7-day chart's complete days all reconcile to one number. */
+/** Light early-morning volume already on the board when the tracked business
+ * day opens at 8:30 AM. A live marketplace is never at a hard zero at 8:30:
+ * buyers shopped overnight and first thing in the morning, so the cumulative
+ * "today" counters (total attempts, completed purchases, the per-method attempt
+ * split, and the Monday bar) OPEN from this value instead of 0. That hard 0 /
+ * "—" at login is exactly what read as broken.
+ *
+ * Sized as OPENING_EQUIV_MINUTES worth of the flat daytime rate: a modest ~5%
+ * of the ~25.3k daytime total, enough that no tile reads zero. It is added ON
+ * TOP of the daytime accumulation, never carved out of it, so
+ * ATTEMPT_VOLUME_PER_MINUTE (the ticket-anchor DAYTIME rate that drives BOTH
+ * Priya's 14-tickets/hr reconciliation AND the incident's "14 failed Apple Pay
+ * checkouts since incident start" counter, incidentApplePayFailuresAt) is left
+ * completely unchanged: those counters integrate the unchanged per-minute rate
+ * and are wholly independent of this display-only opening. The 7-day chart's
+ * complete days fold in the same opening (see TARGET_COMPLETE_DAY_TOTAL) so
+ * every bar is a full day on the same footing and Monday still reaches
+ * complete-day parity at 6:00 PM. Early morning is pre-incident, so its volume
+ * is all at baseline success. */
+const OPENING_EQUIV_MINUTES = 30;
+export const OPENING_ATTEMPTS = Math.round(ATTEMPT_VOLUME_PER_MINUTE * OPENING_EQUIV_MINUTES);
+const OPENING_COMPLETED = Math.round(OPENING_ATTEMPTS * (BASELINE_RATE / 100));
+
+/** Attempts accumulated in sim time so far today, a pure function of the clock.
+ * Opens at OPENING_ATTEMPTS at day start (8:30), growing linearly at
+ * ATTEMPT_VOLUME_PER_MINUTE. A flat intraday rate is used deliberately: it makes
+ * the 9:15 rate equal the daily average equal the anchor above, so the ticket
+ * fact, the live counters, and the 7-day chart's complete days all reconcile to
+ * one number. */
 export function attemptsPerMinuteAt(t: number): number {
   if (t < DAY_START || t >= DAY_END) return 0;
   return ATTEMPT_VOLUME_PER_MINUTE;
 }
 
 export function attemptsSoFar(t: number): number {
-  return Math.max(0, ATTEMPT_VOLUME_PER_MINUTE * (t - DAY_START));
+  if (t <= DAY_START) return OPENING_ATTEMPTS;
+  return OPENING_ATTEMPTS + ATTEMPT_VOLUME_PER_MINUTE * (t - DAY_START);
 }
 
 /** Live value for today's (Monday's) bar on the 7-day chart, rounded. This is
@@ -269,8 +294,8 @@ const INTEGRATION_STEP_MINUTES = 1;
  * overall success rate from day start to t. Numerically integrated because
  * the rate varies across the morning and recovery. */
 export function completedPurchasesSoFar(t: number, inputs: RateInputs): number {
-  if (t <= DAY_START) return 0;
-  let total = 0;
+  if (t <= DAY_START) return OPENING_COMPLETED;
+  let total = OPENING_COMPLETED;
   for (let m = DAY_START; m < t; m += INTEGRATION_STEP_MINUTES) {
     const dt = Math.min(INTEGRATION_STEP_MINUTES, t - m);
     total += attemptsPerMinuteAt(m) * (successRateAt(m, inputs) / 100) * dt;
@@ -356,10 +381,17 @@ const BASE_WEEKLY_SHAPE: { label: string; weight: number }[] = [
   { label: "Sun", weight: 760 },
 ];
 const BASE_SHAPE_AVG = BASE_WEEKLY_SHAPE.reduce((s, d) => s + d.weight, 0) / BASE_WEEKLY_SHAPE.length;
-/** Target complete-day total from the anchor: attempts/min x business-day
- * minutes. Dividing by the base shape's average day rescales the whole shape
- * so its complete-day average equals that target. */
-const TARGET_COMPLETE_DAY_TOTAL = ATTEMPT_VOLUME_PER_MINUTE * BUSINESS_DAY_MINUTES;
+/** Target complete-day total: the daytime accumulation from the anchor
+ * (attempts/min x business-day minutes) PLUS the fixed early-morning opening
+ * (OPENING_ATTEMPTS), so a complete day is the full day a live chart would
+ * show, not just the 8:30-6:00 tracked window. Folding the same opening in here
+ * that attemptsSoFar opens from is what keeps Monday reaching complete-day
+ * parity at 6:00 PM (attemptsSoFar(DAY_END) == this) instead of ending a notch
+ * above the Tue-Sun bars. The daytime RATE anchor is untouched; the opening is
+ * an additive full-day term, not a change to attempts/min. Dividing by the base
+ * shape's average day rescales the whole shape so its complete-day average
+ * equals that target. */
+const TARGET_COMPLETE_DAY_TOTAL = ATTEMPT_VOLUME_PER_MINUTE * BUSINESS_DAY_MINUTES + OPENING_ATTEMPTS;
 const WEEKLY_ATTEMPTS_SCALE = TARGET_COMPLETE_DAY_TOTAL / BASE_SHAPE_AVG;
 
 export const WEEKLY_ATTEMPTS: DayAttempts[] = BASE_WEEKLY_SHAPE.map((d) => ({

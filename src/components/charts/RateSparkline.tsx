@@ -183,6 +183,24 @@ export function RateSparkline({
 
   const hovered = hoverIndex !== null ? history[hoverIndex] : null;
 
+  // Tooltip placement. Two rules keep it from covering the hero's own label and
+  // big % (which live ABOVE this chart) and from clipping past the card edges:
+  //   Vertical — when the hover point is in the TOP half of the chart (a high,
+  //   near-baseline rate), DROP the tooltip below the point so it falls into the
+  //   chart body instead of rising up over the hero. In the bottom half, keep it
+  //   above the point. Either way it stays inside the chart's vertical band and
+  //   never reaches the hero above.
+  //   Horizontal — three zones: near the left edge anchor the tooltip's LEFT
+  //   edge to the point (translateX 0), near the right edge anchor its RIGHT edge
+  //   (-100%), otherwise center it (-50%). That stops a centered tooltip from
+  //   spilling out past the card at the chart's ends.
+  const hoveredXFrac = hovered ? xForT(hovered.t) / SPARKLINE_WIDTH : 0;
+  const hoveredYFrac = hovered ? yForRate(hovered.rate) / SPARKLINE_HEIGHT : 0;
+  const TOOLTIP_EDGE_ZONE = 0.18;
+  const tooltipTranslateX =
+    hoveredXFrac < TOOLTIP_EDGE_ZONE ? "0%" : hoveredXFrac > 1 - TOOLTIP_EDGE_ZONE ? "-100%" : "-50%";
+  const tooltipTranslateY = hoveredYFrac < 0.5 ? "6px" : "calc(-100% - 6px)";
+
   return (
     <div>
       <div className="relative">
@@ -232,10 +250,11 @@ export function RateSparkline({
         </svg>
         {hovered && (
           <div
-            className="pointer-events-none absolute z-10 -translate-x-1/2 -translate-y-[calc(100%+6px)] whitespace-nowrap rounded-[var(--radius-control)] border border-border-hairline bg-surface px-2 py-1 font-mono text-[10px] tabular-nums text-text-primary shadow-sm"
+            className="pointer-events-none absolute z-10 whitespace-nowrap rounded-[var(--radius-control)] border border-border-hairline bg-surface px-2 py-1 font-mono text-[10px] tabular-nums text-text-primary shadow-sm"
             style={{
-              left: `${(xForT(hovered.t) / SPARKLINE_WIDTH) * 100}%`,
-              top: `${(yForRate(hovered.rate) / SPARKLINE_HEIGHT) * 100}%`,
+              left: `${hoveredXFrac * 100}%`,
+              top: `${hoveredYFrac * 100}%`,
+              transform: `translate(${tooltipTranslateX}, ${tooltipTranslateY})`,
             }}
           >
             {formatTime(hovered.t)} · {hovered.rate.toFixed(1)}%

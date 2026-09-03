@@ -116,7 +116,14 @@ export const ENGINEERS: readonly Engineer[] = [
     skin: "#e0b088",
     accent: "#4f9dd8",
     defaultTask: "Rebuilding the payment method selector UI. Blocked on a design review comment about mobile spacing.",
-    taskStartMinutes: 525, // 8:45 AM
+    // The Office is viewable from the moment the sim clock starts (510, 8:30
+    // AM: see simStore's initial clockMinutes), and this is ongoing work with
+    // no scripted event pinning it to a specific later minute, so it reads as
+    // "already in progress when you log in." The value must therefore be <=
+    // 510 or the Office would show a "since" time later than the clock right
+    // at day start (the confirmed bug: this was 525/8:45 while the clock read
+    // 8:30). Fixed at 500 (8:20 AM), strictly before login.
+    taskStartMinutes: 500, // 8:20 AM
   },
   {
     id: "chen",
@@ -125,7 +132,11 @@ export const ENGINEERS: readonly Engineer[] = [
     skin: "#f0cba0",
     accent: "#e0556f",
     defaultTask: "Wiring address validation into checkout. Chasing a silent failure on international addresses.",
-    taskStartMinutes: 520, // 8:40 AM
+    // Same reasoning as Jordan above: no scripted event pins this to a later
+    // minute, so it's already-in-progress work at login. Was 520 (8:40 AM),
+    // after the 510 (8:30 AM) day start, which is the same class of bug.
+    // Fixed at 495 (8:15 AM), before login.
+    taskStartMinutes: 495, // 8:15 AM
   },
   {
     id: "marcus",
@@ -140,6 +151,9 @@ export const ENGINEERS: readonly Engineer[] = [
     // form; OfficeApp previously showed a truncated version.
     defaultTask:
       "Hardening the seller payout pipeline that shipped last week. Chasing a rare double-payout edge case for sellers with multiple bank accounts on file.",
+    // Equal to the sim's day-start clock (510, 8:30 AM), so this one was
+    // already safe: "since" can never exceed clockMinutes when the two start
+    // equal and the clock only counts up from here. Left unchanged.
     taskStartMinutes: 510, // 8:30 AM
   },
   {
@@ -149,6 +163,8 @@ export const ENGINEERS: readonly Engineer[] = [
     skin: "#e0b58c",
     accent: "#c75146",
     defaultTask: "On this week's on-call rotation, patching a memory leak in search indexing that's causing nightly restarts.",
+    // Already before the 510 (8:30 AM) day start ("in early" for on-call), so
+    // this one was already safe. Left unchanged.
     taskStartMinutes: 480, // 8:00 AM: on-call, in early
   },
   {
@@ -158,7 +174,10 @@ export const ENGINEERS: readonly Engineer[] = [
     skin: "#f2d3a2",
     accent: "#6a8caf",
     defaultTask: "First solo ticket: a 'save for later' button on the wishlist page. Raj is reviewing his PRs closely.",
-    taskStartMinutes: 530, // 8:50 AM
+    // Same class of bug as Jordan/Chen: no scripted event pins this to a
+    // later minute, so it's already-in-progress at login. Was 530 (8:50 AM),
+    // after the 510 (8:30 AM) day start. Fixed at 505 (8:25 AM), before login.
+    taskStartMinutes: 505, // 8:25 AM
   },
 ] as const;
 
