@@ -1,31 +1,41 @@
 "use client";
 
 import { Fragment, type ReactNode } from "react";
+import { X } from "lucide-react";
 import { useDocsStore } from "@/store/docsStore";
 import { useSimStore } from "@/store/simStore";
-import { getSimDoc } from "@/data/simDocs";
+import { getSimDoc, type SimDoc } from "@/data/simDocs";
 import { AppIcon } from "@/components/shared/AppIcon";
+import { SaveDemo } from "@/components/docs/SaveDemo";
 
 /**
- * Generic in-sim document viewer/library. Reads the active doc id from
- * docsStore: null (or an id that doesn't resolve in SIM_DOCS) shows the
- * library: a grid of tiles for every doc the player has opened so far
- * (stateBag.openedDocIds); otherwise it renders the doc itself. Nothing
- * here is doc-specific: a new SIM_DOCS entry shows up with zero changes to
- * this file.
+ * Generic in-sim document viewer/library. Reads the open panes from docsStore:
+ * an empty list (or only ids that don't resolve in SIM_DOCS) shows the library,
+ * a grid of tiles for every doc the player has opened so far
+ * (stateBag.openedDocIds); otherwise it renders the open docs as a split view.
+ *
+ * Up to two docs are shown at once so the player can compare Maya's mockups
+ * side by side. Two panes render with a hairline divider (side-by-side, or
+ * stacked when the window is too narrow for a readable split); one pane fills
+ * the width. Each pane keeps its own scroll and its own quiet close affordance;
+ * closing the last pane returns to the library. Nothing here is doc-specific: a
+ * new SIM_DOCS entry shows up with zero changes to this file.
  */
 export function DocsApp() {
-  const activeDocId = useDocsStore((s) => s.activeDocId);
+  const openDocIds = useDocsStore((s) => s.openDocIds);
   const setActiveDoc = useDocsStore((s) => s.setActiveDoc);
   const closeDoc = useDocsStore((s) => s.closeDoc);
   const openedDocIds = useSimStore((s) => s.stateBag.openedDocIds);
   const recordDocOpened = useSimStore((s) => s.recordDocOpened);
-  const doc = getSimDoc(activeDocId);
 
-  if (!doc) {
+  const openDocs = openDocIds
+    .map((id) => getSimDoc(id))
+    .filter((d): d is SimDoc => Boolean(d));
+
+  if (openDocs.length === 0) {
     const tiles = openedDocIds
       .map((id) => getSimDoc(id))
-      .filter((d): d is NonNullable<typeof d> => Boolean(d));
+      .filter((d): d is SimDoc => Boolean(d));
 
     if (tiles.length === 0) {
       return (
@@ -62,20 +72,64 @@ export function DocsApp() {
   }
 
   return (
-    <div className="flex h-full min-h-0 w-full flex-col bg-surface">
-      <div className="flex shrink-0 items-center border-b border-border-hairline px-3 py-2">
+    // @container so the split tracks the DOCS WINDOW width, not the viewport.
+    // Two panes sit side by side once the window is wide enough for a readable
+    // split (@xl ≈ 36rem, which the 640px default Docs window clears, so
+    // comparison is side-by-side out of the box); narrower than that they stack
+    // vertically rather than clip.
+    <div className="@container flex h-full min-h-0 w-full flex-col bg-surface">
+      <div className="flex min-h-0 flex-1 flex-col @xl:flex-row">
+        {openDocs.map((doc, i) => (
+          <DocPane
+            key={doc.id}
+            doc={doc}
+            // Hairline divider BETWEEN panes only: a top border when stacked, a
+            // left border when side by side. First pane carries none.
+            isDivided={i > 0}
+            onClose={() => closeDoc(doc.id)}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/** One document pane: its own header (filename + quiet close) and its own
+ * independently scrolling body, so closing or scrolling one never disturbs the
+ * other. */
+function DocPane({
+  doc,
+  isDivided,
+  onClose,
+}: {
+  doc: SimDoc;
+  isDivided: boolean;
+  onClose: () => void;
+}) {
+  return (
+    <div
+      className={`flex min-h-0 min-w-0 flex-1 flex-col ${
+        isDivided
+          ? "border-t border-border-hairline @xl:border-l @xl:border-t-0"
+          : ""
+      }`}
+    >
+      <div className="flex shrink-0 items-center justify-between gap-2 border-b border-border-hairline px-3 py-2">
+        <span className="truncate text-label text-text-secondary">{doc.filename}</span>
         <button
           type="button"
-          onClick={closeDoc}
-          className="rounded-md border border-border-hairline bg-surface px-2 py-1 text-label text-text-primary hover:bg-muted"
+          onClick={onClose}
+          aria-label={`Close ${doc.filename}`}
+          title="Close"
+          className="shrink-0 rounded-md p-1 text-text-secondary hover:bg-muted hover:text-text-primary"
         >
-          ← Library
+          <X className="size-3.5" aria-hidden />
         </button>
       </div>
       <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4 text-body leading-relaxed text-text-primary">
-        {/* Cap line length so a wide docs window doesn't stretch prose to an
-            unreadable measure; centered within the wider column. */}
-        <div className="mx-auto max-w-[65ch]">{renderMarkdown(doc.markdown)}</div>
+        {/* Cap line length so a wide pane doesn't stretch prose to an unreadable
+            measure; centered within the wider column. */}
+        <div className="mx-auto max-w-[65ch]">{renderMarkdown(doc.markdown, doc.demo)}</div>
       </div>
     </div>
   );
@@ -89,10 +143,13 @@ export function DocsApp() {
  *   - `- ` bullet lists (consecutive bullets grouped into one <ul>)
  *   - `**bold**` and `*italic*` inline emphasis
  *   - blank-line-separated paragraphs
+ *   - a `{{demo}}` marker line, replaced by the interactive SaveDemo when the
+ *     doc declares a `demo` variant (otherwise the marker line renders nothing,
+ *     so the renderer stays generic and SimDoc stays pure data)
  * It is not a general markdown parser; anything outside this subset renders as
  * plain text. Readability over cleverness.
  */
-function renderMarkdown(markdown: string): ReactNode {
+function renderMarkdown(markdown: string, demo?: SimDoc["demo"]): ReactNode {
   const lines = markdown.replace(/\r\n/g, "\n").split("\n");
   const blocks: ReactNode[] = [];
 
@@ -140,6 +197,16 @@ function renderMarkdown(markdown: string): ReactNode {
 
     // Any non-bullet line ends an open bullet list.
     flushBullets();
+
+    if (line.trim() === "{{demo}}") {
+      flushParagraph();
+      // Only emit the interactive demo when the doc opts in via its `demo`
+      // field; an unmatched marker renders nothing rather than literal text.
+      if (demo) {
+        blocks.push(<SaveDemo key={`b${blocks.length}`} variant={demo} />);
+      }
+      continue;
+    }
 
     if (line === "---") {
       flushParagraph();

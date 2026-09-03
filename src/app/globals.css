@@ -226,6 +226,32 @@ body {
   animation: dock-bounce 0.5s ease-out;
 }
 
+/* Save-confirmation toast for the Docs SaveDemo (Mockup A). Fades in ~150ms
+   (0 -> 12% of 1250ms), holds ~800ms (12% -> 76%), fades out ~300ms (76% ->
+   100%). The component unmounts it onAnimationEnd, and remounting with a fresh
+   key replays it — see SaveDemo.tsx. */
+@keyframes save-demo-toast {
+  0% { opacity: 0; transform: translateY(2px); }
+  12% { opacity: 1; transform: translateY(0); }
+  76% { opacity: 1; transform: translateY(0); }
+  100% { opacity: 0; transform: translateY(-2px); }
+}
+.animate-save-demo-toast {
+  animation: save-demo-toast 1250ms ease-out both;
+}
+/* Reduced motion: keep the confirmation MOMENT (the whole point of Mockup A)
+   but drop the fades. Instant show, hold ~800ms, then the component unmounts it
+   for an instant hide. steps(1) prevents any interpolation. */
+@media (prefers-reduced-motion: reduce) {
+  @keyframes save-demo-toast {
+    0% { opacity: 1; transform: none; }
+    100% { opacity: 1; transform: none; }
+  }
+  .animate-save-demo-toast {
+    animation: save-demo-toast 800ms steps(1, end) both;
+  }
+}
+
 /* Scorecard category-bar fill — the one sanctioned celebratory microinteraction
    (see DESIGN.md "The scorecard"). Each bar's colored fill is sized to its
    score via inline width; this grows it in from the left on mount by animating

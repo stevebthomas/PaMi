@@ -14,10 +14,16 @@ export interface SimDoc {
   id: string;
   title: string;
   /** Markdown source, rendered by DocsApp's scoped subset renderer (headings,
-   * hr, bullet lists, bold/italic, blank-line paragraphs). */
+   * hr, bullet lists, bold/italic, blank-line paragraphs, and a `{{demo}}`
+   * marker line). */
   markdown: string;
   /** Display filename for library tiles (e.g. "Welcome to BazaarLoop.md"). */
   filename: string;
+  /** Opt-in interactive demo variant. When set, a `{{demo}}` marker line in the
+   * markdown is replaced by the SaveDemo component in that variant (see
+   * DocsApp/SaveDemo). Pure-data flag: the renderer, not this file, owns the
+   * component. Omitted for ordinary text-only docs. */
+  demo?: "saved-animation" | "silent-instant";
 }
 
 /** Derek's new-hire intro doc, previously a real file download
@@ -31,55 +37,67 @@ const WELCOME_TO_BAZAARLOOP = `# Welcome to BazaarLoop
 
 ## The company
 
-BazaarLoop is a marketplace where people buy and sell secondhand goods — think a mix of Etsy and eBay, built for a younger, mobile-first audience. We're a Series B/C company moving fast, with real customers and real revenue riding on the platform working well every day.
+BazaarLoop is a marketplace where people buy and sell secondhand goods. Think a mix of Etsy and eBay, built for a younger, mobile-first audience. We're a Series B/C company moving fast, with real customers and real revenue riding on the platform working well every day.
 
 ## Your role
 
-You're the Product Manager for **Buyer Experience**. That means everything from search to checkout is your surface area — how people find what they're looking for, how they decide to buy, and how that purchase actually goes through.
+You're the Product Manager for **Buyer Experience**. That means everything from search to checkout is your surface area: how people find what they're looking for, how they decide to buy, and how that purchase actually goes through.
 
 This isn't a role where you sit and plan quietly. You'll be working directly with:
 
-- **Raj** — Engineering Manager, runs the squad building your features
-- **Priya** — Operations & Support Lead, hears from customers first
-- **Maya** — Design Lead, owns the look and feel of what you ship
-- **Marcus** — handles data and technical diligence across the team
-- **Derek** — that's me, your manager, VP of Product
+- **Raj:** Engineering Manager, runs the squad building your features
+- **Priya:** Operations & Support Lead, hears from customers first
+- **Maya:** Design Lead, owns the look and feel of what you ship
+- **Marcus:** handles data and technical diligence across the team
+- **Derek:** that's me, your manager, VP of Product
 
 ## What the work actually looks like
 
-Some days are calm. Some days aren't. You'll get pulled into live incidents, asked to weigh in on design tradeoffs, and expected to communicate clearly with people who have different priorities than you — sometimes all before lunch.
+Some days are calm. Some days aren't. You'll get pulled into live incidents, asked to weigh in on design tradeoffs, and expected to communicate clearly with people who have different priorities than you, sometimes all before lunch.
 
 There's no script for a day like this. Nothing on your calendar is guaranteed to go as planned. Your job is to handle whatever comes up, make calls with incomplete information, and own the tradeoffs that come with those calls.
 
 ## Getting oriented
 
-- **Chattr** is where the team talks — channels for general updates and live incidents, plus direct messages.
-- **Pulse** shows you the live data — checkout success, traffic, whatever's actually happening on the platform right now.
+- **Chattr** is where the team talks. Channels for general updates and live incidents, plus direct messages.
+- **Pulse** shows you the live data: checkout success, traffic, whatever's actually happening on the platform right now.
 - **Taskflow** is where engineering work gets tracked.
 - **Office** shows you who's working on what, across the team.
-- If a term or acronym trips you up, **Ask Claude** is there to explain it — no judgment, just answers.
+- If a term or acronym trips you up, **Ask Claude** is there to explain it. No judgment, just answers.
 
 Good luck. Start your day whenever you're ready.
 `;
 
 /** Maya's mockup A: the "saved!" animation option for Theo's wishlist
  * save-for-later tap. */
-const MAYA_MOCKUP_SAVED_ANIMATION = `# Mockup A — "saved!" animation
+const MAYA_MOCKUP_SAVED_ANIMATION = `# Mockup A: "saved!" animation
 
 A small "saved!" animation plays when you tap save-for-later on Theo's
 wishlist ticket.
 
-- **Gives you:** a visible confirmation moment — the tap clearly registered
+- **Gives you:** a visible confirmation moment, the tap clearly registered
 - **Costs you:** a beat of delay and motion before the interaction feels done
+
+## Try it
+
+Tap save-for-later and watch for the confirmation. Tap it again to reset, then replay.
+
+{{demo}}
 `;
 
 /** Maya's mockup B: the silent, instant option for the same tap. */
-const MAYA_MOCKUP_SILENT_INSTANT = `# Mockup B — silent + instant
+const MAYA_MOCKUP_SILENT_INSTANT = `# Mockup B: silent + instant
 
-No animation — the item just saves the moment you tap save-for-later.
+No animation. The item just saves the moment you tap save-for-later.
 
 - **Gives you:** an instant feel, nothing standing between the tap and done
 - **Costs you:** no explicit confirmation moment for the user to notice
+
+## Try it
+
+Tap save-for-later. The state flips the instant you tap, with nothing in between. Tap again to reset.
+
+{{demo}}
 `;
 
 export const SIM_DOCS: Record<string, SimDoc> = {
@@ -91,15 +109,17 @@ export const SIM_DOCS: Record<string, SimDoc> = {
   },
   "maya-mockup-saved-animation": {
     id: "maya-mockup-saved-animation",
-    title: "Mockup A — 'saved!' animation",
+    title: "Mockup A: 'saved!' animation",
     markdown: MAYA_MOCKUP_SAVED_ANIMATION,
     filename: "Saved Animation Mockup.md",
+    demo: "saved-animation",
   },
   "maya-mockup-silent-instant": {
     id: "maya-mockup-silent-instant",
-    title: "Mockup B — silent + instant",
+    title: "Mockup B: silent + instant",
     markdown: MAYA_MOCKUP_SILENT_INSTANT,
     filename: "Silent Instant Mockup.md",
+    demo: "silent-instant",
   },
 };
 
