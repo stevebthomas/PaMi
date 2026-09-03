@@ -104,11 +104,11 @@ const CS_TEMPLATE_KEYWORDS =
  * synchronous, deterministic, no model call. */
 const SELLER_COMMS_KEYWORDS = /seller|payout|pay ?out|cadence|delay/i;
 
-/** Terms that mark a message to Derek (his DM) or the incident thread as an
- * actual incident briefing (a recap of what happened / the blast radius)
- * rather than off-topic chatter. Used to record derekBriefedOnIncidentAtMinutes
- * so Derek's 1:30 recap ask can acknowledge an earlier rundown instead of cold
- * re-asking for something the player already gave him. Deliberately anchored on
+/** Terms that mark a message to Derek in his DM as an actual incident briefing
+ * (a recap of what happened / the blast radius) rather than off-topic chatter.
+ * Used to record derekBriefedOnIncidentAtMinutes so Derek's 1:30 recap ask can
+ * acknowledge an earlier rundown instead of cold re-asking for something the
+ * player already gave him. Deliberately anchored on
  * the incident's own nouns (Apple Pay / webhook / checkout / the ticket count /
  * root cause / resolution) so a bare "crazy morning, huh" doesn't count as a
  * briefing. Same plain-regex style as the matchers above: synchronous,
@@ -867,6 +867,10 @@ export const useSimStore = create<SimState>((set, get) => ({
           decidedAtMinutes: timeline.decidedAt,
           resolutionAnnouncedAtMinutes: timeline.resolutionAnnouncedAt,
           csTemplateAttemptedAtMinutes: sb.csTemplateAttemptedAtMinutes ?? null,
+          // Maya's design-followup cancel signal: the minute the player answered
+          // her 12:30 ask, straight off the existing requiresResponse record for
+          // that event (no new StateBag fact, no sendPlayerMessage change).
+          mayaDesignRespondedAtMinutes: sb.respondedAtMinutes["maya-design-question"] ?? null,
         });
         if (result.changed) {
           const firedMessages: Message[] = result.firings.map((f) => ({
@@ -1051,19 +1055,22 @@ export const useSimStore = create<SimState>((set, get) => ({
       set((s) => ({ stateBag: { ...s.stateBag, tradeoffEngagedWithRajAtMinutes: playerMsg.sentAtSimMinutes } }));
     }
 
-    // Derek-briefing signal: the player proactively recaps the incident to
-    // Derek (his DM or the incident thread he later says he read) BEFORE his
-    // 1:30 recap ask fires. This is what lets that ask acknowledge an earlier
-    // rundown ("confirm the final numbers") instead of cold re-asking for a
-    // blast radius the player already delivered and Derek already saw.
+    // Derek-briefing signal: the player proactively recaps the incident TO
+    // Derek in his DM BEFORE his 1:30 recap ask fires. This is what lets that
+    // ask acknowledge an earlier rundown ("confirm the final numbers") instead
+    // of cold re-asking for a blast radius the player already delivered him.
+    // Restricted to dm_derek only: the ask's cold variant already frames itself
+    // as "I saw the incident thread," so #incidents activity the player never
+    // addressed to Derek is naturally covered without this fact, and posting
+    // there no longer misfires his "thanks for the earlier rundown" variant.
     // Deterministic: a substantive message (same 40-char floor as the CS/seller
-    // detectors) in dm_derek or #incidents, after the incident was declared,
-    // that actually names the incident's own nouns (DEREK_BRIEF_KEYWORDS) so
-    // off-topic chatter doesn't count. Set once, additively; only meaningful
-    // while derek-escalation hasn't fired yet (a briefing after the ask is just
-    // the normal response path, tracked by respondedAtMinutes).
+    // detectors) in dm_derek, after the incident was declared, that actually
+    // names the incident's own nouns (DEREK_BRIEF_KEYWORDS) so off-topic
+    // chatter doesn't count. Set once, additively; only meaningful while
+    // derek-escalation hasn't fired yet (a briefing after the ask is just the
+    // normal response path, tracked by respondedAtMinutes).
     if (
-      (channel === "dm_derek" || channel === "incidents") &&
+      channel === "dm_derek" &&
       get().firedEventIds.has("priya-incidents-escalation") &&
       !get().firedEventIds.has("derek-escalation") &&
       get().stateBag.derekBriefedOnIncidentAtMinutes === null &&

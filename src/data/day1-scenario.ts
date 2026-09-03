@@ -15,6 +15,7 @@ import {
   seedPriyaCsNudge,
   seedPriyaCsResolvedFollowUp,
   seedPriyaSellerCommsAsk,
+  seedMayaDesignFollowUp,
 } from "../lib/sim/obligations";
 
 /** True when the player DMed Marcus about payouts BEFORE the fix decision was
@@ -511,6 +512,17 @@ export const day1ScenarioEvents: ScenarioEvent[] = [
       { label: "Saved Animation Mockup.md", docId: "maya-mockup-saved-animation" },
       { label: "Silent Instant Mockup.md", docId: "maya-mockup-silent-instant" },
     ],
+    // A2: seed Maya's end-of-day design-call follow-up the moment she asks, keyed
+    // to this ask time (750 = 12:30 PM). If the player never answers, she nudges
+    // once in the last hour (at/after 5:00 PM) to lock the call before Thursday's
+    // ship; any answer in #design-review settles it silently via the cancelWhen
+    // (which reads the same respondedAtMinutes signal requiresResponse records for
+    // this event). Idempotent by stable id (advanceClock is re-entrant); does NOT
+    // touch requiresResponse/scoring, so the existing deliverable mechanic is
+    // unchanged.
+    applyEffect: (state) => ({
+      pendingObligations: seedMayaDesignFollowUp(state.pendingObligations, 750),
+    }),
   },
   {
     id: "derek-notification",

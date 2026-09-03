@@ -409,6 +409,19 @@ export function buildPriyaSellerCommsAsk(): string {
 }
 
 /**
+ * Maya's single end-of-day nudge for the still-unanswered design call on Theo's
+ * save-for-later ticket ("saved!" animation vs silent+instant). The engine only
+ * fires this when the player never answered her 12:30 ask, so it's a gentle
+ * reminder in her established voice (casual, "whenever you get a sec," no dashes),
+ * NOT a re-paste of the original question: it acknowledges the day got hectic,
+ * names the specific call she still needs, and references the Thursday ship as the
+ * reason to lock it now.
+ */
+export function buildMayaDesignFollowUp(): string {
+  return "Hey, totally get that today turned into a lot. Still need your call on Theo's save-for-later ticket whenever you get a sec, the little 'saved!' animation or keeping it silent and instant, so we can lock it before we ship Thursday.";
+}
+
+/**
  * Dispatches an obligation kind to its deterministic copy builder. The store
  * calls this per firing so the switch-on-kind lives here in the copy module,
  * next to the builders, rather than leaking into advanceClock. `timeline` is
@@ -426,6 +439,8 @@ export function buildObligationMessageContent(kind: ObligationKind, timeline: In
       return buildPriyaCsResolvedFollowUp();
     case "priya-seller-comms-ask":
       return buildPriyaSellerCommsAsk();
+    case "maya-design-followup":
+      return buildMayaDesignFollowUp();
     default: {
       const _exhaustive: never = kind;
       return _exhaustive;

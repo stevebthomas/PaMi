@@ -44,7 +44,7 @@ export const ASSIGNABLE_TEAM: RosterMember[] = [
   { id: "raj", name: "Raj", title: "Engineering Manager" },
   { id: "priya", name: "Priya", title: "Operations & Support Lead" },
   { id: "derek", name: "Derek", title: "VP of Product" },
-  { id: "maya", name: "Maya", title: "Backend Engineer" },
+  { id: "maya", name: "Maya", title: "Design Lead" },
   { id: "theo", name: "Theo", title: "Junior Engineer" },
   { id: "jordan", name: "Jordan", title: "Engineer" },
   { id: "chen", name: "Chen", title: "Engineer" },
@@ -609,7 +609,17 @@ export interface CommitmentEntry {
 /** A deliverable the player might owe (referenced by a "player-delivered"
  * obligation trigger). Closed set so triggers stay declarative data A2 can
  * switch on rather than free text. */
-export type ObligationDeliverable = "cs-template" | "postmortem" | "incident-recap" | "fix-decision";
+export type ObligationDeliverable =
+  | "cs-template"
+  | "postmortem"
+  | "incident-recap"
+  | "fix-decision"
+  /** The player's answer to Maya's 12:30 design question on Theo's save-for-later
+   * ticket ("saved!" animation vs silent+instant). "Delivered" here means the
+   * player responded to her ask at all (maya-design-followup's cancelWhen reads
+   * this), tracked via the same respondedAtMinutes["maya-design-question"] signal
+   * requiresResponse already records, NOT a separately graded artifact. */
+  | "maya-design-decision";
 
 /** A named point in the incident's lifecycle an obligation can key off (for the
  * "incident-state-reached" trigger). These mirror milestones the incident
@@ -668,7 +678,15 @@ export type ObligationKind =
    * the payout delay the rollback imposes (~60 sellers pushed back to the old
    * cadence). The rollback-only downstream obligation for the tradeoff the
    * player accepted; never seeded on patch-forward. See B4. */
-  | "priya-seller-comms-ask";
+  | "priya-seller-comms-ask"
+  /** Maya nudges once, late in the day, for the still-unanswered design call on
+   * Theo's save-for-later ticket ("saved!" animation vs silent+instant), so her
+   * 12:30 ask doesn't vanish silently when ignored. END-OF-DAY-ANCHORED (fires in
+   * the last hour, at/after 5:00 PM) so it reads as "let's lock this before we
+   * ship Thursday," and settles silently the moment the player answers her ask in
+   * #design-review (the cancelWhen keys off the same respondedAtMinutes signal
+   * requiresResponse already records for maya-design-question). */
+  | "maya-design-followup";
 
 /**
  * One pending obligation (see StateBag.pendingObligations): a thing an NPC is
@@ -895,7 +913,7 @@ export const AGENT_TITLES: Partial<Record<AgentId, string>> = {
   priya: "Operations & Support Lead",
   derek: "VP of Product",
   sam: "Head of People",
-  maya: "Backend Engineer",
+  maya: "Design Lead",
   theo: "Junior Engineer",
   jordan: "Engineer",
   chen: "Engineer",

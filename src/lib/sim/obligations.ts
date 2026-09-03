@@ -54,6 +54,17 @@ export const PRIYA_CS_NUDGE_DELAY_MINUTES = 45;
  * path ever seeds this obligation (see seedPriyaSellerCommsAsk). */
 export const PRIYA_SELLER_COMMS_DELAY_MINUTES = 10;
 
+/** The absolute sim-minute Maya's design-call follow-up fires at: 1020 = 5:00 PM,
+ * the last hour of the day (the day runs to 6:00 PM = 1080). This is END-OF-DAY-
+ * ANCHORED, not a short elapsed window off her 12:30 ask: her nudge is "let's
+ * lock this before we ship Thursday," so it belongs at end of day, not a few
+ * minutes after she asks. Expressed to the engine as a `sim-minutes-elapsed-since`
+ * trigger anchored at minute 0 (see seedMayaDesignFollowUp), which is exactly a
+ * "fire once the clock reaches 5:00 PM" absolute threshold. Paired, per the
+ * central rule, with a cancelWhen that settles it silently the moment the player
+ * answers her ask, so the fixed time never fires alone. */
+export const MAYA_DESIGN_FOLLOWUP_AT_MINUTES = 1020;
+
 /** Stable, deterministic id for a seeded obligation. Each Day-1 obligation is a
  * singleton (one per day), so keying purely on kind is enough for the append to
  * dedupe by identity across re-entrant advanceClock / re-run applyEffect. */
@@ -191,6 +202,51 @@ export function seedPriyaSellerCommsAsk(obligations: ObligationEntry[], decidedA
 }
 
 /**
+ * Maya's end-of-day design-call follow-up. Her 12:30 ask (maya-design-question)
+ * on Theo's save-for-later ticket ("saved!" animation vs silent+instant) is
+ * low-stakes and "not urgent," so it's easy to let slide, but she still needs the
+ * call locked before Thursday's ship. Rather than let the ask vanish silently when
+ * ignored, she nudges ONCE in #design-review in the last hour of the day (at/after
+ * MAYA_DESIGN_FOLLOWUP_AT_MINUTES = 5:00 PM). END-OF-DAY-ANCHORED via a
+ * `sim-minutes-elapsed-since` trigger anchored at minute 0, so it's a plain
+ * "clock reached 5:00 PM" threshold, NOT a short window off the ask. Per the
+ * central rule the fixed time never fires alone: it's paired with a cancelWhen
+ * that settles it silently the moment the player answered her ask. "Answered" is
+ * read off the SAME response signal requiresResponse already records for this
+ * event (respondedAtMinutes["maya-design-question"], surfaced to the engine as
+ * ObligationInputs.mayaDesignRespondedAtMinutes and matched by the
+ * "maya-design-decision" player-delivered deliverable), so a reply sent anywhere
+ * between 12:30 and 5:00 PM cancels it deterministically. Seeded when the ask
+ * fires (maya-design-question's applyEffect); idempotent by stable id.
+ */
+export function seedMayaDesignFollowUp(obligations: ObligationEntry[], askedAtSimMinutes: number): ObligationEntry[] {
+  return appendObligation(obligations, {
+    id: obligationId("maya-design-followup"),
+    kind: "maya-design-followup",
+    agentId: "maya",
+    summary:
+      "Maya will nudge once in #design-review in the last hour of the day for the still-unanswered save-for-later design call, unless the player already answered her ask.",
+    channel: "design-review",
+    // Absolute end-of-day anchor: sinceSimMinutes 0 + minutes 1020 => fires once
+    // the clock reaches 5:00 PM. Elapsed sim-time is a legitimate trigger
+    // COMPONENT here; the cancelWhen below is what keeps it from firing on the
+    // clock alone.
+    trigger: {
+      type: "sim-minutes-elapsed-since",
+      sinceSimMinutes: 0,
+      minutes: MAYA_DESIGN_FOLLOWUP_AT_MINUTES,
+    },
+    // Settles silently the moment the player answered Maya's ask (a reply in
+    // #design-review at/after 12:30), including any answer sent BEFORE the 5:00 PM
+    // window: the engine compares satisfied-at minutes, so an earlier response
+    // strictly precedes the trigger and cancels it.
+    cancelWhen: { type: "player-delivered", deliverable: "maya-design-decision" },
+    status: "pending",
+    createdAtSimMinutes: askedAtSimMinutes,
+  });
+}
+
+/**
  * The timeline-derived + state-derived facts the trigger evaluator needs, all
  * as plain primitives so this module never imports incidentTimeline (see the
  * dependency note above). The caller (simStore) builds this from
@@ -217,6 +273,12 @@ export interface ObligationInputs {
   /** stateBag.csTemplateAttemptedAtMinutes: the minute the player first
    * attempted the customer-facing draft (good or not); null if never. */
   csTemplateAttemptedAtMinutes: number | null;
+  /** stateBag.respondedAtMinutes["maya-design-question"]: the minute the player
+   * first answered Maya's 12:30 design ask (a reply in #design-review), recorded
+   * by the existing requiresResponse machinery; null if never. Settles the
+   * maya-design-followup obligation (its cancelWhen), so an answer sent any time
+   * before the 5:00 PM window cancels the nudge. */
+  mayaDesignRespondedAtMinutes: number | null;
 }
 
 /** The sim-minute the named incident milestone became true, or null if it has
@@ -261,10 +323,19 @@ export function triggerSatisfiedAt(trigger: ObligationTrigger, inputs: Obligatio
         ? inputs.fullyRecoveredAtMinutes
         : null;
     case "player-delivered":
-      // Only cs-template maps to a recorded attempt minute today; other
-      // deliverables have no sim-minute stamp yet, so they read as "not
+      // Two deliverables map to a recorded minute today: cs-template (the
+      // attempt stamp) and maya-design-decision (the player's answer to Maya's
+      // design ask, read off the existing requiresResponse response signal). Any
+      // other deliverable has no sim-minute stamp yet, so it reads as "not
       // delivered" (null) until one is added. Documented, not silently omitted.
-      return trigger.deliverable === "cs-template" ? inputs.csTemplateAttemptedAtMinutes : null;
+      switch (trigger.deliverable) {
+        case "cs-template":
+          return inputs.csTemplateAttemptedAtMinutes;
+        case "maya-design-decision":
+          return inputs.mayaDesignRespondedAtMinutes;
+        default:
+          return null;
+      }
     case "sim-minutes-elapsed-since": {
       const at = trigger.sinceSimMinutes + trigger.minutes;
       return clockMinutes >= at ? at : null;
