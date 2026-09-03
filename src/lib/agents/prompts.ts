@@ -481,6 +481,12 @@ export function commitmentContextLine(agentId: AgentId, state: StateBag): string
     if (e.kind === "npc-commitment") {
       return line(e.status === "settled" ? "done" : "you're on it", e.summary);
     }
+    // A topic you've already covered with the player: not a promise or a debt,
+    // just ground already walked. Labeled so you reference it as old news
+    // ("like we went over") instead of re-explaining it from scratch.
+    if (e.kind === "topic-discussed") {
+      return line("already discussed", e.summary);
+    }
     // player-owes-npc
     return line(e.status === "settled" ? "delivered" : "still owed to you", e.summary);
   });

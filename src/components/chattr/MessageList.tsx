@@ -3,7 +3,7 @@ import { AGENT_NAMES } from "@/lib/sim/types";
 import { renderInline } from "@/components/shared/renderInline";
 import { formatSimTime, useSimStore } from "@/store/simStore";
 import { useDocsStore } from "@/store/docsStore";
-import { getSimDoc } from "@/data/simDocs";
+import { resolveSimDoc } from "@/data/simDocs";
 import { PixelAvatar } from "@/components/shared/PixelAvatar";
 import { TypingDots } from "@/components/shared/TypingDots";
 import { FileText } from "lucide-react";
@@ -18,6 +18,9 @@ export function MessageList() {
   const pendingReplyChannel = useSimStore((s) => s.pendingReplyChannel);
   const openDocRequest = useDocsStore((s) => s.openDocRequest);
   const recordDocOpened = useSimStore((s) => s.recordDocOpened);
+  // Session-generated docs (e.g. the standup notes) resolve alongside the static
+  // registry, so an attachment chip pointing at one renders and opens too.
+  const sessionDocs = useSimStore((s) => s.stateBag.sessionDocs);
   const showTyping = pendingReplyFrom !== null && pendingReplyChannel === activeChannel;
   const bottomRef = useRef<HTMLDivElement>(null);
 
@@ -70,7 +73,7 @@ export function MessageList() {
                   shape (no docId) silently renders nothing rather than
                   crashing. */}
               {[...(m.attachment ? [m.attachment] : []), ...(m.attachments ?? [])]
-                .filter((a) => getSimDoc(a.docId))
+                .filter((a) => resolveSimDoc(a.docId, sessionDocs))
                 .map((a) => (
                   <button
                     key={a.docId}

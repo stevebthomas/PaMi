@@ -10,6 +10,8 @@
  * inside the sim's Docs window and NEVER trigger a real browser download.
  */
 
+import type { SessionDoc } from "@/lib/sim/types";
+
 export interface SimDoc {
   id: string;
   title: string;
@@ -129,5 +131,26 @@ export const SIM_DOCS: Record<string, SimDoc> = {
  * degrade gracefully rather than crash. */
 export function getSimDoc(id: string | undefined | null): SimDoc | undefined {
   if (!id) return undefined;
+  return SIM_DOCS[id];
+}
+
+/**
+ * Resolve a docId against session-generated docs FIRST, then the static
+ * SIM_DOCS registry. This is the single resolution point every Docs surface
+ * (the Chattr attachment chip, the Docs library tile, the doc window) should
+ * use so a runtime-generated doc (stateBag.sessionDocs, e.g. the 9:00 standup
+ * notes) opens and renders through the exact same plumbing as an authored one.
+ * A SessionDoc is structurally a SimDoc (it simply omits the optional `demo`
+ * field), so it flows through DocWindow unchanged. Session docs take precedence
+ * so a generated doc can shadow a registry id if one ever collides; in practice
+ * the id spaces are disjoint. Tolerates an absent map (old sessions, tests) and
+ * an unknown id, returning undefined so callers degrade gracefully. */
+export function resolveSimDoc(
+  id: string | undefined | null,
+  sessionDocs?: Record<string, SessionDoc>
+): SimDoc | undefined {
+  if (!id) return undefined;
+  const generated = sessionDocs?.[id];
+  if (generated) return generated;
   return SIM_DOCS[id];
 }

@@ -576,7 +576,20 @@ export type CommitmentKind =
   /** Something the PLAYER owes this NPC (e.g. Priya waiting on a CS draft, Derek
    * waiting on a blast-radius number). The obligation is on the player; this
    * entry is the NPC-side memory of it. */
-  | "player-owes-npc";
+  | "player-owes-npc"
+  /** A substantive topic/decision the player has already covered WITH this NPC
+   * (e.g. Raj has already walked the player through the rollback-vs-patch-forward
+   * fix options; Priya has already flagged the checkout ticket spike to them).
+   * Distinct from every kind above: it's neither the NPC's promise, a decision
+   * they're operating under, nor a player debt. It is the "we already went over
+   * this" memory, so a later scripted beat or a free-form reply doesn't
+   * re-present the same ground as if it were brand-new (the cross-channel
+   * re-explain bug). Born "settled" ("discussed" IS the settled state; there is
+   * nothing to close out). Recorded and queried by stable id via
+   * recordTopicDiscussed / hasDiscussed in commitments.ts, and surfaced to the
+   * owning NPC's replies by commitmentContextLine so free-form answers stop
+   * re-explaining too. */
+  | "topic-discussed";
 
 /**
  * One entry in the per-NPC commitment ledger (see StateBag.commitmentLedger).
@@ -725,6 +738,21 @@ export interface ObligationEntry {
   createdAtSimMinutes: number;
 }
 
+/** A session-GENERATED document (see StateBag.sessionDocs): a doc produced at
+ * runtime by a scenario beat rather than authored in the static SIM_DOCS
+ * registry. Structurally a superset-compatible subset of SimDoc (id + title +
+ * filename + markdown, no interactive `demo`), so it resolves and renders
+ * through the exact same Docs plumbing (resolveSimDoc / DocWindow). All fields
+ * are primitives, so it round-trips through session persistence untouched. The
+ * mechanism is deliberately generic: any future day can generate more docs by
+ * upserting into sessionDocs under a stable id. */
+export interface SessionDoc {
+  id: string;
+  title: string;
+  filename: string;
+  markdown: string;
+}
+
 export interface StateBag {
   /** Generic, event-id-keyed acknowledgment tracking: for every
    * requiresResponse event the player has satisfied (by replying in any
@@ -862,6 +890,33 @@ export interface StateBag {
    * consumer must treat "" as "no name given." Plain string, so it round-trips
    * through session persistence untouched. */
   playerName: string;
+  /** The player's chosen avatar sprite id (see PLAYER_SPRITES in
+   * PixelAvatar.tsx), captured on the orientation screen alongside
+   * playerName. Null until a selection is made, which is also the state any
+   * session persisted before this feature was added restores into (see
+   * sessionPersistence's whole-object stateBag merge) — PixelAvatar treats
+   * null as "no selection" and falls back to the plain letter-square, so
+   * those older sessions render exactly as they did before. Plain
+   * string | null, so it round-trips through session persistence untouched. */
+  playerAvatarId: string | null;
+  /** True once the player JOINED the 9:00 standup call (set the moment they hit
+   * Join, not on leave, so entering counts as attending). Gates the two 9:00
+   * standup paths: on the join path this suppresses the scripted #general
+   * fallback digest (the store posts a summary on Leave instead); on the
+   * non-join path it stays false and the fallback digest fires at 9:15. The
+   * "Standup Notes" doc saves in BOTH paths regardless; attendance affects only
+   * the experience, never whether the notes are kept. Plain boolean, so it
+   * round-trips through session persistence untouched. */
+  standupAttended: boolean;
+  /** Session-generated docs, keyed by docId (see SessionDoc). Resolved by
+   * resolveSimDoc BEFORE the static SIM_DOCS registry, so a generated doc opens
+   * and lists through the same Docs plumbing as an authored one, and listed in
+   * the Docs library the moment it exists (see DocsApp). Empty until a beat
+   * generates one (the 9:00 standup notes are the first). A plain
+   * Record<string, primitive-only object>, so the whole map round-trips through
+   * session persistence untouched. Generic on purpose: later days upsert more
+   * docs here under their own stable ids. */
+  sessionDocs: Record<string, SessionDoc>;
   [key: string]: unknown;
 }
 
@@ -891,6 +946,9 @@ export const initialStateBag: StateBag = {
   redirectsFiredToday: [],
   openedDocIds: [],
   playerName: "",
+  playerAvatarId: null,
+  standupAttended: false,
+  sessionDocs: {},
 };
 
 export const AGENT_NAMES: Record<AgentId, string> = {

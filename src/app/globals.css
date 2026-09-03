@@ -272,6 +272,30 @@ body {
   }
 }
 
+/* Standup call overlay entrance — a quiet fade/scale-in for the 9:00 standup
+   call surface (and the Join affordance pill), matching the scorecard-fill
+   pattern above: keyframes are defined ONLY under prefers-reduced-motion:
+   no-preference, so with motion reduced the animation is simply not applied and
+   the surface appears at rest immediately. */
+.animate-standup-enter {
+  transform-origin: center;
+}
+@media (prefers-reduced-motion: no-preference) {
+  @keyframes standup-enter {
+    from {
+      opacity: 0;
+      transform: translateY(8px) scale(0.98);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+    }
+  }
+  .animate-standup-enter {
+    animation: standup-enter 0.28s ease-out both;
+  }
+}
+
 /* Busy pointer during an app launch — applied to <body> by docsStore while a
    launch animation is in flight, and always reverted when the window opens.
    The descendant selector makes it win over elements' own cursors. */

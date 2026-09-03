@@ -35,8 +35,12 @@ import {
   settlePlayerOwesCsTemplate,
   recordPlayerOwesSellerComms,
   settlePlayerOwesSellerComms,
+  recordTopicDiscussed,
+  DISCUSSED_RAJ_INCIDENT_OPTIONS,
+  DISCUSSED_PRIYA_TICKET_SPIKE,
 } from "@/lib/sim/commitments";
 import { evaluateObligations, seedRajAllClear, seedPriyaSellerCommsAsk } from "@/lib/sim/obligations";
+import { buildStandupDoc, standupDigestContent, STANDUP_DOC_ID, STANDUP_DOC_FILENAME } from "@/lib/sim/standup";
 import { getIncidentTimeline } from "@/lib/sim/incidentTimeline";
 import { formatSimClock } from "@/lib/sim/timeOfDay";
 import { satisfyingChannels } from "@/lib/sim/acknowledgment";
@@ -292,6 +296,13 @@ interface SimState {
    * on the store, not the state bag, because it's an in-progress-request guard,
    * not part of the day's saved state. */
   rajFallbackInFlight: boolean;
+  /** Transient (not persisted): true while the 9:00 standup call overlay is on
+   * screen. UI-plumbing only, like a modal-open flag, so it's reset to false on
+   * restore rather than persisted (a refresh mid-call just lands back on the
+   * desktop; the Join affordance reappears if still before 9:15 and unattended).
+   * The DURABLE fact — whether the player attended — lives in
+   * stateBag.standupAttended. */
+  standupCallOpen: boolean;
 
   startDay: () => void;
   setActiveChannel: (channel: ChannelId) => void;
@@ -309,8 +320,21 @@ interface SimState {
   setNotesText: (text: string) => void;
   setDifficulty: (difficulty: Difficulty) => void;
   setPlayerName: (name: string) => void;
+  /** Sets the player's chosen avatar sprite id (see PLAYER_SPRITES in
+   * PixelAvatar.tsx), captured alongside setPlayerName on the orientation
+   * screen. */
+  setPlayerAvatarId: (id: string) => void;
   recordDocOpened: (docId: string) => void;
   dismissScorecard: () => void;
+  /** Player accepted the 9:00 standup call: open the call overlay AND mark the
+   * day's standupAttended durably (entering counts as attending, so the 9:15
+   * #general fallback digest is suppressed on this path). Idempotent. */
+  joinStandup: () => void;
+  /** Player left the standup call: close the overlay and — once, on the join
+   * path — post the standup summary to #general and save the "Standup Notes,
+   * Day 1" doc into sessionDocs, both from the same continuity-conditioned
+   * source the fallback digest uses. Re-entrancy/double-fire safe. */
+  leaveStandup: () => void;
 }
 
 // Alias, not a reimplementation: formatSimClock in timeOfDay.ts is the
@@ -610,6 +634,7 @@ export const useSimStore = create<SimState>((set, get) => ({
   difficulty: "easy",
   easterEggsFound: [],
   rajFallbackInFlight: false,
+  standupCallOpen: false,
 
   startDay: () => {
     if (get().started) return;
@@ -1052,7 +1077,31 @@ export const useSimStore = create<SimState>((set, get) => ({
       trimmed.length >= 15 &&
       TRADEOFF_ENGAGEMENT_KEYWORDS.test(trimmed)
     ) {
-      set((s) => ({ stateBag: { ...s.stateBag, tradeoffEngagedWithRajAtMinutes: playerMsg.sentAtSimMinutes } }));
+      // Same transition also records the DISCUSSED-LEDGER entry that Raj has now
+      // been over the fix with the player (rollback-vs-patch options), keyed off
+      // this exact substantive-engagement signal. This is the mechanism that
+      // lets a later scripted beat OR Raj's own free-form reply tell "we've
+      // already gone over these options" apart from "first time." It's recorded
+      // independent of whether a definite CHOICE ever classifies into
+      // tradeoffChoice, which is precisely the confirmed re-explain hole: a DM
+      // call the tradeoff evaluator read as "unclear" (or made before the gate
+      // opened) left tradeoffChoice null, so the 9:38 offer, keyed only on
+      // tradeoffChoice, cold re-presented the whole tradeoff. Idempotent by
+      // stable id (re-entrancy-safe).
+      set((s) => ({
+        stateBag: {
+          ...s.stateBag,
+          tradeoffEngagedWithRajAtMinutes: playerMsg.sentAtSimMinutes,
+          commitmentLedger: recordTopicDiscussed(s.stateBag.commitmentLedger, {
+            agentId: "raj",
+            topic: DISCUSSED_RAJ_INCIDENT_OPTIONS,
+            channel,
+            atSimMinutes: playerMsg.sentAtSimMinutes,
+            summary:
+              "You and the player have already been going back and forth on the incident fix (the rollback-vs-patch-forward call), so don't re-present those two options as if it's the first time.",
+          }),
+        },
+      }));
     }
 
     // Derek-briefing signal: the player proactively recaps the incident TO
@@ -1144,6 +1193,34 @@ export const useSimStore = create<SimState>((set, get) => ({
       }
       return { stateBag: next };
     });
+
+    // Discussed-ledger population (Priya side). Satisfying Priya's 8:45 heads-up
+    // (priya-heads-up-dm) means the player has actually worked the checkout /
+    // Apple Pay ticket spike WITH her: that event is only ever satisfiable by a
+    // reply in her DM (no reAsks/alsoSatisfiedByChannels route it elsewhere), so
+    // "responded" here is by construction a real back-and-forth with Priya about
+    // the spike. Record it so the 9:00 standup digest and Priya's own free-form
+    // replies build on that conversation ("like I flagged earlier") instead of
+    // presenting the spike as brand-new. Idempotent by stable id, so a
+    // re-entrant advanceClock / re-satisfied event can't double-append.
+    {
+      const priyaHeadsUp = respondedNow.find((r) => r.id === "priya-heads-up-dm");
+      if (priyaHeadsUp) {
+        set((s) => ({
+          stateBag: {
+            ...s.stateBag,
+            commitmentLedger: recordTopicDiscussed(s.stateBag.commitmentLedger, {
+              agentId: "priya",
+              topic: DISCUSSED_PRIYA_TICKET_SPIKE,
+              channel: "dm_priya",
+              atSimMinutes: priyaHeadsUp.sentAtSimMinutes,
+              summary:
+                "You've already flagged the checkout / Apple Pay ticket spike to the player directly and they've engaged with you on it, so don't raise it as brand-new.",
+            }),
+          },
+        }));
+      }
+    }
 
     // Easter eggs: purely-for-fun discoveries, deliberately kept separate
     // from the acknowledgment block above rather than folded into it: these
@@ -1322,24 +1399,42 @@ export const useSimStore = create<SimState>((set, get) => ({
     // channel, so this can't double-evaluate; tradeoffChoice === null stays the
     // master guard regardless.
     //
-    // The readiness gate is raj-diagnosis (9:20 #incidents), NOT the 9:38
-    // raj-tradeoff-offer beat (fix 1c). Raj's live persona routinely surfaces
-    // the rollback/patch options in dm_raj well before the scripted 9:38 offer,
-    // and readily ACCEPTS an explicit early call ("go patch-forward, ping me
-    // when it's live" -> "Got it, pulling Jordan in, will ping you"). Gating on
-    // the 9:38 beat dropped that decision on the floor: tradeoffChoice stayed
-    // null, Raj's 10:05 fallback fired, and the escalation beats announced "PM
-    // went quiet, so I made the call": flatly contradicting Raj's own on-record
-    // acceptance 50 min earlier. raj-diagnosis is the right threshold: before
-    // 9:20 there's no fix framing at all, so a "decision" would be meaningless;
-    // once Raj has diagnosed, an explicit choice is real and must register.
+    // The readiness gate is priya-incidents-escalation (9:15 #incidents), NOT
+    // the 9:38 raj-tradeoff-offer beat (fix 1c) and NOT raj-diagnosis (9:20).
+    // Raj's live persona routinely surfaces the rollback/patch options in dm_raj
+    // well before the scripted 9:38 offer, and readily ACCEPTS an explicit early
+    // call ("go patch-forward, ping me when it's live" -> "Got it, pulling
+    // Jordan in, will ping you"). Gating on the 9:38 beat dropped that decision
+    // on the floor: tradeoffChoice stayed null, Raj's 10:05 fallback fired, and
+    // the escalation beats announced "PM went quiet, so I made the call": flatly
+    // contradicting Raj's own on-record acceptance 50 min earlier.
+    //
+    // Loosened from raj-diagnosis (9:20) to priya-incidents-escalation (9:15) as
+    // the ROOT-CAUSE fix for the confirmed re-explain repro (player settled the
+    // patch-forward call with Raj in DM, Raj acknowledged, yet the 9:38
+    // #incidents offer re-presented both options and re-asked "which way do you
+    // want to go?"). The 9:20 gate had a 5-minute blind window: once the
+    // incident is CONFIRMED real (priya-incidents-escalation's "14 tickets, all
+    // Apple Pay, CS getting slammed") Raj's persona already holds every fix fact,
+    // so a player who jumps straight into Raj's DM and states an explicit call at,
+    // say, 9:16 makes a genuine decision, but the 9:20 gate silently refused to
+    // classify it, leaving tradeoffChoice null so the 9:38 beat's tradeoffChoice-
+    // keyed contentFor cold re-asked. 9:15 is the earliest a rollback-vs-patch
+    // call is actually meaningful (the incident isn't confirmed before it, so a
+    // "decision" there would be premature), which is the right threshold. The
+    // async classifier still returns "unclear" for a mere question, so this only
+    // widens WHEN a real, unambiguous call is allowed to register, never what
+    // counts as one. (The DISCUSSED-LEDGER variant on the 9:38 beat is the
+    // belt-and-suspenders for the residual case where the call is real but the
+    // classifier can't extract a definite side.)
+    //
     // requestTradeoffEvaluation is still handed the 9:38 offer beat's static
     // `content` as the classifier's reference framing: that scenario text lays
     // out both options and is usable for classification whether or not the beat
     // has fired yet, so an early decision is classified against the same rubric.
     if (
       (channel === "incidents" || channel === "dm_raj") &&
-      get().firedEventIds.has("raj-diagnosis") &&
+      get().firedEventIds.has("priya-incidents-escalation") &&
       get().stateBag.tradeoffChoice === null
     ) {
       const offerEvent = day1ScenarioEvents.find((e) => e.id === "raj-tradeoff-offer");
@@ -1920,6 +2015,7 @@ export const useSimStore = create<SimState>((set, get) => ({
   setNotesText: (text) => set({ notesText: text }),
   setDifficulty: (difficulty) => set({ difficulty }),
   setPlayerName: (name) => set((s) => ({ stateBag: { ...s.stateBag, playerName: name.trim() } })),
+  setPlayerAvatarId: (id) => set((s) => ({ stateBag: { ...s.stateBag, playerAvatarId: id } })),
   recordDocOpened: (docId) =>
     set((s) =>
       s.stateBag.openedDocIds.includes(docId)
@@ -1927,6 +2023,56 @@ export const useSimStore = create<SimState>((set, get) => ({
         : { stateBag: { ...s.stateBag, openedDocIds: [...s.stateBag.openedDocIds, docId] } }
     ),
   dismissScorecard: () => set({ scorecardDismissed: true }),
+
+  joinStandup: () => {
+    // Entering the call IS attending: set standupAttended durably now (not on
+    // leave) so the 9:15 #general fallback digest is suppressed even if the
+    // player somehow reaches 9:15 with the overlay still open. Idempotent: a
+    // second join just re-opens the (already-open) overlay.
+    set((s) => ({
+      standupCallOpen: true,
+      stateBag: { ...s.stateBag, standupAttended: true },
+    }));
+  },
+
+  leaveStandup: () => {
+    // Guard on the overlay actually being open so a stray double-call can't
+    // double-post the summary or re-save the doc. Closing the overlay is the
+    // first thing we do, so the guard also makes this single-fire.
+    if (!get().standupCallOpen) {
+      set({ standupCallOpen: false });
+      return;
+    }
+    const sb = get().stateBag;
+    const summaryContent = standupDigestContent(sb);
+    const doc = buildStandupDoc(sb);
+    const at = get().clockMinutes;
+    const summaryMsg: Message = {
+      id: makeId("evt"),
+      channel: "general",
+      senderId: "system",
+      content: summaryContent,
+      sentAtSimMinutes: at,
+      createdAt: Date.now(),
+      // The saved notes, reachable straight from the summary message, exactly
+      // like the non-join fallback digest's own attachment.
+      attachment: { label: STANDUP_DOC_FILENAME, docId: STANDUP_DOC_ID },
+    };
+    set((s) => {
+      const unread = new Set(s.unreadChannels);
+      if (s.activeChannel !== "general") unread.add("general");
+      return {
+        standupCallOpen: false,
+        messages: [...s.messages, summaryMsg],
+        unreadChannels: unread,
+        // Upsert by stable id: idempotent with the fallback path's own save.
+        stateBag: {
+          ...s.stateBag,
+          sessionDocs: { ...s.stateBag.sessionDocs, [doc.id]: doc },
+        },
+      };
+    });
+  },
 }));
 
 export { formatSimTime };

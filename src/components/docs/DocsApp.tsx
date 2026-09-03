@@ -2,7 +2,7 @@
 
 import { useDocsStore } from "@/store/docsStore";
 import { useSimStore } from "@/store/simStore";
-import { getSimDoc, type SimDoc } from "@/data/simDocs";
+import { resolveSimDoc, type SimDoc } from "@/data/simDocs";
 import { AppIcon } from "@/components/shared/AppIcon";
 
 /**
@@ -19,10 +19,19 @@ import { AppIcon } from "@/components/shared/AppIcon";
 export function DocsApp() {
   const openDocRequest = useDocsStore((s) => s.openDocRequest);
   const openedDocIds = useSimStore((s) => s.stateBag.openedDocIds);
+  const sessionDocs = useSimStore((s) => s.stateBag.sessionDocs);
   const recordDocOpened = useSimStore((s) => s.recordDocOpened);
 
-  const tiles = openedDocIds
-    .map((id) => getSimDoc(id))
+  // Received docs = every static doc the player has opened, PLUS every
+  // session-generated doc, which is listed the moment it exists (a generated
+  // doc like the standup notes shows up without needing to be opened first).
+  // Session ids first so a freshly-generated doc reads as the newest arrival;
+  // de-duped so a session doc that was also opened isn't listed twice.
+  const orderedIds = [...Object.keys(sessionDocs), ...openedDocIds];
+  const seen = new Set<string>();
+  const tiles = orderedIds
+    .filter((id) => (seen.has(id) ? false : (seen.add(id), true)))
+    .map((id) => resolveSimDoc(id, sessionDocs))
     .filter((d): d is SimDoc => Boolean(d));
 
   if (tiles.length === 0) {

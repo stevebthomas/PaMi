@@ -167,3 +167,62 @@ export function recordPlayerOwesSellerComms(ledger: CommitmentEntry[], atSimMinu
 export function settlePlayerOwesSellerComms(ledger: CommitmentEntry[]): CommitmentEntry[] {
   return settleCommitment(ledger, commitmentId("player-owes-npc", "priya", SELLER_COMMS_TAG));
 }
+
+// --- DISCUSSED-TOPIC LEDGER (the "we already went over this" record; see the
+// "topic-discussed" CommitmentKind in types.ts). One stable tag per substantive
+// topic the player can cover with an NPC, so the record site and the query site
+// (hasDiscussed) can never drift on the key that ties them together, exactly
+// like the commitment tags above. These are the mechanism that lets scripted
+// beats and free-form replies tell "the player has already been walked through
+// this" apart from "this is the first time," across every channel. Populated at
+// the deterministic transition points the store already tracks (e.g. the same
+// send-time signal that sets tradeoffEngagedWithRajAtMinutes, the satisfaction
+// of priya-heads-up-dm), never from a free-form model reply. ---
+
+/** Raj has already walked the player through the fix options (the
+ * rollback-vs-patch-forward tradeoff), in DM or #incidents. Recorded off the
+ * same substantive-engagement signal that sets tradeoffEngagedWithRajAtMinutes
+ * in the store, so it's true exactly when the player has actually been going
+ * back and forth with Raj on the call, independent of whether a definite choice
+ * has been classified yet. */
+export const DISCUSSED_RAJ_INCIDENT_OPTIONS = "raj-incident-options";
+
+/** Priya has already flagged the checkout / Apple Pay ticket spike directly to
+ * the player and they've engaged on it. Recorded when the player satisfies
+ * Priya's 8:45 heads-up DM (priya-heads-up-dm), which is a dm_priya reply by
+ * construction, so it means a real back-and-forth with her about the spike. */
+export const DISCUSSED_PRIYA_TICKET_SPIKE = "priya-ticket-spike";
+
+/**
+ * Record that the player has already covered `topic` WITH `agentId` (see the
+ * "topic-discussed" CommitmentKind). Born "settled": discussed is a settled
+ * fact, not an open obligation. Idempotent by stable, content-derived id
+ * (commitmentId("topic-discussed", agentId, topic)), so a re-entrant
+ * advanceClock or a re-run detector can't double-append. `summary` is the
+ * human-readable line the owning NPC sees in their reply context, phrased as
+ * already-known ground ("you've already walked them through X").
+ */
+export function recordTopicDiscussed(
+  ledger: CommitmentEntry[],
+  opts: { agentId: AgentId; topic: string; channel: ChannelId; atSimMinutes: number; summary: string }
+): CommitmentEntry[] {
+  return appendCommitment(ledger, {
+    id: commitmentId("topic-discussed", opts.agentId, opts.topic),
+    agentId: opts.agentId,
+    summary: opts.summary,
+    channel: opts.channel,
+    atSimMinutes: opts.atSimMinutes,
+    kind: "topic-discussed",
+    status: "settled",
+  });
+}
+
+/** True iff `topic` has been recorded as discussed with `agentId`. The read
+ * side of recordTopicDiscussed, keyed by the same stable id so the two can't
+ * drift. Tolerates an absent/undefined ledger (old sessions, tests) as "not
+ * discussed," so every caller stays a one-liner. */
+export function hasDiscussed(ledger: CommitmentEntry[] | undefined, agentId: AgentId, topic: string): boolean {
+  if (!ledger || ledger.length === 0) return false;
+  const id = commitmentId("topic-discussed", agentId, topic);
+  return ledger.some((e) => e.id === id);
+}

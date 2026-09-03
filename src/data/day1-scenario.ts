@@ -7,7 +7,24 @@ import { useTaskflowStore } from "../store/taskflowStore";
 import { PAYOUT_PIPELINE } from "../lib/sim/payoutCanon";
 // commitments.ts imports ONLY from types.ts, so this stays clear of the
 // worldCanon -> incidentTimeline -> day1-scenario init cycle documented above.
-import { recordFixDecisionAck, recordPlayerOwesCsTemplate } from "../lib/sim/commitments";
+import {
+  recordFixDecisionAck,
+  recordPlayerOwesCsTemplate,
+  hasDiscussed,
+  DISCUSSED_RAJ_INCIDENT_OPTIONS,
+} from "../lib/sim/commitments";
+// Standup content lives in its ONE source module (see standup.ts): the digest
+// the #general fallback posts, the doc saved into Docs, and the timing. Also a
+// leaf (imports only types + commitments), so it's clear of the worldCanon ->
+// incidentTimeline -> day1-scenario init cycle documented above.
+import {
+  standupDigestContent,
+  buildStandupDoc,
+  STANDUP_DIGEST_DEFAULT,
+  STANDUP_EXPIRE_MINUTES,
+  STANDUP_DOC_ID,
+  STANDUP_DOC_FILENAME,
+} from "../lib/sim/standup";
 // obligations.ts likewise imports ONLY from types.ts (same leaf discipline), so
 // seeding NPC-initiated follow-ups from these applyEffects is cycle-safe.
 import {
@@ -117,6 +134,29 @@ export const day1ScenarioEvents: ScenarioEvent[] = [
     content: "Morning everyone, standup in 25",
   },
   {
+    // Quiet system reminder in the same voice as derek-notification: short,
+    // low-stakes, no requiresResponse. Paired with the 8:55 reminder below so the
+    // 9:00 standup call (Join affordance appears at STANDUP_START_MINUTES) doesn't
+    // arrive cold. #general because the standup is team-wide, matching where the
+    // 8:30 sys-welcome notification lands.
+    id: "standup-reminder-15",
+    day: 1,
+    triggerTimeMinutes: 525, // 8:45 AM
+    eventType: "notification",
+    agentId: "system",
+    channel: "general",
+    content: "Standup in 15 minutes.",
+  },
+  {
+    id: "standup-reminder-5",
+    day: 1,
+    triggerTimeMinutes: 535, // 8:55 AM
+    eventType: "notification",
+    agentId: "system",
+    channel: "general",
+    content: "Standup in 5 minutes.",
+  },
+  {
     id: "priya-heads-up-dm",
     day: 1,
     triggerTimeMinutes: 525, // 8:45 AM
@@ -146,14 +186,48 @@ export const day1ScenarioEvents: ScenarioEvent[] = [
     condition: (state) => !("priya-heads-up-dm" in state.respondedAtMinutes),
   },
   {
+    // NON-JOIN FALLBACK for the 9:00 standup call. The Join affordance appears at
+    // 9:00 (STANDUP_START_MINUTES) and is UI-driven off the sim clock; if the
+    // player NEVER joins, the standup still happens without them and this posts
+    // the digest to #general at 9:15 (STANDUP_EXPIRE_MINUTES) exactly as the
+    // pre-feature behavior did (just moved 15 min later), so a player who skips
+    // standup still gets the information and the scorecard/evaluators that read
+    // this digest keep working. Gated on !standupAttended: on the JOIN path the
+    // store posts the summary on Leave and sets standupAttended, so this never
+    // fires there (exactly one #general standup post in either path).
+    //
+    // The "Standup Notes, Day 1" doc is saved into sessionDocs here (skip path);
+    // the join path saves the identical doc in leaveStandup. Saving in BOTH paths
+    // is deliberate: attendance affects only the experience, never whether the
+    // notes are kept. Idempotent (upsert by STANDUP_DOC_ID); advanceClock is
+    // re-entrant, so re-running this applyEffect is a no-op overwrite.
+    //
+    // Kept the event id "standup" and a contentFor producing the digest so the
+    // discussed-ledger fix and its deterministic script (scripts/discussed-ledger)
+    // are unchanged: only the timing, the !standupAttended gate, the doc-save
+    // applyEffect, and the notes attachment are new.
+    //
+    // Priya's digest line is state-aware (see standupDigestContent): it doesn't
+    // present the checkout ticket spike as brand-new when the player already
+    // worked it with her in DM before standup (discussed ledger). Raj's and
+    // Design's lines are verbatim: the fix plan (rollback vs patch) doesn't exist
+    // until Raj's 9:20 diagnosis / 9:38 offer, both AFTER standup, so there is
+    // nothing pre-standup for Raj to have "already discussed"; Design isn't a
+    // player-facing thread at all.
     id: "standup",
     day: 1,
-    triggerTimeMinutes: 540, // 9:00 AM
+    triggerTimeMinutes: STANDUP_EXPIRE_MINUTES, // 9:15 AM (Join affordance expired)
     eventType: "chattr_message",
     agentId: "system",
     channel: "general",
-    content:
-      "**Daily Standup, 9:00 AM**\n\n**Raj:** \"Jordan and Chen are mid-sprint on the checkout redesign, no blockers there. Rest of the team's heads-down on their own stuff. I want eyes on payment service tech debt soon.\"\n**Priya:** \"Support queue's a little heavier than usual this morning, mostly checkout-related. Keeping an eye on it.\"\n**Design:** \"Heads-down on the listing page wireframes this morning, will post something in #design-review around midday.\"\n\n*Nothing here is flagged urgent, but you've already heard from Priya once this morning.*",
+    content: STANDUP_DIGEST_DEFAULT,
+    contentFor: (state) => standupDigestContent(state),
+    condition: (state) => !state.standupAttended,
+    applyEffect: (state) => ({
+      sessionDocs: { ...state.sessionDocs, [STANDUP_DOC_ID]: buildStandupDoc(state) },
+    }),
+    // The saved notes, reachable straight from the digest message.
+    attachment: { label: STANDUP_DOC_FILENAME, docId: STANDUP_DOC_ID },
   },
   {
     id: "priya-incidents-escalation",
@@ -236,6 +310,22 @@ export const day1ScenarioEvents: ScenarioEvent[] = [
       }
       if (state.tradeoffChoice === "patch-forward") {
         return "Logging this in the channel for the record: we're going patch-forward and keeping payout speed. Jordan and Chen are on the retry/idempotency fix now, roughly 30 min. Same honest caveat I gave you: I couldn't reproduce the exact Stripe failure, so it might need a second pass. I'll flag fast if it does.";
+      }
+      // No decision is on the record yet, but if Raj has ALREADY walked the
+      // player through these options (discussed ledger: they engaged him on the
+      // fix in DM or #incidents, recorded off the same signal as
+      // tradeoffEngagedWithRajAtMinutes), don't cold-re-present the whole
+      // tradeoff as first contact ("Ok, two ways to fix this...") the way the
+      // full offer does. That's the other half of the confirmed re-explain bug:
+      // even when the decision itself didn't classify into tradeoffChoice (e.g.
+      // a DM call the tradeoff evaluator read as "unclear"), the player has
+      // demonstrably been over this with Raj, so he references the ongoing
+      // thread and puts the same two paths on the record instead of re-teaching
+      // them. facts[] still carry both options into the checklist either way.
+      // The full, first-contact explanation is only right when they genuinely
+      // HAVEN'T discussed it (adaptive, not a hardcoded skip).
+      if (hasDiscussed(state.commitmentLedger, "raj", DISCUSSED_RAJ_INCIDENT_OPTIONS)) {
+        return "Dropping this in #incidents for the record since you and I have been going back and forth on it: still the same two paths. Rollback is the sure thing, about 10 min, but it pulls last week's faster seller payouts. Patch-forward keeps payout speed, about 30 min, but I still can't promise it covers the exact Stripe failure on the first ship. Your call whenever you're ready.";
       }
       return RAJ_TRADEOFF_OFFER_CONTENT;
     },
@@ -490,6 +580,102 @@ export const day1ScenarioEvents: ScenarioEvent[] = [
     channel: "random",
     content: "Is anyone doing a lunch order today? If so, count me in, I completely forgot to bring anything 🙃",
     easterEgg: { label: "Joined Theo's lunch order" },
+  },
+  {
+    // Ambient life pass: #random previously only carried Theo's two beats
+    // above plus whatever the player dragged into it. These seven fill out
+    // the rest of the day so the channel feels alive independent of the
+    // player, same non-graded/no-requiresResponse/no-facts shape as Theo's
+    // beats (channel isn't in scoredEvals in scorecard.ts, so none of this
+    // touches grading). Each stays strictly in-character for what that
+    // person is canonically doing at that hour per prompts.ts/worldCanon:
+    // Jordan is still on the redesign (not yet pulled onto the fix) at 9:31,
+    // Maya and Marcus post once the 11:00 resolution has freed up the day,
+    // and Chen's fried EOD line lands at 5:00 PM, well clear of his own
+    // incident-fix window if he was ever pulled onto it. Ines is excluded on
+    // purpose: she has no AgentId/persona of her own (see types.ts's
+    // AssigneeId comment and dmContacts.ts), so she can't be a chattr_message
+    // sender. Sam and Theo's short coffee-run exchange is the one NPC-to-NPC
+    // reply this pass adds, landing a few minutes apart like a real thread.
+    id: "jordan-random-spacing",
+    day: 1,
+    triggerTimeMinutes: 571, // 9:31 AM
+    eventType: "chattr_message",
+    agentId: "jordan",
+    channel: "random",
+    content: "Anyone else waiting forever on a design review comment right now, or is it just me? Mobile spacing note on the payment selector rebuild has had me blocked since yesterday.",
+  },
+  {
+    id: "sam-random-coffee-run",
+    day: 1,
+    triggerTimeMinutes: 608, // 10:08 AM
+    eventType: "chattr_message",
+    agentId: "sam",
+    channel: "random",
+    content: "Doing a coffee run in a few if anyone wants something. I'm buying, no judgment on order size.",
+  },
+  {
+    // Light NPC-to-NPC reply to sam-random-coffee-run above, a few minutes
+    // later like a real thread. Theo is uninvolved in the incident either
+    // way, so this is safe at any point in the morning.
+    id: "theo-random-coffee-reply",
+    day: 1,
+    triggerTimeMinutes: 613, // 10:13 AM
+    eventType: "chattr_message",
+    agentId: "theo",
+    channel: "random",
+    content: "Oh count me in, whatever's easiest for you. Thank you!",
+  },
+  {
+    // Lands well after the 11:00 resolution (resolution-good/partial/cold),
+    // so Maya having a quiet, unrelated moment to close out small design
+    // debt is consistent regardless of how the incident's CS-note branch
+    // resolved. Independent of jordan-random-spacing above, not a reply to it.
+    id: "maya-random-design-debt",
+    day: 1,
+    triggerTimeMinutes: 700, // 11:40 AM
+    eventType: "chattr_message",
+    agentId: "maya",
+    channel: "random",
+    content: "Finally closing out a few small design debt tickets today. Good day for tiny wins.",
+  },
+  {
+    // Marcus is at his desk on the payout pipeline all day (worldCanon), not
+    // pulled onto the incident, so an unrelated kitchen observation any time
+    // before his 2:30 PM payout-inconsistency beat (or 2:30 PM clean beat) is
+    // safe. Placed well clear of both.
+    id: "marcus-random-cake",
+    day: 1,
+    triggerTimeMinutes: 715, // 11:55 AM
+    eventType: "chattr_message",
+    agentId: "marcus",
+    channel: "random",
+    content: "Heads up there's leftover cake in the kitchen from Friday's thing. Going fast.",
+  },
+  {
+    // Deliberately NOT about CSAT/the incident's outcome, so it can't
+    // contradict the resolution-cold branch's priyaMood: "overwhelmed" (see
+    // resolution-cold above): this is just a small, unrelated team moment,
+    // true regardless of how the player's day went.
+    id: "priya-random-five-star",
+    day: 1,
+    triggerTimeMinutes: 975, // 4:15 PM
+    eventType: "chattr_message",
+    agentId: "priya",
+    channel: "random",
+    content: "My newest agent just got her first five-star review. Small joy today.",
+  },
+  {
+    // Chen only jokes once his own work (and any incident-fix pull) is long
+    // done for the day, matching the "not mid-rollback" guardrail: 5:00 PM is
+    // well clear of the fix window on either path.
+    id: "chen-random-eod-fried",
+    day: 1,
+    triggerTimeMinutes: 1020, // 5:00 PM
+    eventType: "chattr_message",
+    agentId: "chen",
+    channel: "random",
+    content: "International address validation might actually be the death of me. Calling it a day before I break something else.",
   },
   {
     // Maya's ask is a deliberately low-stakes, unrelated-to-the-incident

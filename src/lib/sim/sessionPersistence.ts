@@ -294,6 +294,10 @@ export function restoreSession(): boolean {
       pendingReplyChannel: null,
       rajFallbackInFlight: false,
       askClaudePending: false,
+      // Transient UI: never persisted. A refresh mid-call lands on the desktop;
+      // the durable attendance fact lives in stateBag.standupAttended (restored
+      // via the whole-object stateBag merge above).
+      standupCallOpen: false,
     });
 
     useTaskflowStore.setState({

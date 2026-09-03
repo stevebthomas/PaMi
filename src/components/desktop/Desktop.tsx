@@ -17,8 +17,10 @@ import { TaskflowApp } from "../taskflow/TaskflowApp";
 import { OfficeApp } from "../office/OfficeApp";
 import { DocsApp } from "../docs/DocsApp";
 import { DocWindow } from "../docs/DocWindow";
+import { StandupCallBar } from "../standup/StandupCallBar";
+import { StandupCall } from "../standup/StandupCall";
 import { FileText } from "lucide-react";
-import { getSimDoc } from "@/data/simDocs";
+import { resolveSimDoc } from "@/data/simDocs";
 import { useSimStore } from "@/store/simStore";
 import {
   docIdFromWindowId,
@@ -89,6 +91,9 @@ export function Desktop() {
   const dismissScorecard = useSimStore((s) => s.dismissScorecard);
   const day = useSimStore((s) => s.day);
   const clockMinutes = useSimStore((s) => s.clockMinutes);
+  // Session-generated docs (e.g. the 9:00 standup notes) resolve alongside the
+  // static registry when opening a doc window.
+  const sessionDocs = useSimStore((s) => s.stateBag.sessionDocs);
   const windows = useWindowStore((s) => s.windows);
   const openWindow = useWindowStore((s) => s.openWindow);
   // Docs launch signal: the docsStore plays the dock-bounce, then queues the
@@ -187,8 +192,9 @@ export function Desktop() {
   if (phase === "onboarding") {
     return (
       <OnboardingScreen
-        onStart={(name) => {
+        onStart={(name, avatarId) => {
           useSimStore.getState().setPlayerName(name);
+          useSimStore.getState().setPlayerAvatarId(avatarId);
           setPhase("desktop");
         }}
       />
@@ -274,7 +280,7 @@ export function Desktop() {
             docId (e.g. a stale key) resolves to no SimDoc and renders nothing. */}
         {(Object.keys(windows) as WindowId[]).filter(isDocWindowId).map((wid) => {
           const docId = docIdFromWindowId(wid);
-          const doc = docId ? getSimDoc(docId) : undefined;
+          const doc = docId ? resolveSimDoc(docId, sessionDocs) : undefined;
           if (!doc) return null;
           return (
             <DesktopWindow
@@ -292,6 +298,13 @@ export function Desktop() {
       </div>
 
       <Taskbar openApps={openApps} onSelectApp={handleSelectApp} />
+
+      {/* 9:00 standup: the Join affordance (quiet floating bar) shows only in
+          its live window, and the call overlay covers the whole shell (StatusBar
+          included, so +15m can't advance the clock mid-call). Both are inert
+          outside the standup window / when not open. */}
+      <StandupCallBar />
+      <StandupCall />
 
       {dayComplete && !scorecardDismissed && <DayScorecard onClose={dismissScorecard} />}
     </div>
