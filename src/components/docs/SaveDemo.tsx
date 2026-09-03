@@ -5,7 +5,7 @@ import { Bookmark, BookmarkCheck, Check } from "lucide-react";
 
 /**
  * Small interactive "save for later" demo embedded INSIDE a mockup doc (see
- * simDocs.ts `demo` field and DocsApp's `{{demo}}` marker). One component, two
+ * simDocs.ts `demo` field and DocWindow's `{{demo}}` marker). One component, two
  * variants:
  *
  *   - "saved-animation": tapping Save plays a real confirmation moment. A

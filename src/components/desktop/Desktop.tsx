@@ -16,8 +16,17 @@ import { NotesApp } from "../notes/NotesApp";
 import { TaskflowApp } from "../taskflow/TaskflowApp";
 import { OfficeApp } from "../office/OfficeApp";
 import { DocsApp } from "../docs/DocsApp";
+import { DocWindow } from "../docs/DocWindow";
+import { FileText } from "lucide-react";
+import { getSimDoc } from "@/data/simDocs";
 import { useSimStore } from "@/store/simStore";
-import { useWindowStore } from "@/store/windowStore";
+import {
+  docIdFromWindowId,
+  docWindowId,
+  isDocWindowId,
+  useWindowStore,
+  type WindowId,
+} from "@/store/windowStore";
 import { useDocsStore } from "@/store/docsStore";
 import { getSessionCostSummary } from "@/store/costStore";
 import { getAmbientTint, getDayProgress } from "@/lib/sim/timeOfDay";
@@ -52,6 +61,14 @@ export const APP_MIN_SIZE: Record<AppId, { width: number; height: number }> = {
   docs: { width: 380, height: 360 },
 };
 
+/** Size for a document's own window (keyed `doc:${docId}`). Not an AppId, so it
+ * lives outside the APP_* tables: a comfortable reading default that cascades
+ * on top of the library, with a floor that keeps the prose column readable. */
+const DOC_WINDOW_SIZE = {
+  default: { width: 520, height: 420 },
+  min: { width: 300, height: 240 },
+} as const;
+
 export function Desktop() {
   // "loading" until the mount effect has run the client-only restore. The
   // resume decision depends on restoreSession(), which reads localStorage:
@@ -74,14 +91,23 @@ export function Desktop() {
   const clockMinutes = useSimStore((s) => s.clockMinutes);
   const windows = useWindowStore((s) => s.windows);
   const openWindow = useWindowStore((s) => s.openWindow);
-  // Docs launch signal: the docsStore plays the dock-bounce, then flips
-  // pendingOpen so Desktop (the only caller of openWindow with real desk
-  // bounds) opens the window centered/cascaded like every other app.
-  const docsPendingOpen = useDocsStore((s) => s.pendingOpen);
+  // Docs launch signal: the docsStore plays the dock-bounce, then queues the
+  // docIds so Desktop (the only caller of openWindow with real desk bounds)
+  // opens each doc's own window centered/cascaded like every other window.
+  const docsPendingOpenIds = useDocsStore((s) => s.pendingOpenDocIds);
   const clearDocsPendingOpen = useDocsStore((s) => s.clearPendingOpen);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  const openApps = useMemo(() => new Set(Object.keys(windows) as AppId[]), [windows]);
+  // Taskbar/app logic is app-only: doc windows (keyed `doc:${docId}`) never
+  // become taskbar tiles, so filter them out of the openApps set. What remains
+  // is exactly the static AppId keys, so the cast is sound.
+  const openApps = useMemo(
+    () =>
+      new Set(
+        (Object.keys(windows) as WindowId[]).filter((id) => !isDocWindowId(id)) as AppId[]
+      ),
+    [windows]
+  );
 
   // Client-only restore + persistence startup, on mount. restoreSession()
   // hydrates both stores SYNCHRONOUSLY here, before the desktop can render
@@ -132,17 +158,23 @@ export function Desktop() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [phase]);
 
-  // Opens the Docs window once the docsStore's launch animation completes and
-  // flips pendingOpen. Kept here (not in the store) so openWindow is still only
-  // ever called with real containerRef desk dimensions: the window then
-  // centers/cascades exactly like every other app. Clearing the flag after is
-  // idempotent under StrictMode (openWindow bringsToFront if already open).
+  // Opens each queued doc's own window once the docsStore's launch choreography
+  // hands over the docIds. Kept here (not in the store) so openWindow is still
+  // only ever called with real containerRef desk dimensions: each doc window
+  // then centers/cascades exactly like every other window. Draining the queue
+  // after is idempotent under StrictMode (openWindow brings-to-front if already
+  // open), and each doc gets a distinct `doc:${docId}` key so multiple docs
+  // become multiple independent windows.
   useEffect(() => {
-    if (!docsPendingOpen) return;
+    if (docsPendingOpenIds.length === 0) return;
     const bounds = containerRef.current;
-    openWindow("docs", APP_DEFAULT_SIZE.docs, bounds?.clientWidth ?? 1024, bounds?.clientHeight ?? 640);
+    const deskWidth = bounds?.clientWidth ?? 1024;
+    const deskHeight = bounds?.clientHeight ?? 640;
+    for (const docId of docsPendingOpenIds) {
+      openWindow(docWindowId(docId), DOC_WINDOW_SIZE.default, deskWidth, deskHeight);
+    }
     clearDocsPendingOpen();
-  }, [docsPendingOpen, openWindow, clearDocsPendingOpen]);
+  }, [docsPendingOpenIds, openWindow, clearDocsPendingOpen]);
 
   // Neutral frame shown on the server and the first client render (identical on
   // both, so no hydration mismatch) until the mount effect decides resume vs.
@@ -236,6 +268,27 @@ export function Desktop() {
             <DocsApp />
           </DesktopWindow>
         )}
+        {/* One independent window per open document. The windows map is the sole
+            source of truth for which docs are open, so closeWindow (the X) is
+            the single close path — no docsStore mirror to desync. An unknown
+            docId (e.g. a stale key) resolves to no SimDoc and renders nothing. */}
+        {(Object.keys(windows) as WindowId[]).filter(isDocWindowId).map((wid) => {
+          const docId = docIdFromWindowId(wid);
+          const doc = docId ? getSimDoc(docId) : undefined;
+          if (!doc) return null;
+          return (
+            <DesktopWindow
+              key={wid}
+              id={wid}
+              title={doc.title}
+              icon={<FileText className="h-4 w-4" strokeWidth={2} aria-hidden="true" />}
+              containerRef={containerRef}
+              minSize={DOC_WINDOW_SIZE.min}
+            >
+              <DocWindow doc={doc} />
+            </DesktopWindow>
+          );
+        })}
       </div>
 
       <Taskbar openApps={openApps} onSelectApp={handleSelectApp} />

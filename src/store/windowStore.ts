@@ -1,8 +1,38 @@
 import { create } from "zustand";
 import type { AppId } from "@/components/desktop/Desktop";
 
+/**
+ * Window key. Static app windows are keyed by their static AppId (one window
+ * per app). Documents each get their OWN independent window, keyed
+ * `doc:${docId}`, so multiple docs can be open at once as separate,
+ * independently closable windows. AppId itself is left untouched: taskbar and
+ * app-launch logic stays app-only, and only the window layer knows about the
+ * wider key.
+ */
+export type WindowId = AppId | `doc:${string}`;
+
+const DOC_WINDOW_PREFIX = "doc:";
+
+/** Build the window key for a document's own window. */
+export function docWindowId(docId: string): WindowId {
+  return `${DOC_WINDOW_PREFIX}${docId}`;
+}
+
+/** True when a window key is a per-document window (vs. a static app window).
+ * A type guard so the negative branch narrows back to AppId — none of the
+ * AppIds start with `doc:` (note `docs` lacks the colon), so this never
+ * misclassifies the Docs library window as a doc window. */
+export function isDocWindowId(id: WindowId): id is `doc:${string}` {
+  return id.startsWith(DOC_WINDOW_PREFIX);
+}
+
+/** Recover the docId from a doc window key, or null for a static app window. */
+export function docIdFromWindowId(id: WindowId): string | null {
+  return isDocWindowId(id) ? id.slice(DOC_WINDOW_PREFIX.length) : null;
+}
+
 export interface WindowInstance {
-  id: AppId;
+  id: WindowId;
   x: number;
   y: number;
   width: number;
@@ -11,27 +41,29 @@ export interface WindowInstance {
 }
 
 interface WindowStoreState {
-  /** At most one window per app: reopening an already-open app brings it
-   * to front instead of spawning a duplicate. */
-  windows: Partial<Record<AppId, WindowInstance>>;
+  /** At most one window per key: reopening an already-open app (or an
+   * already-open document) brings it to front instead of spawning a duplicate.
+   * Keys are AppId for the static app windows plus `doc:${docId}` for each
+   * open document's own window. */
+  windows: Partial<Record<WindowId, WindowInstance>>;
   nextZIndex: number;
   openCount: number;
 
   openWindow: (
-    id: AppId,
+    id: WindowId,
     defaults: { width: number; height: number },
     deskWidth: number,
     deskHeight: number
   ) => void;
-  bringToFront: (id: AppId) => void;
-  moveWindow: (id: AppId, x: number, y: number) => void;
+  bringToFront: (id: WindowId) => void;
+  moveWindow: (id: WindowId, x: number, y: number) => void;
   /** Resizes a window, clamping to the per-app minimum and to the desk
    * bounds the caller passes in. Mirrors moveWindow's store-only shape: the
    * clamp bounds (per-app min from Desktop's APP_MIN_SIZE, max from the live
    * containerRef) are threaded in by DesktopWindow rather than read here, so
    * the store keeps no dependency on Desktop's size tables or the DOM. */
   resizeWindow: (
-    id: AppId,
+    id: WindowId,
     width: number,
     height: number,
     clamp: { minWidth: number; minHeight: number; maxWidth: number; maxHeight: number }
@@ -39,8 +71,10 @@ interface WindowStoreState {
   /** Closes the window (removes it from view/state). The underlying app
    * data (Chattr messages, Ask Claude history, etc.) lives in its own
    * store and is untouched, so reopening via the taskbar picks up where
-   * it left off. */
-  closeWindow: (id: AppId) => void;
+   * it left off. For document windows this is the SINGLE close path: there is
+   * no separate open-docs mirror to keep in sync — the windows map is the sole
+   * source of truth for which docs are open. */
+  closeWindow: (id: WindowId) => void;
 }
 
 const CASCADE_STEP = 28;

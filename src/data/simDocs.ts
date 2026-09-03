@@ -13,7 +13,7 @@
 export interface SimDoc {
   id: string;
   title: string;
-  /** Markdown source, rendered by DocsApp's scoped subset renderer (headings,
+  /** Markdown source, rendered by DocWindow's scoped subset renderer (headings,
    * hr, bullet lists, bold/italic, blank-line paragraphs, and a `{{demo}}`
    * marker line). */
   markdown: string;
@@ -21,7 +21,7 @@ export interface SimDoc {
   filename: string;
   /** Opt-in interactive demo variant. When set, a `{{demo}}` marker line in the
    * markdown is replaced by the SaveDemo component in that variant (see
-   * DocsApp/SaveDemo). Pure-data flag: the renderer, not this file, owns the
+   * DocWindow/SaveDemo). Pure-data flag: the renderer, not this file, owns the
    * component. Omitted for ordinary text-only docs. */
   demo?: "saved-animation" | "silent-instant";
 }

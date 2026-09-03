@@ -2,8 +2,7 @@
 
 import { useCallback, useRef, type PointerEvent, type ReactNode, type RefObject } from "react";
 import { Window } from "./Window";
-import { useWindowStore } from "@/store/windowStore";
-import type { AppId } from "./Desktop";
+import { isDocWindowId, useWindowStore, type WindowId } from "@/store/windowStore";
 import { AppIcon } from "@/components/shared/AppIcon";
 
 /** How much of the title bar must always stay reachable on screen. */
@@ -16,18 +15,24 @@ const RESIZE_MARGIN = 16;
 export function DesktopWindow({
   id,
   title,
+  icon,
   headerRight,
   containerRef,
   minSize,
   children,
 }: {
-  id: AppId;
+  id: WindowId;
   title: string;
+  /** Title-bar icon override. App windows omit it and fall back to their
+   * AppIcon; document windows pass an explicit icon (FileText), since their id
+   * is a `doc:${docId}` key with no AppIcon of its own. */
+  icon?: ReactNode;
   headerRight?: ReactNode;
   containerRef: RefObject<HTMLDivElement | null>;
-  /** Per-app resize floor (Desktop's APP_MIN_SIZE); the desk bounds supply the
-   * ceiling. Threaded as a prop so the store stays free of Desktop's size
-   * tables (mirrors how containerRef, not the store, owns the drag bounds). */
+  /** Per-window resize floor (Desktop's APP_MIN_SIZE, or DOC_WINDOW_SIZE for
+   * doc windows); the desk bounds supply the ceiling. Threaded as a prop so the
+   * store stays free of Desktop's size tables (mirrors how containerRef, not
+   * the store, owns the drag bounds). */
   minSize: { width: number; height: number };
   children: ReactNode;
 }) {
@@ -130,7 +135,7 @@ export function DesktopWindow({
     >
       <Window
         title={title}
-        icon={<AppIcon id={id} sizeClassName="h-4 w-4" />}
+        icon={icon ?? (isDocWindowId(id) ? undefined : <AppIcon id={id} sizeClassName="h-4 w-4" />)}
         headerRight={headerRight}
         onTitleBarPointerDown={handlePointerDown}
         onTitleBarPointerMove={handlePointerMove}
