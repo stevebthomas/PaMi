@@ -233,6 +233,15 @@ export function ScorecardDetail({ record }: { record: DayScorecardRecord | Playt
               <li key={i}>
                 <span className="font-semibold">{area.topicLabel}.</span>
                 {area.reason && <span> {area.reason}</span>}
+                {/* Freeform "additional" topics carry no curated reason or
+                    resources, so a bare bold label reads as broken. Give them a
+                    quiet supporting line instead. Inferred from the empty shape
+                    (no reason and no resources) rather than a data flag. */}
+                {!area.reason && area.resources.length === 0 && (
+                  <div className="mt-0.5 text-label italic text-text-secondary">
+                    Flagged from today&apos;s session. No curated resources for this one yet, worth exploring on your own.
+                  </div>
+                )}
                 {area.resources.length > 0 && (
                   <div className="mt-1 space-y-0.5">
                     {area.resources.map((r) => (

@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, type KeyboardEvent } from "react";
 import { Bot, Send, User } from "lucide-react";
 import { useSimStore } from "@/store/simStore";
 import { TypingDots } from "@/components/shared/TypingDots";
+import { renderInline } from "@/components/shared/renderInline";
 
 export function AskClaudeApp() {
   const messages = useSimStore((s) => s.askClaudeMessages);
@@ -50,7 +51,7 @@ export function AskClaudeApp() {
               <div className="text-body font-semibold text-text-primary">
                 {m.senderId === "assistant" ? "Ask Claude" : "You"}
               </div>
-              <p className="whitespace-pre-wrap text-body leading-snug text-text-primary">{m.content}</p>
+              <p className="whitespace-pre-wrap text-body leading-snug text-text-primary">{renderInline(m.content)}</p>
             </div>
           </div>
         ))}

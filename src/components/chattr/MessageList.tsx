@@ -1,5 +1,6 @@
-import { Fragment, useEffect, useRef, type ReactNode } from "react";
+import { useEffect, useRef } from "react";
 import { AGENT_NAMES } from "@/lib/sim/types";
+import { renderInline } from "@/components/shared/renderInline";
 import { formatSimTime, useSimStore } from "@/store/simStore";
 import { useDocsStore } from "@/store/docsStore";
 import { getSimDoc } from "@/data/simDocs";
@@ -99,26 +100,4 @@ export function MessageList() {
       <div ref={bottomRef} />
     </div>
   );
-}
-
-/** Inline emphasis for message content: `**bold**` and `*italic*` only —
- * no links, no headings, no block parsing. Single-pass split, returns React
- * nodes (no dangerouslySetInnerHTML), adapted from DocsApp's renderInline
- * so system-voice content like the 9:00 standup digest doesn't render
- * literal asterisks. */
-function renderInline(text: string): ReactNode {
-  const parts = text.split(/(\*\*[^*]+\*\*|\*[^*]+\*)/g);
-  return parts.map((part, i) => {
-    if (part.startsWith("**") && part.endsWith("**")) {
-      return (
-        <strong key={i} className="font-semibold">
-          {part.slice(2, -2)}
-        </strong>
-      );
-    }
-    if (part.startsWith("*") && part.endsWith("*")) {
-      return <em key={i}>{part.slice(1, -1)}</em>;
-    }
-    return <Fragment key={i}>{part}</Fragment>;
-  });
 }
