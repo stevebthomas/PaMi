@@ -1,6 +1,13 @@
-# PM Simulator
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="public/brand/rally-logotype-dark.png">
+    <img alt="Rally" src="public/brand/rally-logotype-light.png" width="220">
+  </picture>
+</p>
 
-A realistic training simulation for new Product Managers. You play a brand-new PM at BazaarLoop, a
+# Rally
+
+A realistic training simulation for new Project Managers. You play a brand-new PM at BazaarLoop, a
 fictional secondhand-marketplace startup, working one simulated day inside a pixel-art desktop
 (Chattr for team chat, Pulse for the live metrics dashboard, Taskflow for tickets, Office for the
 engineering floor, Ask Claude for on-demand glossary and concept help, deliberately not coaching). Day 1 drops you into a live payments incident:

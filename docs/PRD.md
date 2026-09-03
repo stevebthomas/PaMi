@@ -1,8 +1,8 @@
-# PM Simulator: Product Requirements (Day 1)
+# Rally: Product Requirements (Day 1)
 
 ## 1. Overview
 
-PM Simulator is a single-player, browser-based training simulation that puts a brand-new product manager through one
+Rally is a single-player, browser-based training simulation that puts a brand-new project manager through one
 simulated workday at BazaarLoop, a fictional secondhand marketplace (an Etsy/eBay mix built for a younger,
 mobile-first audience). The player works inside a pixel-art desktop of apps (team chat, a live metrics dashboard, a
 ticket board, an engineering floor view, and a glossary assistant) and lives through Day 1: a live payments incident
@@ -14,7 +14,7 @@ place to practice the calls that are otherwise only learnable on the job.
 
 ## 2. Problem statement
 
-Product managers are judged on judgment under pressure: how fast they assess a blast radius, whether they take
+Project managers are judged on judgment under pressure: how fast they assess a blast radius, whether they take
 ownership of a decision or let it drift, whether they ground what they say in real signals instead of inventing
 numbers, how well they relay information up to stakeholders, and whether they see the hidden cost inside a tradeoff.
 These skills are hardest to practice safely, because the only realistic setting for them is a real incident with

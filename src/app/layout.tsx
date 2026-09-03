@@ -13,8 +13,8 @@ const bodyFont = Geist({
 });
 
 export const metadata: Metadata = {
-  title: "PM Simulator — BazaarLoop",
-  description: "A gamified, AI-powered simulation of Day 1 as a PM at a marketplace startup, working a live payments incident.",
+  title: "Rally — BazaarLoop",
+  description: "Rally is a gamified, AI-powered simulation of Day 1 as a PM at a marketplace startup, working a live payments incident.",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

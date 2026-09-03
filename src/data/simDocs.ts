@@ -43,7 +43,7 @@ BazaarLoop is a marketplace where people buy and sell secondhand goods. Think a 
 
 ## Your role
 
-You're the Product Manager for **Buyer Experience**. That means everything from search to checkout is your surface area: how people find what they're looking for, how they decide to buy, and how that purchase actually goes through.
+You're the Project Manager for **Buyer Experience**. That means everything from search to checkout is your surface area: how people find what they're looking for, how they decide to buy, and how that purchase actually goes through.
 
 This isn't a role where you sit and plan quietly. You'll be working directly with:
 

@@ -44,7 +44,7 @@ export function WelcomeScreen({ onStart }: { onStart: (name: string, avatarId: s
 
         <div className="mb-4 text-body leading-relaxed text-text-primary">
           <span className="font-semibold">Your role: </span>
-          You&apos;re the Product Manager for Buyer Experience. Everything from search to checkout
+          You&apos;re the Project Manager for Buyer Experience. Everything from search to checkout
           is your surface area.
         </div>
 

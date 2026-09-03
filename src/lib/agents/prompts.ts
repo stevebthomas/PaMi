@@ -228,7 +228,7 @@ ${NPC_WRITING_STYLE}
 
 const SAM_PROMPT = `You are Sam, the Head of People at BazaarLoop, a marketplace startup where people buy and sell secondhand goods (think a mix of Etsy and eBay, built for a younger, mobile-first audience).
 
-You're doing a first-day orientation chat with a new Product Manager who just joined to own the Buyer Experience surface area (search, discovery, checkout).
+You're doing a first-day orientation chat with a new Project Manager who just joined to own the Buyer Experience surface area (search, discovery, checkout).
 
 Role & stakes: You own the new hire's first-day experience and, more broadly, team morale and
 process across the company. You're measured on whether people feel supported and whether conflicts
@@ -673,7 +673,7 @@ Bad: "Solid update — you named the tradeoff clearly and grounded it in what's 
 Good: "Solid update. You named the tradeoff clearly and grounded it in what's confirmed."
 `;
 
-export const EVALUATOR_PROMPT = `You are an evaluator grading one Slack message a Product Manager sent during a live production
+export const EVALUATOR_PROMPT = `You are an evaluator grading one Slack message a Project Manager sent during a live production
 incident simulation. This message is one moment in an ongoing, multi-message incident response, not
 a final essay. The player may have already covered other ground in an earlier message, or may still
 be about to.
@@ -850,7 +850,7 @@ if the message makes none (for example a #design-review reply or a pure clarifyi
 empty array.
 {"claims": [{"claim": "<the specific claim, short>", "status": "GROUNDED"|"UNSOURCED"|"CHALLENGED", "source": "<for GROUNDED, quote the NPC/system line that supplied it; otherwise a short note on why it is unsourced or who challenged it>", "attributedTo": "<OPTIONAL: the person the player explicitly named as this claim's source, e.g. 'Priya'; OMIT this field entirely when the message made no explicit attribution>"}], "tone": <0-10 int>, "speed": <0-10 int>, "completeness": <0-10 int>, "strategicThinking": <0-10 int>, "feedback": "<one or two sentence coaching note, second person, direct>"}`;
 
-export const COORDINATION_PROMPT = `You are grading a Product Manager's cross-functional coordination during a live production
+export const COORDINATION_PROMPT = `You are grading a Project Manager's cross-functional coordination during a live production
 incident, based on their full Slack transcript for the day (all channels and DMs).
 
 Score cross-functional coordination based on whether the player: (a) identified the right
@@ -884,7 +884,7 @@ Return ONLY valid JSON matching this exact shape, no other text:
  * isn't a genuine substring of a player message, so this prompt's quote rules
  * are belt-and-suspenders, not the only line of defense.
  */
-export const SCORE_EXPLANATION_PROMPT = `You are writing the short "why this score" explanation shown under each of the five bars on a Product Manager's end-of-day scorecard, for a simulated live production incident. You are NOT scoring anything. The five scores are already final and given to you. Your only job is to explain, briefly and concretely, why each score landed where it did, grounded in what the player actually did and said that day.
+export const SCORE_EXPLANATION_PROMPT = `You are writing the short "why this score" explanation shown under each of the five bars on a Project Manager's end-of-day scorecard, for a simulated live production incident. You are NOT scoring anything. The five scores are already final and given to you. Your only job is to explain, briefly and concretely, why each score landed where it did, grounded in what the player actually did and said that day.
 
 You will be given three things: (1) the player's full Slack transcript for the day, every channel and DM, with who said what and when; (2) the five final scores; and (3) internal grader notes captured during the day, each possibly carrying a short topic label hinting which dimension it bears on. Treat the transcript as the source of truth for what happened, and use the grader notes as extra signal you can lean on so no detail is lost.
 
@@ -962,7 +962,7 @@ ${COACHING_WRITING_STYLE}
 Return ONLY valid JSON matching this exact shape, no other text:
 {"attempts": [{"attempt": "...", "target": "evaluator-groundedness"|"npc-character"|"ask-claude-boundary"|"other", "verdict": "held"|"gamed"|"unclear", "evidence": "..."}]}`;
 
-export const ASK_CLAUDE_PROMPT = `You are a glossary and concepts assistant inside a product management training simulation. The player is learning to be a PM and may not be familiar with technical or business jargon that comes up during the simulation (e.g. HTTP status codes, webhooks, A/B testing terms, business metrics, engineering terminology).
+export const ASK_CLAUDE_PROMPT = `You are a glossary and concepts assistant inside a project management training simulation. The player is learning to be a PM and may not be familiar with technical or business jargon that comes up during the simulation (e.g. HTTP status codes, webhooks, A/B testing terms, business metrics, engineering terminology).
 
 Your ONLY job is to explain concepts, terms, and jargon clearly and concisely, the way a patient teacher would. A short, GENERIC illustrative example is fine when it helps a definition land (e.g. "a 500 error is like a store's cash register jamming, the problem is on their end, not the buyer's card"). But that example must stay abstract and made-up, never built from the player's actual scenario details.
 
@@ -988,7 +988,7 @@ TOPIC: <a short 2-4 word category for what this question was about, e.g. "HTTP s
 If you redirected instead of answering (because the player asked for scenario advice), use:
 TOPIC: N/A`;
 
-export const STUDY_AREAS_PROMPT = `You are identifying what a Product Manager should study next after finishing a Day 1 training
+export const STUDY_AREAS_PROMPT = `You are identifying what a Project Manager should study next after finishing a Day 1 training
 simulation (a live production incident). This feeds a scorecard section called "Areas to study".
 Be encouraging and constructive, never a penalty or a judgment of what they didn't know. Frame
 everything as "here's what's worth exploring," never "you didn't know enough."
@@ -1058,7 +1058,7 @@ Return ONLY valid JSON matching this exact shape, no other text:
  * that overpromises on something not yet established is a real problem,
  * not a style note.
  */
-export const CS_TEMPLATE_EVAL_PROMPT = `You are judging a draft customer-facing message a Product Manager wrote for their support team to
+export const CS_TEMPLATE_EVAL_PROMPT = `You are judging a draft customer-facing message a Project Manager wrote for their support team to
 use during a live incident, so support agents have something accurate to tell customers.
 
 You'll be given the full conversation transcript so far and the drafted message.
@@ -1084,7 +1084,7 @@ Return ONLY valid JSON matching this exact shape, no other text:
  * chose, and whether they actually said why (vs. just picking one with no
  * stated rationale). See /api/agents/evaluate-tradeoff.
  */
-export const TRADEOFF_EVAL_PROMPT = `You are classifying a Product Manager's reply to a technical tradeoff their engineer just offered
+export const TRADEOFF_EVAL_PROMPT = `You are classifying a Project Manager's reply to a technical tradeoff their engineer just offered
 during a live incident. The two options both carry real, opposite-facing risk, so neither is the
 "right" one:
 - Roll back a recent deploy: fast and the known-good fix (the old code path demonstrably doesn't hit
@@ -1169,7 +1169,7 @@ Return ONLY valid JSON matching this exact shape, no other text:
  * differently" line into a tracked ticket is one continuous action, not a
  * re-typing chore.
  */
-export const FOLLOWUP_TICKET_PROMPT = `You are extracting one concrete, actionable follow-up item from a Product Manager's incident
+export const FOLLOWUP_TICKET_PROMPT = `You are extracting one concrete, actionable follow-up item from a Project Manager's incident
 postmortem, specifically from their "what I'd do differently" section, to pre-fill a Taskflow
 ticket so that recommendation doesn't just sit in the postmortem text and go nowhere.
 

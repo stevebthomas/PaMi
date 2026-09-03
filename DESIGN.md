@@ -1,4 +1,4 @@
-# DESIGN.md — PM Simulator Visual System
+# DESIGN.md — Rally Visual System
 
 Source: research report on "professional with a Duolingo touch" direction, refined toward Brilliant.org specifically as the closest match. Feed this file to Claude Code on every UI task so it has a consistent target instead of defaulting to generic AI-tool aesthetics.
 

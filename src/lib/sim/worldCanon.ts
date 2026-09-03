@@ -70,7 +70,7 @@ export const COMPANY = {
  * and not just checkout numbers: browse and search are inside the player's
  * surface too. */
 export const PLAYER_ROLE = {
-  title: "Product Manager, Buyer Experience",
+  title: "Project Manager, Buyer Experience",
   /** Ordered funnel stages the player owns, top to bottom. */
   scope: ["search", "browse", "cart", "checkout"] as const,
   scopeSummary: "search through checkout",

@@ -1,4 +1,4 @@
-# PM Simulator: Technical Audit
+# Rally: Technical Audit
 
 Scope: the `pm-simulator` codebase as of 2026-08-26, working tree (uncommitted). All claims reference files under `src/`, `scripts/`, `playtests/`, `supabase/`. Line numbers are approximate; function and type names are exact.
 
