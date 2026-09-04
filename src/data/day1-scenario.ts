@@ -583,13 +583,12 @@ export const day1ScenarioEvents: ScenarioEvent[] = [
   },
   {
     // Ambient life pass: #random previously only carried Theo's two beats
-    // above plus whatever the player dragged into it. These seven fill out
+    // above plus whatever the player dragged into it. These six fill out
     // the rest of the day so the channel feels alive independent of the
     // player, same non-graded/no-requiresResponse/no-facts shape as Theo's
     // beats (channel isn't in scoredEvals in scorecard.ts, so none of this
     // touches grading). Each stays strictly in-character for what that
     // person is canonically doing at that hour per prompts.ts/worldCanon:
-    // Jordan is still on the redesign (not yet pulled onto the fix) at 9:31,
     // Maya and Marcus post once the 11:00 resolution has freed up the day,
     // and Chen's fried EOD line lands at 5:00 PM, well clear of his own
     // incident-fix window if he was ever pulled onto it. Ines is excluded on
@@ -597,15 +596,11 @@ export const day1ScenarioEvents: ScenarioEvent[] = [
     // AssigneeId comment and dmContacts.ts), so she can't be a chattr_message
     // sender. Sam and Theo's short coffee-run exchange is the one NPC-to-NPC
     // reply this pass adds, landing a few minutes apart like a real thread.
-    id: "jordan-random-spacing",
-    day: 1,
-    triggerTimeMinutes: 571, // 9:31 AM
-    eventType: "chattr_message",
-    agentId: "jordan",
-    channel: "random",
-    content: "Anyone else waiting forever on a design review comment right now, or is it just me? Mobile spacing note on the payment selector rebuild has had me blocked since yesterday.",
-  },
-  {
+    // (Jordan's design-review blocker, formerly here as jordan-random-spacing,
+    // moved to #design-review as jordan-designreview-spacing below, next to
+    // maya-design-question: it's a real, ongoing work blocker, not ambient
+    // texture, and #random is explicitly not for that. See that event's
+    // comment for the full reasoning.)
     id: "sam-random-coffee-run",
     day: 1,
     triggerTimeMinutes: 608, // 10:08 AM
@@ -630,7 +625,7 @@ export const day1ScenarioEvents: ScenarioEvent[] = [
     // Lands well after the 11:00 resolution (resolution-good/partial/cold),
     // so Maya having a quiet, unrelated moment to close out small design
     // debt is consistent regardless of how the incident's CS-note branch
-    // resolved. Independent of jordan-random-spacing above, not a reply to it.
+    // resolved. Unrelated to her 12:30 PM design-review ask below.
     id: "maya-random-design-debt",
     day: 1,
     triggerTimeMinutes: 700, // 11:40 AM
@@ -678,12 +673,45 @@ export const day1ScenarioEvents: ScenarioEvent[] = [
     content: "International address validation might actually be the death of me. Calling it a day before I break something else.",
   },
   {
+    // Real, ongoing work blocker, so it belongs here in #design-review, not in
+    // #random (which is ambient office texture only, never real work). This
+    // was formerly jordan-random-spacing, misfiled in #random; moved here and
+    // rewritten as a proper channel post (a light nudge toward Maya, since
+    // she owns design) rather than a vent. Matches existing canon rather than
+    // introducing anything new: Raj's persona already states Jordan is
+    // "blocked on a design review comment about mobile spacing" (RAJ_PROMPT
+    // in prompts.ts) and worldCanon.ts's Jordan defaultTask says the same;
+    // roster.ts's #design-review presence list already includes Jordan
+    // BECAUSE of this exact fact. 9:31 AM is well clear of Maya's 12:30 PM
+    // ask below and consistent with her standup line ("heads-down on
+    // wireframes this morning, will post something in #design-review around
+    // midday" - standup.ts's DESIGN_TEXT): she simply isn't posting yet when
+    // Jordan does. Not a reply to (or from) Maya's unrelated ask below, and
+    // it doesn't distort the EVALUATOR_PROMPT #design-review special case
+    // that grades the player's reply to HER ask: that special case keys off
+    // the channel and the graded player message's own content, not the
+    // channel's total message volume, and the UI's Design-review card routes
+    // the player specifically to "Message Maya" (OfficeApp.tsx), so this
+    // extra NPC message is just added color, not a second thing being
+    // graded.
+    id: "jordan-designreview-spacing",
+    day: 1,
+    triggerTimeMinutes: 571, // 9:31 AM
+    eventType: "chattr_message",
+    agentId: "jordan",
+    channel: "design-review",
+    content:
+      "Posting here in case it fell off the radar: mobile spacing note on the payment selector rebuild has had me blocked since yesterday. Maya, whenever you get a sec to take another look, I'd appreciate it.",
+  },
+  {
     // Maya's ask is a deliberately low-stakes, unrelated-to-the-incident
     // interruption during the midday lull between the morning incident and
     // Derek's early-afternoon check-in: see prompts.ts's EVALUATOR_PROMPT
     // #design-review special case for how this gets graded (handling, not
     // which option gets picked). References Theo's actual Office-roster
-    // ticket rather than inventing new work.
+    // ticket rather than inventing new work. (Jordan's own design-review
+    // blocker post above, at 9:31 AM, is unrelated to this ask; see that
+    // event's comment for why it doesn't affect this one's grading.)
     id: "maya-design-question",
     day: 1,
     triggerTimeMinutes: 750, // 12:30 PM

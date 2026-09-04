@@ -44,7 +44,7 @@ a state test passes at that minute (the test is spelled out in plain English). A
 | 9:15 AM | Priya, #incidents | `priya-incidents-escalation` | Fixed. "OK this is escalating. 14 tickets in the last hour… All Apple Pay." **Requires a response** (30-min deadline). The incident is now formally declared. |
 | 9:20 AM | Raj, #incidents | `raj-diagnosis` | Fixed. "Stripe webhook for Apple Pay is returning 500s on ~3% of attempts." Supplies the root-cause facts. |
 | 9:26 AM | Priya, DM | `priya-template-request` | Fixed. Asks for a customer-facing note ("doesn't need to be polished, just accurate"). Silently records that you owe her the CS template and seeds her two follow-ups (see obligations below). |
-| 9:31 AM | Jordan, #random | `jordan-random-spacing` | Fixed ambient. Jordan grumbling about a blocked design-review comment. Not graded. |
+| 9:31 AM | Jordan, #design-review | `jordan-designreview-spacing` | Fixed. Jordan posts a real, ongoing blocker (mobile spacing note on the payment selector rebuild) and nudges Maya. This NPC message itself isn't graded — only your own reply in #design-review would be, under the special case in Section 4. |
 | 9:32 AM | Raj, #incidents | `raj-ownership-check` | **Conditional:** only if you have NOT responded to the 9:15 escalation. "I can pull Jordan or Chen off the redesign… that's your call." |
 | 9:38 AM | Raj, #incidents | `raj-tradeoff-offer` | Fixed. **The rollback-vs-patch-forward offer.** Content is state-aware (see Section 2). This is the central decision beat. |
 | 9:42 AM | Priya, #incidents | `priya-seller-payout-flag` | Fixed. Flags the seller-payout cost of a rollback; offers to pull the exact count if it'd help you decide. Content is state-aware. |
@@ -133,7 +133,7 @@ All **40** event ids in `src/data/day1-scenario.ts` are accounted for above: `sy
 `priya-early-followup`, `standup`, `priya-incidents-escalation`, `raj-diagnosis`, `raj-ownership-check`,
 `raj-tradeoff-offer`, `priya-seller-payout-flag`, `priya-template-request`, `raj-nudge`,
 `priya-no-response-fallback`, `derek-tradeoff-escalation`, `raj-tradeoff-escalation-followup`,
-`theo-random-bathroom`, `theo-random-lunch`, `jordan-random-spacing`, `sam-random-coffee-run`,
+`theo-random-bathroom`, `theo-random-lunch`, `jordan-designreview-spacing`, `sam-random-coffee-run`,
 `theo-random-coffee-reply`, `maya-random-design-debt`, `marcus-random-cake`, `priya-random-five-star`,
 `chen-random-eod-fried`, `maya-design-question`, `derek-notification`, `derek-escalation`, `derek-followup`,
 `derek-unassigned-fix-nudge`, `marcus-payout-inconsistency`, `priya-payout-inconsistency-followup`,
