@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { Hourglass, SkipForward } from "lucide-react";
 import { useSimStore, formatSimTime } from "@/store/simStore";
 import { getBatteryLevel, getDayProgress } from "@/lib/sim/timeOfDay";
@@ -45,6 +46,17 @@ export function StatusBar() {
     <div className="flex h-9 shrink-0 items-center justify-between border-b border-border-hairline bg-surface px-3">
       <div className="text-label font-semibold tracking-wide text-text-secondary">BAZAARLOOP</div>
       <div className="flex items-center gap-3">
+        {/* DEMO/FILMING: pure nav link to the isolated /demo/day2 ad-shoot scaffolding — not a real day-advance trigger; remove with src/app/demo. */}
+        {dayComplete && (
+          <Link
+            href="/demo/day2"
+            className="flex items-center gap-1.5 rounded-full bg-primary px-2.5 py-1 text-caption font-medium text-primary-foreground transition-colors hover:bg-primary/80"
+            title="Continue to Day 2"
+          >
+            <span className="h-1.5 w-1.5 rounded-full bg-primary-foreground animate-pulse" />
+            Day 2 ready
+          </Link>
+        )}
         <button
           onClick={() => setDifficulty(difficulty === "easy" ? "standard" : "easy")}
           className="rounded-full bg-muted px-2.5 py-1 text-caption font-medium text-text-secondary hover:text-text-primary"
