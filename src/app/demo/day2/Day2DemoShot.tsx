@@ -32,8 +32,6 @@ type Trace = {
   no: number;
   meta: string;
   sample: string;
-  presets: Record<RuleKey, RuleVerdict>;
-  verdict: Verdict;
 };
 
 const TRACES: Trace[] = [
@@ -41,24 +39,18 @@ const TRACES: Trace[] = [
     no: 3,
     meta: "listing-assistant · draft · 9:01 AM",
     sample:
-      "Retro chrome toaster in gleaming condition — vintage-inspired styling with the original 1950s heating elements still going strong. Barely used, basically brand new. Toasts perfectly even every time — you won't find a cleaner one at this price, guaranteed.",
-    presets: { rule1: "fail", rule2: "pass", rule3: "pass", rule4: "fail" },
-    verdict: "fail",
+      "Retro chrome toaster in gleaming condition. Vintage-inspired styling with the original 1950s heating elements still going strong. Barely used, basically brand new. Toasts perfectly even every time, and you won't find a cleaner one at this price, guaranteed.",
   },
   {
     no: 4,
     meta: "listing-assistant · draft · 9:01 AM",
     sample:
-      "Vintage 90s denim jacket in great worn-in condition — soft, faded wash with just the right amount of character. Fits true to size (tagged L, sits more like a relaxed M/L) and layers well over a hoodie or tee. Ships within 1–2 business days in eco-friendly packaging — a closet staple that won't last long at this price.",
-    presets: { rule1: "pass", rule2: "pass", rule3: "pass", rule4: "pass" },
-    verdict: "good",
+      "Vintage 90s denim jacket in great worn-in condition. Soft, faded wash with just the right amount of character. Fits true to size (tagged L, sits more like a relaxed M/L) and layers well over a hoodie or tee. Ships within 1–2 business days in eco-friendly packaging, a closet staple that won't last long at this price.",
   },
   {
     no: 5,
     meta: "listing-assistant · draft · 9:01 AM",
     sample: "Ceramic planter, 8 inch. White. No cracks. Comes with drainage tray.",
-    presets: { rule1: "pass", rule2: "pass", rule3: "pass", rule4: "pass" },
-    verdict: "weak",
   },
 ];
 
@@ -135,12 +127,20 @@ function MessageScreen({ onOpenEval }: { onOpenEval: () => void }) {
   );
 }
 
+const EMPTY_RULE_VERDICTS: Record<RuleKey, RuleVerdict | null> = {
+  rule1: null,
+  rule2: null,
+  rule3: null,
+  rule4: null,
+};
+
 function EvalScreen() {
   const [visible, setVisible] = useState(false);
   const [traceIndex, setTraceIndex] = useState(0);
   const trace = TRACES[traceIndex];
-  const [ruleVerdicts, setRuleVerdicts] = useState<Record<RuleKey, RuleVerdict>>(trace.presets);
-  const [verdict, setVerdict] = useState<Verdict>(trace.verdict);
+  const [ruleVerdicts, setRuleVerdicts] =
+    useState<Record<RuleKey, RuleVerdict | null>>(EMPTY_RULE_VERDICTS);
+  const [verdict, setVerdict] = useState<Verdict | null>(null);
   const [reason, setReason] = useState("");
   const [goodResponse, setGoodResponse] = useState("");
 
@@ -151,10 +151,9 @@ function EvalScreen() {
   }, []);
 
   function goToTrace(index: number) {
-    const nextTrace = TRACES[index];
     setTraceIndex(index);
-    setRuleVerdicts(nextTrace.presets);
-    setVerdict(nextTrace.verdict);
+    setRuleVerdicts(EMPTY_RULE_VERDICTS);
+    setVerdict(null);
     setReason("");
     setGoodResponse("");
   }
@@ -171,7 +170,7 @@ function EvalScreen() {
           <div className="flex items-center gap-2 text-text-secondary">
             <ClipboardCheck className="h-4 w-4" aria-hidden />
             <span className="text-label font-semibold text-text-primary">
-              AI Eval — Listing Assistant
+              AI Eval: Listing Assistant
             </span>
           </div>
           <span className="rounded-full bg-status-pending/15 px-2 py-0.5 text-caption font-semibold uppercase tracking-wide text-status-pending">
@@ -208,7 +207,7 @@ function EvalScreen() {
 
           <div className="mt-6">
             <p className="text-label font-semibold uppercase tracking-wide text-text-secondary">
-              SAMPLE OUTPUT — LISTING ASSISTANT (SELLER PILOT)
+              SAMPLE OUTPUT: LISTING ASSISTANT (SELLER PILOT)
             </p>
             <div className="mt-2 rounded-md border border-border-hairline bg-surface p-4">
               <p className="font-pixel text-caption text-text-secondary">{trace.meta}</p>
