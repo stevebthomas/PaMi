@@ -39,7 +39,7 @@ export function ChannelList() {
               : "text-text-secondary hover:bg-muted/60 hover:text-text-primary"
           }`}
         >
-          <span>{c.label}</span>
+          <span className={unreadChannels.has(c.id) ? "font-semibold" : ""}>{c.label}</span>
           {unreadChannels.has(c.id) && <span className="h-2 w-2 rounded-full bg-accent-green" />}
         </button>
       ))}
@@ -55,7 +55,7 @@ export function ChannelList() {
               : "text-text-secondary hover:bg-muted/60 hover:text-text-primary"
           }`}
         >
-          <span>{c.label}</span>
+          <span className={unreadChannels.has(c.id) ? "font-semibold" : ""}>{c.label}</span>
           {unreadChannels.has(c.id) && <span className="h-2 w-2 rounded-full bg-accent-green" />}
         </button>
       ))}
