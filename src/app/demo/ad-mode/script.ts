@@ -82,6 +82,17 @@ export type SceneState = {
    * and also drives the battery meter and the wallpaper's ambient tint, the
    * same two things the real clock drives. */
   minutes: number;
+  /**
+   * The OPEN WINDOW SET for this beat, in open order. The engine places each
+   * one through the real product's `cascadePlacement`, so several windows
+   * spread across the desk with exactly the stagger the live app gives them;
+   * apps that drop out of this list have their window closed. Order is the
+   * OPEN order (it decides the cascade step a newly-opened window gets), NOT
+   * the stacking order — `frontApp` owns that.
+   */
+  windows: FrontApp[];
+  /** The focused window: raised to the top of the stack and, for Chattr, the
+   * one the scripted composer types into. Always a member of `windows`. */
   frontApp: FrontApp;
   overlay: Overlay;
   activeChannel: ChannelId;
@@ -100,14 +111,26 @@ export type SceneState = {
   typing: TypingIndicator | null;
 };
 
+/**
+ * The ONLY scripted Pulse inputs. Everything the dashboard shows — the hero
+ * success rate, the failed-checkout count, the per-payment-method rows, the
+ * funnel tiles, the weekly bar chart's live Monday bar, the status badge — is
+ * DERIVED from these three numbers by `derivePulse` below, in one place. No
+ * beat sets a second, independently-authored figure, so no two tiles on screen
+ * can ever disagree.
+ */
 export type PulseState = {
-  /** Checkout failure rate, in percent. Scripted value, not derived. */
+  /** Checkout FAILURE rate, in percent (the ad is written around it: 3 -> 17
+   * -> 6 -> 3, with one deliberate 3.1 misread). The dashboard displays its
+   * complement, the success rate, like the real Pulse does. */
   rate: number;
   /** Checkout attempts today. Scripted value, not derived. */
   attempts: number;
-  /** Sim minute the tiles claim to be showing, drives the sparkline "now" dot. */
+  /** Sim minute the tiles claim to be showing: drives the sparkline "now" dot
+   * and the "data as of" freshness stamp. */
   t: number;
-  /** Sparkline series. Scripted samples only, no real data behind it. */
+  /** Sparkline series, as FAILURE rates (same orientation as `rate`).
+   * Scripted samples only, no real data behind it. */
   history: { t: number; rate: number }[];
 };
 
@@ -320,6 +343,148 @@ export function dayProgress(s: SceneState): number {
   return Math.max(0, Math.min(1, raw));
 }
 
+/* ------------------------------------------------- derived Pulse numbers */
+
+/**
+ * The scripted world's healthy checkout success rate, and its complement. The
+ * live sim's canon baseline is 99.7% (worldCanon.BASELINE_RATE); the ad runs a
+ * deliberately louder world so a 60-second shot reads on camera, so the shoot
+ * declares its own band here rather than pretending to be canon.
+ */
+export const DEMO_BASELINE_SUCCESS_PCT = 97;
+export const DEMO_BASELINE_FAILURE_PCT = 100 - DEMO_BASELINE_SUCCESS_PCT;
+
+/** Failure rate at which the scripted incident counts as DECLARED (the point
+ * the badge turns red and the sparkline goes to status colour). */
+export const DEMO_ALARM_FAILURE_PCT = 9;
+
+/**
+ * Share of checkout attempts per payment method. Mirrors the live model's split
+ * (worldCanon.APPLE_PAY_SHARE = 0.35, pulseMetrics' GOOGLE_PAY_SHARE = 0.17,
+ * card = the rest) so the breakdown rows carry the same weights the real
+ * dashboard does. Copied rather than imported: this folder is deleted wholesale
+ * after the shoot and must not become a live dependency of the sim's canon.
+ */
+const APPLE_PAY_SHARE = 0.35;
+const GOOGLE_PAY_SHARE = 0.17;
+const CARD_SHARE = 1 - APPLE_PAY_SHARE - GOOGLE_PAY_SHARE;
+
+/** Funnel conversions, mirroring worldCanon's SEARCH_TO_CART_RATE (0.12) and
+ * CART_TO_CHECKOUT_START_RATE (0.65). Search -> cart sits upstream of the
+ * Apple Pay webhook so it holds flat; cart -> completed checkout folds in the
+ * live success rate, exactly like cartToCompletedCheckoutRateAt does. */
+const SEARCH_TO_CART_PCT = 12;
+const CART_TO_CHECKOUT_START_RATE = 0.65;
+
+/** Freshness-stamp granularity, mirroring pulseMetrics.SAMPLE_STEP_MINUTES: a
+ * dashboard refreshes on a cadence, so "data as of" floors to 5 sim-minutes. */
+const SAMPLE_STEP_MINUTES = 5;
+
+/** Fixed checkout-attempt counts for the six complete days ending yesterday.
+ * The relative weekday/weekend SHAPE is the live chart's own
+ * (pulseMetrics' BASE_WEEKLY_SHAPE); the magnitude is left at that shape's
+ * scale because it sits naturally alongside the ad's few-hundred-per-day live
+ * counter. Static, hardcoded for filming. */
+const DEMO_WEEKLY_ATTEMPTS: { label: string; value: number }[] = [
+  { label: "Tue", value: 1180 },
+  { label: "Wed", value: 1240 },
+  { label: "Thu", value: 1310 },
+  { label: "Fri", value: 1460 },
+  { label: "Sat", value: 890 },
+  { label: "Sun", value: 760 },
+];
+
+export type PulseMethodRow = { method: string; share: number; successRate: number };
+
+/** Everything the scripted dashboard renders, all of it a function of ONE
+ * PulseState. */
+export type DerivedPulse = {
+  /** Hero figure: 100 − failure rate. */
+  successRatePct: number;
+  failureRatePct: number;
+  attempts: number;
+  /** attempts x failure rate. */
+  failedCheckouts: number;
+  /** attempts − failedCheckouts, so the two always sum back to attempts. */
+  completedCheckouts: number;
+  /** Apple Pay carries the damage; card and Google Pay hold at baseline. The
+   * share-weighted blend of these rows equals `successRatePct` exactly. */
+  methods: PulseMethodRow[];
+  /** Static history plus today's partial (= attempts) as the muted final bar. */
+  weekly: { label: string; value: number; muted?: boolean }[];
+  searchToCartPct: number;
+  cartToCheckoutPct: number;
+  /** "data as of 11:20 AM", floored to the refresh cadence. */
+  freshness: string;
+  /** Sparkline series, flipped to the success-rate orientation the real hero
+   * sparkline uses: the incident is a DIP that recovers, not a spike. */
+  successHistory: { t: number; rate: number }[];
+  /** Status inputs, in the exact shape the real `checkoutStatusBadge` takes. */
+  incidentStartMinutes: number | null;
+  recovering: boolean;
+  isBaseline: boolean;
+};
+
+/**
+ * The SINGLE derivation. Given a beat's scripted (failure rate, attempts, t,
+ * history), produce every number the dashboard shows.
+ *
+ * Apple Pay's rate is solved, not invented: with card/Google Pay pinned at
+ * baseline, the share-weighted blend must equal the scripted overall rate, so
+ *
+ *   applePay = baseline − (failureRate − baselineFailure) / applePayShare
+ *
+ * which is why a 17% overall failure spike drives Apple Pay to 57% while the
+ * other rails sit at 97% — the same "all Apple Pay" shape the live breakdown
+ * has, at the ad's louder scale.
+ *
+ * Incident phase comes from the RECORDED series, not the tile number, so the
+ * misread beat (`record: false`: 3.1% on the tile over an unchanged 17% series)
+ * still reads as a live incident rather than briefly declaring itself resolved.
+ */
+export function derivePulse(pulse: PulseState): DerivedPulse {
+  const failureRatePct = pulse.rate;
+  const successRatePct = 100 - failureRatePct;
+  const attempts = pulse.attempts;
+  const failedCheckouts = Math.round((attempts * failureRatePct) / 100);
+
+  const applePayRate =
+    DEMO_BASELINE_SUCCESS_PCT - (failureRatePct - DEMO_BASELINE_FAILURE_PCT) / APPLE_PAY_SHARE;
+
+  const recordedRates = pulse.history.map((h) => h.rate);
+  const peakFailure = Math.max(...recordedRates);
+  const latestFailure = recordedRates[recordedRates.length - 1];
+  // Declared once the series has actually been to alarm level; from then on the
+  // incident stays declared for the rest of the take, exactly like the real
+  // dashboard's escalation gate.
+  const declared = peakFailure >= DEMO_ALARM_FAILURE_PCT;
+  const isBaseline = failureRatePct <= DEMO_BASELINE_FAILURE_PCT;
+  const recovering = declared && !isBaseline && latestFailure < peakFailure;
+
+  return {
+    successRatePct,
+    failureRatePct,
+    attempts,
+    failedCheckouts,
+    completedCheckouts: attempts - failedCheckouts,
+    methods: [
+      { method: "Apple Pay", share: APPLE_PAY_SHARE, successRate: Math.max(0, applePayRate) },
+      { method: "Card", share: CARD_SHARE, successRate: DEMO_BASELINE_SUCCESS_PCT },
+      { method: "Google Pay", share: GOOGLE_PAY_SHARE, successRate: DEMO_BASELINE_SUCCESS_PCT },
+    ],
+    weekly: [...DEMO_WEEKLY_ATTEMPTS, { label: "Mon*", value: attempts, muted: true }],
+    searchToCartPct: SEARCH_TO_CART_PCT,
+    cartToCheckoutPct: CART_TO_CHECKOUT_START_RATE * successRatePct,
+    freshness: `data as of ${formatClock(
+      Math.floor(pulse.t / SAMPLE_STEP_MINUTES) * SAMPLE_STEP_MINUTES,
+    )}`,
+    successHistory: pulse.history.map((h) => ({ t: h.t, rate: 100 - h.rate })),
+    incidentStartMinutes: declared ? INCIDENT_MINUTE : null,
+    recovering,
+    isBaseline,
+  };
+}
+
 /* --------------------------------------------------------- patch builders */
 
 /** Appends one message to a channel. Pure, so re-invoking the state updater
@@ -350,6 +515,19 @@ export function landLine(s: SceneState, line: ExchangeEvent): SceneState {
       ? say(s, line.channel, PLAYER_AGENT_ID, PLAYER_SENDER, line.time, line.text)
       : say(s, line.channel, line.agentId, line.sender, line.time, line.text);
   return line.apply ? line.apply(landed) : landed;
+}
+
+/**
+ * Stages the beat's desktop: the ordered OPEN WINDOW SET plus which of them is
+ * focused (defaults to the last entry, so `show(s, ["chattr", "pulse"])` reads
+ * as "Pulse in front, Chattr staggered behind it"). Windows already open keep
+ * the position they were placed at — and any position the actor dragged them
+ * to; windows that drop out of the list are closed. The last entry is the one
+ * that gets the newest cascade step, so declaring a scene's BACKGROUND window
+ * first is what makes the front one land offset on top of it.
+ */
+function show(s: SceneState, windows: FrontApp[], front?: FrontApp): SceneState {
+  return { ...s, windows, frontApp: front ?? windows[windows.length - 1] };
 }
 
 function markUnread(s: SceneState, ...ids: ChannelId[]): SceneState {
@@ -391,6 +569,9 @@ function setPulse(
 export const INITIAL_SCENE: SceneState = {
   day: 1,
   minutes: 540, // 9:00 AM
+  // The calm open: Chattr alone, centered, exactly like the real desktop's
+  // first window at login.
+  windows: ["chattr"],
   frontApp: "chattr",
   overlay: "none",
   activeChannel: "design-review",
@@ -469,8 +650,9 @@ export const SCRIPT: Step[] = [
   {
     id: "first-fire",
     label: "FIRST FIRE",
-    // Opens #incidents empty, then Priya types into it on camera.
-    apply: (s) => read({ ...s, day: 1, minutes: 555, frontApp: "chattr" }, "incidents"),
+    // Opens #incidents empty, then Priya types into it on camera. Still Chattr
+    // alone: the desk is calm right up to the moment it isn't.
+    apply: (s) => read(show({ ...s, day: 1, minutes: 555 }, ["chattr"]), "incidents"),
     exchange: [
       {
         kind: "npc",
@@ -487,7 +669,9 @@ export const SCRIPT: Step[] = [
   {
     id: "stacking",
     label: "STACKING",
-    apply: (s) => setPulse({ ...s, day: 1, minutes: 580, frontApp: "pulse" }, 580, 3, 268),
+    // Pulse comes up IN FRONT of the Chattr window that is already open, one
+    // cascade step down-right of it: the desk starts stacking.
+    apply: (s) => setPulse(show({ ...s, day: 1, minutes: 580 }, ["chattr", "pulse"]), 580, 3, 268),
     // The automated burst. Three sub-events on a timer while the actor just
     // watches Pulse: badge climbs, numbers climb, banners start landing.
     autos: [
@@ -537,9 +721,12 @@ export const SCRIPT: Step[] = [
   {
     id: "whos-taking-this",
     label: "WHO IS TAKING THIS",
+    // Chattr comes back to the front; Pulse stays open behind it, still
+    // showing the spike. The actor clicks Office in the dock during this beat,
+    // which opens a third window live on camera.
     apply: (s) =>
       read(
-        { ...s, day: 1, minutes: 605, frontApp: "chattr", chattrBadge: 0, unread: [] },
+        show({ ...s, day: 1, minutes: 605, chattrBadge: 0, unread: [] }, ["chattr", "pulse"], "chattr"),
         "dm-derek",
       ),
     exchange: [
@@ -585,8 +772,9 @@ export const SCRIPT: Step[] = [
     id: "misread-1",
     label: "MISREAD 1 of 5",
     // 3.1% next to 407 attempts: the two confusable numbers, side by side.
+    // Pulse front, Chattr staggered behind it.
     apply: (s) =>
-      setPulse({ ...s, day: 1, minutes: 680, frontApp: "pulse" }, 680, 3.1, 407, false),
+      setPulse(show({ ...s, day: 1, minutes: 680 }, ["chattr", "pulse"]), 680, 3.1, 407, false),
   },
 
   /* 5 */
@@ -595,7 +783,10 @@ export const SCRIPT: Step[] = [
     label: "MISREAD 2 of 5",
     // The player types the misread into Derek's DM, on camera, one character
     // at a time, then hits Enter.
-    apply: (s) => read({ ...s, day: 1, minutes: 685, frontApp: "chattr" }, "dm-derek"),
+    // Chattr forward, Pulse still open behind with the number the player is
+    // about to misquote.
+    apply: (s) =>
+      read(show({ ...s, day: 1, minutes: 685 }, ["chattr", "pulse"], "chattr"), "dm-derek"),
     exchange: [
       {
         kind: "player",
@@ -612,7 +803,10 @@ export const SCRIPT: Step[] = [
     label: "MISREAD 3 of 5",
     // Front stays on Derek's DM, so Priya's indicator (in #incidents) is
     // correctly hidden and the banner is the only way this lands.
-    apply: (s) => ({ ...s, day: 1, minutes: 700, frontApp: "chattr", activeChannel: "dm-derek" }),
+    apply: (s) => ({
+      ...show({ ...s, day: 1, minutes: 700 }, ["chattr", "pulse"], "chattr"),
+      activeChannel: "dm-derek",
+    }),
     exchange: [
       {
         kind: "npc",
@@ -635,7 +829,8 @@ export const SCRIPT: Step[] = [
   {
     id: "misread-4",
     label: "MISREAD 4 of 5",
-    apply: (s) => read({ ...s, day: 1, minutes: 702, frontApp: "chattr" }, "dm-priya"),
+    apply: (s) =>
+      read(show({ ...s, day: 1, minutes: 702 }, ["chattr", "pulse"], "chattr"), "dm-priya"),
     exchange: [
       {
         kind: "player",
@@ -652,7 +847,10 @@ export const SCRIPT: Step[] = [
     label: "MISREAD 5 of 5",
     // Priya's correction is the longest line in the ad, so its indicator holds
     // the longest — the point of the length-scaled formula.
-    apply: (s) => ({ ...s, day: 1, minutes: 705, frontApp: "chattr", activeChannel: "dm-priya" }),
+    apply: (s) => ({
+      ...show({ ...s, day: 1, minutes: 705 }, ["chattr", "pulse"], "chattr"),
+      activeChannel: "dm-priya",
+    }),
     exchange: [
       {
         kind: "npc",
@@ -669,8 +867,10 @@ export const SCRIPT: Step[] = [
   {
     id: "course-correct",
     label: "COURSE CORRECT",
-    // Clears the earlier assignment so the roster is live again for take two.
-    apply: (s) => ({ ...s, day: 1, minutes: 825, frontApp: "office", assignedTo: null }),
+    // Office in front, Chattr behind it so Derek's thread is still on the desk
+    // when he reacts. Clears the earlier assignment so the roster is live again
+    // for take two.
+    apply: (s) => show({ ...s, day: 1, minutes: 825, assignedTo: null }, ["chattr", "office"]),
     onAssign: {
       person: "Raj",
       delayMs: 1500,
@@ -692,12 +892,17 @@ export const SCRIPT: Step[] = [
   {
     id: "pulse-payoff",
     label: "PULSE PAYOFF",
-    // Scripted recovery, no real data: the number walks 17 -> 12 -> 6 on a
-    // timer and the sparkline picks up the hump.
-    apply: (s) => setPulse({ ...s, day: 1, minutes: 850, frontApp: "pulse" }, 850, 17, 468),
+    // Scripted recovery, no real data: the failure rate walks 17 -> 12 -> 6 ->
+    // 3 on a timer, so the success-rate hero climbs 83% -> 97% and the
+    // sparkline draws the dip-and-recover hump. The badge walks the real
+    // dashboard's three states with it: "Incident active" (red) while it is
+    // still at the spike, "Recovering" (amber) on the way back, "Back to
+    // baseline" (green) once it lands. Pulse front, Chattr staggered behind.
+    apply: (s) => setPulse(show({ ...s, day: 1, minutes: 850 }, ["chattr", "pulse"]), 850, 17, 468),
     autos: [
       { delayMs: 1200, apply: (s) => setPulse(s, 860, 12, 468) },
       { delayMs: 2400, apply: (s) => setPulse(s, 870, 6, 468) },
+      { delayMs: 3600, apply: (s) => setPulse(s, 880, DEMO_BASELINE_FAILURE_PCT, 468) },
     ],
   },
 
@@ -712,14 +917,16 @@ export const SCRIPT: Step[] = [
   {
     id: "closer-transition",
     label: "CLOSER, DAY 2",
-    apply: (s) => ({ ...s, day: 2, minutes: 540, overlay: "day2" }),
+    // A new day starts from a clean desk: only Chattr is open behind the
+    // transition card, exactly like the real Desktop's login.
+    apply: (s) => show({ ...s, day: 2, minutes: 540, overlay: "day2" }, ["chattr"]),
   },
 
   /* 13 */
   {
     id: "maya-follow-up",
     label: "MAYA FOLLOW UP",
-    apply: (s) => read({ ...s, overlay: "none", frontApp: "chattr" }, "design-review"),
+    apply: (s) => read(show({ ...s, overlay: "none" }, ["chattr"]), "design-review"),
     exchange: [
       {
         kind: "npc",
@@ -741,7 +948,7 @@ export const SCRIPT: Step[] = [
   {
     id: "derek-assignment",
     label: "DEREK ASSIGNMENT",
-    apply: (s) => read({ ...s, frontApp: "chattr" }, "dm-derek"),
+    apply: (s) => read(show(s, ["chattr"]), "dm-derek"),
     exchange: [
       {
         kind: "npc",

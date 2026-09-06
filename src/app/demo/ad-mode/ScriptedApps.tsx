@@ -9,36 +9,50 @@
  * ChattrApp's own wrapper markup, so the sidebar, the avatar rows, the
  * composer, the fonts and the spacing are the shipping ones, not a copy. The
  * composer's send handler is the scene's own, so a scripted line lands in demo
- * state and never touches the store or the reply API. Pulse, Office and
- * Taskflow are APPROXIMATIONS:
- * their real components are wired to sim state the script has no equivalent for
- * (Pulse reports a success rate off pulseMetrics; Office renders worldCanon's
- * floor with no assign affordance; Taskflow's cards mutate the taskflow store on
- * every control). They reuse the real components' exported pieces and class
- * tokens where they can, but they are rebuilt here so a take can never write to
- * a real store.
+ * state and never touches the store or the reply API.
+ *
+ * Pulse is the real dashboard's full board — same hero, same three accordions,
+ * same StatTile/breakdown/bar-chart/sparkline/status-badge pieces — with
+ * scripted numbers substituted for pulseMetrics' incident model (see
+ * ScriptedPulse). Office and Taskflow remain APPROXIMATIONS: their real
+ * components are wired to sim state the script has no equivalent for (Office
+ * renders worldCanon's floor with no assign affordance; Taskflow's cards mutate
+ * the taskflow store on every control), so they reuse the real components'
+ * markup and class tokens but are rebuilt here with the controls inert.
  *
  * Nothing in this file calls a store action or an API.
  */
 
 import { useMemo, type Ref } from "react";
-import { Activity, AlertTriangle } from "lucide-react";
+import { Activity, BarChart3, CreditCard, GitBranch } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { RateSparkline } from "@/components/charts/RateSparkline";
+import { WeeklyAttemptsBarChart } from "@/components/charts/WeeklyAttemptsBarChart";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { ChannelListView } from "@/components/chattr/ChannelList";
 import { MessageListView, type MessageListItem } from "@/components/chattr/MessageList";
 import { MessageInputView } from "@/components/chattr/MessageInput";
 import { GenericAvatar, PLAYER_SPRITES } from "@/components/shared/PixelAvatar";
 import { ENGINEERS } from "@/lib/sim/worldCanon";
-import { StatTile, toneBadge, toneEdge, toneText, type Tone } from "@/components/pulse/PulseMock";
+import {
+  PaymentMethodBreakdownView,
+  StatTile,
+  checkoutStatusBadge,
+  formatAttemptCount,
+  toneBadge,
+  toneEdge,
+  toneText,
+  type Tone,
+} from "@/components/pulse/PulseMock";
 import type { AgentId } from "@/lib/sim/types";
 import {
   CHANNELS,
   DAY_END_MINUTE,
   DAY_START_MINUTE,
+  DEMO_BASELINE_SUCCESS_PCT,
   DIRECT_MESSAGES,
-  INCIDENT_MINUTE,
   composerPlaceholder,
+  derivePulse,
   formatClock,
   type ChannelId,
   type ChattrMessage,
@@ -126,37 +140,65 @@ export function ScriptedChattr({
 
 /* ------------------------------------------------------------------- Pulse */
 
-/** The failure tile goes red at or above 9%. Everything below that reads
- * neutral. Scripted threshold, no real logic. */
-const FAILURE_ALARM_THRESHOLD = 9;
-
 /**
- * APPROXIMATION of PulseMock. The real dashboard reports a checkout SUCCESS
- * rate derived from pulseMetrics' incident/tradeoff model plus three
- * progressively-disclosed accordions; the ad is built end-to-end around a
- * FAILURE rate the script drives by hand (3% -> 17% -> 6%, with one deliberate
- * misread at 3.1%). Reusing PulseMock would mean either inverting the ad's
- * central number or teaching the real component a scripted-input mode, so the
- * hero card is rebuilt here — but from the real component's own exported tone
- * tables and StatTile, and with its exact hero markup/classes.
+ * The real Pulse dashboard, driven by the script instead of by the sim.
+ *
+ * Structure, markup and class tokens are PulseMock's, card for card: the hero
+ * checkout SUCCESS rate (live dot, big tone-coloured figure, freshness stamp,
+ * computed status badge, sparkline, "Updates live" note) over the same three
+ * progressively-disclosed accordions (payment methods open by default, then the
+ * checkout funnel, then traffic & support). The real pieces do the work
+ * wherever they are prop-driven: `StatTile` and the `tone*` tables,
+ * `PaymentMethodBreakdownView`, `WeeklyAttemptsBarChart`, `RateSparkline`,
+ * `formatAttemptCount`, and `checkoutStatusBadge` — so the badge's labels,
+ * icons and precedence ("Back to baseline" beats "Recovering" beats "Incident
+ * active") are the shipping logic's, not a lookalike.
+ *
+ * What is NOT real is the data: every figure comes from `derivePulse`, the one
+ * place the beat's scripted (failure rate, attempts, clock) is turned into the
+ * whole board, so no two tiles on camera can disagree. The one extra card the
+ * live dashboard doesn't have is the attempts/failure-rate pair directly under
+ * the hero: the ad's misread beat needs "407 attempts" and "3.1%" adjacent and
+ * legible in one frame.
  */
 export function ScriptedPulse({ pulse }: { pulse: PulseState }) {
-  const alarming = pulse.rate >= FAILURE_ALARM_THRESHOLD;
-  // RateSparkline scales its y-range against baselineRate, so hand it the peak
-  // of the scripted series to keep the whole hump inside the chart box.
-  const baselineRate = Math.max(...pulse.history.map((h) => h.rate));
-  // The chart is coloured by the last RECORDED sample, not by the tile number.
-  // They differ on exactly one beat (the misread, where the tile shows 3.1%
-  // over an unchanged series) and the line should keep telling the truth about
-  // the series it is actually drawing.
-  const lastSample = pulse.history[pulse.history.length - 1];
-  const lineAlarming = lastSample.rate >= FAILURE_ALARM_THRESHOLD;
+  const d = derivePulse(pulse);
 
-  const heroTone: Tone = alarming ? "red" : "green";
-  const heroDotBg = alarming ? "bg-status-failed" : "bg-accent-green";
+  // Same precedence the live dashboard applies (see PulseMock): red only while
+  // the incident is actively degrading, green once it is back at baseline,
+  // amber for the climb back. `resolutionFired` is a live-store concept with no
+  // scripted equivalent, so the baseline check alone carries "resolved".
+  const statusBadge = checkoutStatusBadge(d.incidentStartMinutes, d.recovering, d.isBaseline, false);
+  const incidentActive = d.incidentStartMinutes !== null;
+  const resolved = d.isBaseline;
+  // PulseMock's own mapping: red ONLY while a declared incident is actively
+  // degrading; green for healthy AND for recovering (recovery is "trending back
+  // to success"); amber for a real-but-undeclared dip.
+  const heroTone: Tone = incidentActive
+    ? resolved || d.recovering
+      ? "green"
+      : "red"
+    : d.isBaseline
+      ? "green"
+      : "amber";
+  const sparklineColorVar =
+    heroTone === "red" ? "--color-status-failed" : heroTone === "amber" ? "--color-status-pending" : "--color-accent-green";
+  const heroDotBg =
+    heroTone === "red" ? "bg-status-failed" : heroTone === "amber" ? "bg-status-pending" : "bg-accent-green";
+
+  // The sparkline's y-range tops out at baselineRate, so hand it the scripted
+  // baseline — or the best sample in the series, on the off chance a beat sits
+  // above it — to keep the whole dip-and-recover hump inside the chart box.
+  const sparklineBaseline = Math.max(DEMO_BASELINE_SUCCESS_PCT, ...d.successHistory.map((h) => h.rate));
+  // The chart tracks the last RECORDED sample, not the tile number. They differ
+  // on exactly one beat (the misread, where the tile shows 3.1% over an
+  // unchanged series) and the line should keep telling the truth about the
+  // series it is actually drawing.
+  const lastSample = d.successHistory[d.successHistory.length - 1];
 
   return (
     <div className="@container h-full w-full overflow-y-auto bg-canvas p-4 text-text-primary">
+      {/* Primary metric: checkout success rate leads, sparkline sits with it. */}
       <section className={cn("mb-4 rounded-[var(--radius-card)] border border-border-hairline bg-surface p-4", toneEdge[heroTone])}>
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
@@ -165,38 +207,36 @@ export function ScriptedPulse({ pulse }: { pulse: PulseState }) {
                 <span className={cn("absolute inline-flex h-full w-full animate-ping rounded-full opacity-60", heroDotBg)} />
                 <span className={cn("relative inline-flex h-1.5 w-1.5 rounded-full", heroDotBg)} />
               </span>
-              Checkout failure rate
+              Checkout success rate
             </div>
             <div className={cn("mt-2 text-5xl leading-none font-semibold tracking-tight tabular-nums", toneText[heroTone])}>
-              {pulse.rate.toFixed(1)}%
+              {d.successRatePct.toFixed(1)}%
             </div>
-            <div className="mt-2 font-mono text-[11px] tabular-nums text-text-secondary">
-              data as of {formatClock(pulse.t)}
-            </div>
+            <div className="mt-2 font-mono text-[11px] tabular-nums text-text-secondary">{d.freshness}</div>
           </div>
-          {alarming && (
+          {statusBadge && (
             <span
               className={cn(
                 "inline-flex shrink-0 items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-medium",
-                toneBadge.red,
+                toneBadge[statusBadge.tone],
               )}
             >
-              <AlertTriangle className="size-3.5" aria-hidden />
-              Incident active
+              <statusBadge.Icon className="size-3.5" aria-hidden />
+              {statusBadge.label}
             </span>
           )}
         </div>
 
         <div className="mt-4">
           <RateSparkline
-            history={pulse.history}
+            history={d.successHistory}
             dayStart={DAY_START_MINUTE}
             dayEnd={DAY_END_MINUTE}
-            incidentStartMinutes={lastSample.t >= INCIDENT_MINUTE ? INCIDENT_MINUTE : null}
+            incidentStartMinutes={d.incidentStartMinutes}
             tradeoffDecidedAtMinutes={null}
             clockMinutes={lastSample.t}
-            baselineRate={baselineRate}
-            colorVar={lineAlarming ? "--color-status-failed" : "--color-accent-green"}
+            baselineRate={sparklineBaseline}
+            colorVar={sparklineColorVar}
             formatTime={formatClock}
           />
         </div>
@@ -207,12 +247,98 @@ export function ScriptedPulse({ pulse }: { pulse: PulseState }) {
         </p>
       </section>
 
-      <div className="grid grid-cols-2 gap-3 @lg:grid-cols-3">
+      {/* The ad's two confusable numbers, deliberately side by side and above
+          the fold: total attempts today, and the failure rate. Beat 4 is the
+          player reading the first as the second. */}
+      <div className="mb-4 grid grid-cols-2 gap-3">
         <StatTile
           label="Checkout attempts (today)"
-          value={pulse.attempts.toLocaleString()}
+          value={d.attempts.toLocaleString()}
           caption="rolling count, resets at midnight"
         />
+        <StatTile
+          label="Checkout failure rate"
+          value={`${d.failureRatePct.toFixed(1)}%`}
+          caption={d.freshness}
+          tone={incidentActive && !resolved ? "red" : "neutral"}
+        />
+      </div>
+
+      {/* Secondary data, progressively disclosed. Payment methods (the incident
+          blast radius) opens by default; the rest stays one click away. */}
+      <div className="rounded-[var(--radius-card)] border border-border-hairline bg-surface px-4">
+        <Accordion multiple defaultValue={["payments"]}>
+          <AccordionItem value="payments">
+            <AccordionTrigger>
+              <span className="flex items-center gap-2 text-text-primary">
+                <CreditCard className="size-4 text-text-secondary" aria-hidden />
+                Payment methods
+              </span>
+            </AccordionTrigger>
+            <AccordionContent className="flex flex-col gap-3">
+              <StatTile
+                label="Failed checkouts (today)"
+                value={d.failedCheckouts.toLocaleString()}
+                caption={d.freshness}
+                tone={incidentActive && !resolved ? "red" : "neutral"}
+              />
+              <PaymentMethodBreakdownView
+                rows={d.methods}
+                freshness={d.freshness}
+                totalToday={d.attempts}
+                baselineRate={DEMO_BASELINE_SUCCESS_PCT}
+              />
+            </AccordionContent>
+          </AccordionItem>
+
+          <AccordionItem value="funnel">
+            <AccordionTrigger>
+              <span className="flex items-center gap-2 text-text-primary">
+                <GitBranch className="size-4 text-text-secondary" aria-hidden />
+                Checkout funnel
+              </span>
+            </AccordionTrigger>
+            <AccordionContent>
+              <div className="grid grid-cols-2 gap-3 @lg:grid-cols-3">
+                <StatTile label="Search → cart, today" value={`${d.searchToCartPct.toFixed(1)}%`} caption={d.freshness} />
+                <StatTile
+                  label="Cart → completed checkout, today"
+                  value={`${d.cartToCheckoutPct.toFixed(1)}%`}
+                  caption={d.freshness}
+                  tone={heroTone}
+                />
+                <StatTile
+                  label="Completed purchases today"
+                  value={d.completedCheckouts.toLocaleString()}
+                  caption={d.freshness}
+                />
+              </div>
+            </AccordionContent>
+          </AccordionItem>
+
+          <AccordionItem value="traffic">
+            <AccordionTrigger>
+              <span className="flex items-center gap-2 text-text-primary">
+                <BarChart3 className="size-4 text-text-secondary" aria-hidden />
+                Traffic &amp; support
+              </span>
+            </AccordionTrigger>
+            <AccordionContent className="flex flex-col gap-4">
+              <div>
+                <div className="mb-2 flex items-baseline justify-between gap-2">
+                  <div className="text-[11px] text-text-secondary">Checkout attempts, last 7 days</div>
+                  <div className="font-mono text-[10px] tabular-nums text-text-secondary">{d.freshness}</div>
+                </div>
+                <WeeklyAttemptsBarChart data={d.weekly} formatValue={formatAttemptCount} />
+                <div className="mt-1 text-[10px] text-text-secondary">* today, in progress</div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <StatTile label="Avg support response" value="4h 02m" />
+                <StatTile label="CSAT (7d)" value="82" />
+              </div>
+            </AccordionContent>
+          </AccordionItem>
+        </Accordion>
       </div>
     </div>
   );

@@ -29,10 +29,21 @@
  *
  * The CHROME here is the real app's: the real StatusBar (difficulty pill, +15m,
  * battery meter, clock), the real Wallpaper and ambient time-of-day tint, the
- * real Window shell with its real AppIcon, and the real Taskbar dock with every
- * app in the shipping order. All of it is rendered through those components'
- * presentational cores and fed from script.ts, so nothing on this route reads
- * or writes a real store, and the system controls are deliberately inert.
+ * real DesktopWindow shell (draggable title bar, resize grip, real AppIcon) at
+ * positions computed by the real cascade placement, and the real Taskbar dock
+ * with every app in the shipping order. All of it is rendered through those
+ * components' presentational cores and fed from script.ts, so nothing on this
+ * route reads or writes a real store, and the system controls are deliberately
+ * inert.
+ *
+ * WINDOWS. Each beat declares an ordered OPEN WINDOW SET (see `windows` in
+ * script.ts) rather than one front app, and the desk holds them all at once.
+ * Placement is the product's own: windowStore's pure `clampSpawnSize` /
+ * `cascadePlacement` against the live desk box, with the shipping
+ * APP_DEFAULT_SIZE / APP_MIN_SIZE tables, so several windows spread with
+ * exactly the stagger the live app gives them (see windowLayout.ts). The layout
+ * is demo-local React state, never the window store. Windows are draggable and
+ * resizable on camera; clicking a window or its dock tile raises it.
  *
  * Nothing on this route is real: the clock, the messages, the Pulse numbers,
  * the unread badge and the scorecard are all read straight out of script.ts.
@@ -40,13 +51,23 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Window } from "@/components/desktop/Window";
 import { Wallpaper } from "@/components/desktop/Wallpaper";
 import { StatusBarView } from "@/components/desktop/StatusBar";
 import { TaskbarView } from "@/components/desktop/Taskbar";
+import { DesktopWindowView } from "@/components/desktop/DesktopWindow";
 import { AppIcon } from "@/components/shared/AppIcon";
-import type { AppId } from "@/components/desktop/Desktop";
+import { APP_MIN_SIZE, type AppId } from "@/components/desktop/appWindows";
+import type { WindowSizeClamp } from "@/store/windowStore";
 import { getAmbientTint, getBatteryLevel } from "@/lib/sim/timeOfDay";
+import {
+  EMPTY_LAYOUT,
+  focusWindow,
+  moveWindow,
+  resizeWindow,
+  syncLayout,
+  type DemoWindowLayout,
+  type DeskSize,
+} from "./windowLayout";
 import { EvalScreen, type Trace } from "../shared/EvalScreen";
 import { Banners, type BannerItem } from "./Banners";
 import { ScriptedChattr, ScriptedOffice, ScriptedPulse, ScriptedTaskflow } from "./ScriptedApps";
@@ -85,7 +106,7 @@ const AD_TRACES: Trace[] = [
 const BANNER_HOLD_MS = 2600;
 const BANNER_EXIT_MS = 300;
 
-/** The dock tiles that actually switch the front window on click. Every other
+/** The dock tiles that actually open/raise a window on click. Every other
  * real app is still on the dock (TaskbarView renders the full shipping list in
  * the shipping order) but has no scripted body, so its tile no-ops. */
 const SCRIPTED_APPS = new Set<string>(["chattr", "pulse", "taskflow", "office"]);
@@ -173,6 +194,11 @@ export default function AdModeShot() {
   const [scene, setScene] = useState<SceneState>(INITIAL_SCENE);
   const [stepIndex, setStepIndex] = useState(0);
   const [banners, setBanners] = useState<BannerItem[]>([]);
+  /** Where each open window sits. Demo-local; see windowLayout.ts. */
+  const [layout, setLayout] = useState<DemoWindowLayout>(EMPTY_LAYOUT);
+  /** The live desk box, measured off the same element windows are positioned
+   * in, so the real cascade math is fed the real dimensions. */
+  const [desk, setDesk] = useState<DeskSize | null>(null);
   /** Bumped on reset so keyed overlays remount and replay their animations. */
   const [runKey, setRunKey] = useState(0);
   /**
@@ -206,6 +232,9 @@ export default function AdModeShot() {
   const bannerId = useRef(0);
   /** The real composer's textarea, for focus/caret/synthetic-Enter. */
   const composerRef = useRef<HTMLTextAreaElement | null>(null);
+  /** The desk element: the drag/resize bounds, exactly like Desktop's own
+   * containerRef. */
+  const deskRef = useRef<HTMLDivElement>(null);
   /** The player line the next scripted send should post. Read by the composer's
    * onSend, so the send path never has to inspect the textarea's value. */
   const pendingSendRef = useRef<PlayerLine | null>(null);
@@ -364,8 +393,46 @@ export default function AdModeShot() {
     setStepIndex(0);
     setScene(INITIAL_SCENE);
     setBanners([]);
+    // Wipes every placed window AND the cascade/z counters, so take two opens
+    // Chattr dead-centre again rather than continuing the previous take's
+    // cascade. The sync effect below immediately re-places beat 0's window set.
+    setLayout(EMPTY_LAYOUT);
     setRunKey((k) => k + 1);
   }, [cancelSession]);
+
+  /* -------------------------------------------------------- window layout */
+
+  // Measure the desk. Same box Desktop measures (the padded, relatively
+  // positioned area between the status bar and the dock), so cascadePlacement
+  // gets exactly the dimensions the live app would hand it.
+  useEffect(() => {
+    const el = deskRef.current;
+    if (!el) return;
+    const measure = () => {
+      const next = { width: el.clientWidth, height: el.clientHeight };
+      // Compare before setting so a ResizeObserver notification that didn't
+      // actually change the box can't spin the layout effect below.
+      setDesk((prev) => (prev && prev.width === next.width && prev.height === next.height ? prev : next));
+    };
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+
+  // Place the beat's declared window set. This is the sanctioned "synchronize
+  // React state with an external system" shape: a window CANNOT be placed until
+  // the desk has been measured out of the DOM (cascadePlacement needs real
+  // dimensions), so the placement necessarily lands one pass after the scene
+  // patch that declared it — the same one-frame ordering Desktop lives with
+  // when it calls openWindow off containerRef. syncLayout is pure and returns
+  // the SAME object when nothing moved, so this settles in a single pass (no
+  // cascading renders) and is safe under strict mode's double-invoked updater.
+  useEffect(() => {
+    if (!desk) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setLayout((prev) => syncLayout(prev, scene.windows, scene.frontApp, desk));
+  }, [scene.windows, scene.frontApp, desk]);
 
   /* ------------------------------------------------------------- hotkeys */
 
@@ -495,13 +562,37 @@ export default function AdModeShot() {
 
   /* ------------------------------------------------------------ dock/chrome */
 
-  /** One window is on screen at a time, so exactly one dock tile carries the
-   * open dot — the same treatment the real dock gives an open app. */
-  const openApps = useMemo(() => new Set<AppId>([scene.frontApp]), [scene.frontApp]);
+  /** Every open window carries the dock's open dot, exactly like the real
+   * dock. */
+  const openApps = useMemo(() => new Set<AppId>(scene.windows), [scene.windows]);
 
+  /** Dock click: opens the app if it isn't on the desk yet (it lands on the
+   * next cascade step), otherwise just raises it. Same semantics as the real
+   * Taskbar -> openWindow -> bringToFront path. */
   function handleSelectApp(id: AppId) {
     if (!SCRIPTED_APPS.has(id)) return;
-    setScene((prev) => ({ ...prev, frontApp: id as FrontApp }));
+    const app = id as FrontApp;
+    setScene((prev) =>
+      prev.windows.includes(app)
+        ? { ...prev, frontApp: app }
+        : { ...prev, windows: [...prev.windows, app], frontApp: app },
+    );
+  }
+
+  /** Clicking anywhere in a window raises it. The z-bump is applied straight
+   * away (so the click feels live) and the scene's front app follows; the sync
+   * effect's own bringToFront is then a no-op, as in the store. */
+  function handleFocusApp(app: FrontApp) {
+    setLayout((prev) => focusWindow(prev, app));
+    setScene((prev) => (prev.frontApp === app ? prev : { ...prev, frontApp: app }));
+  }
+
+  function handleMoveApp(app: FrontApp, x: number, y: number) {
+    setLayout((prev) => moveWindow(prev, app, x, y));
+  }
+
+  function handleResizeApp(app: FrontApp, width: number, height: number, clamp: WindowSizeClamp) {
+    setLayout((prev) => resizeWindow(prev, app, width, height, clamp));
   }
 
   /** Sidebar clicks are live so the actor can browse between beats. Same
@@ -540,8 +631,8 @@ export default function AdModeShot() {
   const typingAgentId =
     scene.typing && scene.typing.channel === scene.activeChannel ? scene.typing.agentId : null;
 
-  function renderFront() {
-    switch (scene.frontApp) {
+  function renderApp(app: FrontApp) {
+    switch (app) {
       case "pulse":
         return <ScriptedPulse pulse={scene.pulse} />;
       case "office":
@@ -580,31 +671,45 @@ export default function AdModeShot() {
         onSkipAhead={() => {}}
       />
 
-      <div className="relative min-h-0 flex-1 overflow-hidden p-4">
+      <div ref={deskRef} className="relative min-h-0 flex-1 overflow-hidden p-4">
         <Wallpaper dayProgress={progress} />
         <div
           className="pointer-events-none absolute inset-0 z-0 transition-colors duration-[3000ms] ease-linear"
           style={{ backgroundColor: ambientTint.color, opacity: ambientTint.opacity }}
         />
-        <div className="relative z-10 flex h-full items-center justify-center">
-          <div className="h-[520px] w-full max-w-4xl">
-            <Window
-              title={WINDOW_TITLE[scene.frontApp]}
-              icon={<AppIcon id={scene.frontApp} sizeClassName="h-4 w-4" />}
+        {/* One REAL DesktopWindow per open app, at the frame the product's own
+            cascade placed it in. Rendered in the beat's open order; the stack
+            order is the zIndex on each frame, exactly like the live desk. */}
+        {scene.windows.map((app) => {
+          const frame = layout.frames[app];
+          // First paint before the desk has been measured: nothing placed yet.
+          if (!frame) return null;
+          return (
+            <DesktopWindowView
+              key={app}
+              frame={frame}
+              title={WINDOW_TITLE[app]}
+              icon={<AppIcon id={app} sizeClassName="h-4 w-4" />}
+              containerRef={deskRef}
+              minSize={APP_MIN_SIZE[app]}
+              onFocus={() => handleFocusApp(app)}
+              onMove={(x, y) => handleMoveApp(app, x, y)}
+              onResize={(width, height, clamp) => handleResizeApp(app, width, height, clamp)}
               // Chrome fidelity only: the X is present because every real window
               // has one, but nothing closes during a take.
               onClose={() => {}}
             >
-              {renderFront()}
-            </Window>
-          </div>
-        </div>
+              {renderApp(app)}
+            </DesktopWindowView>
+          );
+        })}
       </div>
 
-      {/* The REAL dock, full shipping app list and order. The four apps with
-          scripted bodies switch the front window on click (the actor clicks
-          Office on camera); the rest no-op. The badge count is scripted, never
-          derived from the messages. */}
+      {/* The REAL dock, full shipping app list and order, with an open dot on
+          every window currently on the desk. The four apps with scripted bodies
+          open (or raise) their window on click, cascading onto the desk exactly
+          like the live app — the actor clicks Office on camera; the rest no-op.
+          The badge count is scripted, never derived from the messages. */}
       <TaskbarView
         openApps={openApps}
         onSelectApp={handleSelectApp}
