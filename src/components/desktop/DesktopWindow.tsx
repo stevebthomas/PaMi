@@ -2,7 +2,7 @@
 
 import { useCallback, useRef, type PointerEvent, type ReactNode, type RefObject } from "react";
 import { Window } from "./Window";
-import { isDocWindowId, useWindowStore, type WindowId } from "@/store/windowStore";
+import { isDocWindowId, useWindowStore, type WindowId, type WindowSizeClamp } from "@/store/windowStore";
 import { AppIcon } from "@/components/shared/AppIcon";
 
 /** How much of the title bar must always stay reachable on screen. */
@@ -12,53 +12,70 @@ const TITLE_BAR_HEIGHT = 40;
  * matching the 16px inset openWindow already centers windows within. */
 const RESIZE_MARGIN = 16;
 
-export function DesktopWindow({
-  id,
+/** Placed rectangle a desktop window is drawn at. Structurally the geometry
+ * half of windowStore's WindowInstance, without its `id`. */
+export type WindowFrame = { x: number; y: number; width: number; height: number; zIndex: number };
+
+/**
+ * The window chrome, PRESENTATIONAL. Everything DesktopWindow used to do — the
+ * absolutely-positioned frame, the title-bar drag with its on-desk clamping,
+ * the bottom-right resize grip, focus-on-mousedown — but reading its rectangle
+ * from a prop and reporting every change through callbacks instead of reaching
+ * into the window store.
+ *
+ * The connected `DesktopWindow` below is the only in-app caller and is
+ * unchanged in name, props and behavior: it binds these callbacks straight to
+ * the store actions it always called. The split exists so the ad-mode filming
+ * route can render the SHIPPING window chrome (drag included) against its own
+ * demo-local, store-free window state.
+ */
+export function DesktopWindowView({
+  frame,
   title,
   icon,
   headerRight,
   containerRef,
   minSize,
+  onFocus,
+  onMove,
+  onResize,
+  onClose,
   children,
 }: {
-  id: WindowId;
+  frame: WindowFrame;
   title: string;
-  /** Title-bar icon override. App windows omit it and fall back to their
-   * AppIcon; document windows pass an explicit icon (FileText), since their id
-   * is a `doc:${docId}` key with no AppIcon of its own. */
   icon?: ReactNode;
   headerRight?: ReactNode;
   containerRef: RefObject<HTMLDivElement | null>;
-  /** Per-window resize floor (Desktop's APP_MIN_SIZE, or DOC_WINDOW_SIZE for
-   * doc windows); the desk bounds supply the ceiling. Threaded as a prop so the
-   * store stays free of Desktop's size tables (mirrors how containerRef, not
-   * the store, owns the drag bounds). */
+  /** Per-window resize floor; the desk bounds supply the ceiling. */
   minSize: { width: number; height: number };
+  /** Raise this window (title-bar press, resize press, any mousedown inside). */
+  onFocus: () => void;
+  /** Dragged to a new, already on-desk-clamped top-left. */
+  onMove: (x: number, y: number) => void;
+  /** Raw dragged size plus the bounds it must be clamped into. The clamp itself
+   * is the callee's (windowStore.resizeWindow / clampWindowSize), exactly as
+   * before. */
+  onResize: (width: number, height: number, clamp: WindowSizeClamp) => void;
+  onClose: () => void;
   children: ReactNode;
 }) {
-  const win = useWindowStore((s) => s.windows[id]);
-  const bringToFront = useWindowStore((s) => s.bringToFront);
-  const moveWindow = useWindowStore((s) => s.moveWindow);
-  const resizeWindow = useWindowStore((s) => s.resizeWindow);
-  const closeWindow = useWindowStore((s) => s.closeWindow);
-
   const dragOrigin = useRef<{ pointerX: number; pointerY: number; winX: number; winY: number } | null>(null);
   const resizeOrigin = useRef<{ pointerX: number; pointerY: number; winW: number; winH: number } | null>(null);
 
   const handlePointerDown = useCallback(
     (e: PointerEvent<HTMLDivElement>) => {
-      if (!win) return;
-      bringToFront(id);
-      dragOrigin.current = { pointerX: e.clientX, pointerY: e.clientY, winX: win.x, winY: win.y };
+      onFocus();
+      dragOrigin.current = { pointerX: e.clientX, pointerY: e.clientY, winX: frame.x, winY: frame.y };
       e.currentTarget.setPointerCapture(e.pointerId);
     },
-    [win, id, bringToFront]
+    [frame.x, frame.y, onFocus]
   );
 
   const handlePointerMove = useCallback(
     (e: PointerEvent<HTMLDivElement>) => {
       const origin = dragOrigin.current;
-      if (!origin || !win) return;
+      if (!origin) return;
 
       const bounds = containerRef.current;
       const boundsW = bounds?.clientWidth ?? window.innerWidth;
@@ -67,7 +84,7 @@ export function DesktopWindow({
       const dx = e.clientX - origin.pointerX;
       const dy = e.clientY - origin.pointerY;
 
-      const minX = MIN_VISIBLE_X - win.width;
+      const minX = MIN_VISIBLE_X - frame.width;
       const maxX = boundsW - MIN_VISIBLE_X;
       const minY = 0;
       const maxY = Math.max(minY, boundsH - TITLE_BAR_HEIGHT);
@@ -75,9 +92,9 @@ export function DesktopWindow({
       const nextX = Math.min(Math.max(origin.winX + dx, minX), maxX);
       const nextY = Math.min(Math.max(origin.winY + dy, minY), maxY);
 
-      moveWindow(id, nextX, nextY);
+      onMove(nextX, nextY);
     },
-    [win, id, moveWindow, containerRef]
+    [frame.width, onMove, containerRef]
   );
 
   const handlePointerUp = useCallback((e: PointerEvent<HTMLDivElement>) => {
@@ -89,13 +106,12 @@ export function DesktopWindow({
   // just growing width/height from the bottom-right corner instead of moving x/y.
   const handleResizeDown = useCallback(
     (e: PointerEvent<HTMLDivElement>) => {
-      if (!win) return;
       e.stopPropagation();
-      bringToFront(id);
-      resizeOrigin.current = { pointerX: e.clientX, pointerY: e.clientY, winW: win.width, winH: win.height };
+      onFocus();
+      resizeOrigin.current = { pointerX: e.clientX, pointerY: e.clientY, winW: frame.width, winH: frame.height };
       e.currentTarget.setPointerCapture(e.pointerId);
     },
-    [win, id, bringToFront]
+    [frame.width, frame.height, onFocus]
   );
 
   const handleResizeMove = useCallback(
@@ -110,14 +126,14 @@ export function DesktopWindow({
       const dx = e.clientX - origin.pointerX;
       const dy = e.clientY - origin.pointerY;
 
-      resizeWindow(id, origin.winW + dx, origin.winH + dy, {
+      onResize(origin.winW + dx, origin.winH + dy, {
         minWidth: minSize.width,
         minHeight: minSize.height,
         maxWidth: boundsW - RESIZE_MARGIN,
         maxHeight: boundsH - RESIZE_MARGIN,
       });
     },
-    [id, resizeWindow, containerRef, minSize.width, minSize.height]
+    [onResize, containerRef, minSize.width, minSize.height]
   );
 
   const handleResizeUp = useCallback((e: PointerEvent<HTMLDivElement>) => {
@@ -125,22 +141,20 @@ export function DesktopWindow({
     e.currentTarget.releasePointerCapture(e.pointerId);
   }, []);
 
-  if (!win) return null;
-
   return (
     <div
       className="absolute"
-      style={{ left: win.x, top: win.y, width: win.width, height: win.height, zIndex: win.zIndex }}
-      onMouseDown={() => bringToFront(id)}
+      style={{ left: frame.x, top: frame.y, width: frame.width, height: frame.height, zIndex: frame.zIndex }}
+      onMouseDown={onFocus}
     >
       <Window
         title={title}
-        icon={icon ?? (isDocWindowId(id) ? undefined : <AppIcon id={id} sizeClassName="h-4 w-4" />)}
+        icon={icon}
         headerRight={headerRight}
         onTitleBarPointerDown={handlePointerDown}
         onTitleBarPointerMove={handlePointerMove}
         onTitleBarPointerUp={handlePointerUp}
-        onClose={() => closeWindow(id)}
+        onClose={onClose}
       >
         {children}
       </Window>
@@ -167,5 +181,63 @@ export function DesktopWindow({
         </svg>
       </div>
     </div>
+  );
+}
+
+export function DesktopWindow({
+  id,
+  title,
+  icon,
+  headerRight,
+  containerRef,
+  minSize,
+  children,
+}: {
+  id: WindowId;
+  /** Title-bar icon override. App windows omit it and fall back to their
+   * AppIcon; document windows pass an explicit icon (FileText), since their id
+   * is a `doc:${docId}` key with no AppIcon of its own. */
+  title: string;
+  icon?: ReactNode;
+  headerRight?: ReactNode;
+  containerRef: RefObject<HTMLDivElement | null>;
+  /** Per-window resize floor (Desktop's APP_MIN_SIZE, or DOC_WINDOW_SIZE for
+   * doc windows); the desk bounds supply the ceiling. Threaded as a prop so the
+   * store stays free of Desktop's size tables (mirrors how containerRef, not
+   * the store, owns the drag bounds). */
+  minSize: { width: number; height: number };
+  children: ReactNode;
+}) {
+  const win = useWindowStore((s) => s.windows[id]);
+  const bringToFront = useWindowStore((s) => s.bringToFront);
+  const moveWindow = useWindowStore((s) => s.moveWindow);
+  const resizeWindow = useWindowStore((s) => s.resizeWindow);
+  const closeWindow = useWindowStore((s) => s.closeWindow);
+
+  const handleFocus = useCallback(() => bringToFront(id), [bringToFront, id]);
+  const handleMove = useCallback((x: number, y: number) => moveWindow(id, x, y), [moveWindow, id]);
+  const handleResize = useCallback(
+    (width: number, height: number, clamp: WindowSizeClamp) => resizeWindow(id, width, height, clamp),
+    [resizeWindow, id]
+  );
+  const handleClose = useCallback(() => closeWindow(id), [closeWindow, id]);
+
+  if (!win) return null;
+
+  return (
+    <DesktopWindowView
+      frame={win}
+      title={title}
+      icon={icon ?? (isDocWindowId(id) ? undefined : <AppIcon id={id} sizeClassName="h-4 w-4" />)}
+      headerRight={headerRight}
+      containerRef={containerRef}
+      minSize={minSize}
+      onFocus={handleFocus}
+      onMove={handleMove}
+      onResize={handleResize}
+      onClose={handleClose}
+    >
+      {children}
+    </DesktopWindowView>
   );
 }

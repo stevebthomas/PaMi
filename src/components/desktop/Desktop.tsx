@@ -20,6 +20,7 @@ import { DocWindow } from "../docs/DocWindow";
 import { StandupCallBar } from "../standup/StandupCallBar";
 import { StandupCall } from "../standup/StandupCall";
 import { FileText } from "lucide-react";
+import { APP_DEFAULT_SIZE, APP_MIN_SIZE, type AppId } from "./appWindows";
 import { resolveSimDoc } from "@/data/simDocs";
 import { useSimStore } from "@/store/simStore";
 import {
@@ -34,34 +35,14 @@ import { getSessionCostSummary } from "@/store/costStore";
 import { getAmbientTint, getDayProgress } from "@/lib/sim/timeOfDay";
 import { restoreSession, startSessionPersistence, resetSession } from "@/lib/sim/sessionPersistence";
 
-export type AppId = "chattr" | "pulse" | "taskflow" | "askClaude" | "reviews" | "notes" | "office" | "docs";
-
-export const APP_DEFAULT_SIZE: Record<AppId, { width: number; height: number }> = {
-  chattr: { width: 760, height: 600 },
-  pulse: { width: 700, height: 560 },
-  taskflow: { width: 700, height: 560 },
-  askClaude: { width: 640, height: 580 },
-  reviews: { width: 640, height: 580 },
-  notes: { width: 480, height: 520 },
-  office: { width: 860, height: 660 },
-  docs: { width: 640, height: 600 },
-};
-
-/** Smallest each window may be resized to (see DesktopWindow's resize handle).
- * Derived from each app's internal reflow: Chattr needs both fixed rails plus a
- * usable thread; Pulse/Taskflow need their card grids to survive a 2-up
- * collapse; Office/Docs go single-column at their floor; the simpler apps share
- * a generic 360x360 minimum. */
-export const APP_MIN_SIZE: Record<AppId, { width: number; height: number }> = {
-  chattr: { width: 540, height: 420 },
-  pulse: { width: 460, height: 400 },
-  taskflow: { width: 480, height: 400 },
-  askClaude: { width: 360, height: 360 },
-  reviews: { width: 360, height: 360 },
-  notes: { width: 360, height: 360 },
-  office: { width: 400, height: 400 },
-  docs: { width: 380, height: 360 },
-};
+/* The AppId union and the two per-app size tables now live in ./appWindows so
+ * they can be imported as plain data (the ad-mode filming route needs the
+ * defaults/minimums) without dragging this module's whole graph along. They are
+ * re-exported here under their existing names, so `AppId`, `APP_DEFAULT_SIZE`
+ * and `APP_MIN_SIZE` keep resolving from "@/components/desktop/Desktop" exactly
+ * as before for every existing importer. */
+export type { AppId };
+export { APP_DEFAULT_SIZE, APP_MIN_SIZE };
 
 /** Size for a document's own window (keyed `doc:${docId}`). Not an AppId, so it
  * lives outside the APP_* tables: a comfortable reading default that cascades

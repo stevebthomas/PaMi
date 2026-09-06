@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import type { AppId } from "@/components/desktop/Desktop";
+import type { AppId } from "@/components/desktop/appWindows";
 
 /**
  * Window key. Static app windows are keyed by their static AppId (one window
@@ -62,12 +62,7 @@ interface WindowStoreState {
    * clamp bounds (per-app min from Desktop's APP_MIN_SIZE, max from the live
    * containerRef) are threaded in by DesktopWindow rather than read here, so
    * the store keeps no dependency on Desktop's size tables or the DOM. */
-  resizeWindow: (
-    id: WindowId,
-    width: number,
-    height: number,
-    clamp: { minWidth: number; minHeight: number; maxWidth: number; maxHeight: number }
-  ) => void;
+  resizeWindow: (id: WindowId, width: number, height: number, clamp: WindowSizeClamp) => void;
   /** Closes the window (removes it from view/state). The underlying app
    * data (Chattr messages, Ask Claude history, etc.) lives in its own
    * store and is untouched, so reopening via the taskbar picks up where
@@ -87,6 +82,90 @@ const DESK_MARGIN = 16;
  * minimums (Desktop's APP_MIN_SIZE) are enforced in the resize path, not here:
  * openWindow doesn't receive them; this is only a sane floor for the clamp. */
 const SPAWN_HARD_FLOOR = 200;
+/** Smallest top-left inset a spawned window may sit at, and the floor the
+ * on-desk upper bound is guarded with. */
+const SPAWN_MIN_INSET = 16;
+
+/**
+ * Spawn size for a window: never larger than the desk. A window taller/wider
+ * than the desk pushes its bottom-right resize handle off the visible area and
+ * out of reach (Office's 660px default on a ~650px laptop desk did exactly
+ * this). Clamps to desk-minus-margin, with the same max<min inversion guard
+ * resizeWindow uses (a hard floor here, since per-app minimums aren't available
+ * at open time: they stay enforced in the resize path).
+ *
+ * PURE. Extracted from openWindow so a non-store surface (the ad-mode filming
+ * route's demo-local window layer) can place windows through the exact same
+ * math the product uses instead of re-deriving it. openWindow is its only
+ * in-app caller and its result is unchanged.
+ */
+export function clampSpawnSize(
+  defaults: { width: number; height: number },
+  deskWidth: number,
+  deskHeight: number
+): { width: number; height: number } {
+  return {
+    width: Math.min(defaults.width, Math.max(SPAWN_HARD_FLOOR, deskWidth - DESK_MARGIN)),
+    height: Math.min(defaults.height, Math.max(SPAWN_HARD_FLOOR, deskHeight - DESK_MARGIN)),
+  };
+}
+
+/**
+ * Where the `openCount`-th window of a session lands: centered on the desk
+ * using its (already clamped) size, plus the cascade offset that wraps every
+ * CASCADE_WRAP windows, then clamped on-desk.
+ *
+ * The SPAWN_MIN_INSET floor is the long-standing top-left minimum; the upper
+ * bound keeps the window fully on-desk so the cascade offset can't push a
+ * desk-sized window's bottom/right (and thus its resize handle) back
+ * off-screen. For normal sub-desk windows deskDim − size stays larger than the
+ * cascaded center, so the cascade is preserved untouched.
+ *
+ * PURE, same extraction rationale as clampSpawnSize above.
+ */
+export function cascadePlacement(
+  openCount: number,
+  width: number,
+  height: number,
+  deskWidth: number,
+  deskHeight: number
+): { x: number; y: number } {
+  const cascade = (openCount % CASCADE_WRAP) * CASCADE_STEP;
+  const centeredX = Math.round((deskWidth - width) / 2) + cascade;
+  const centeredY = Math.round((deskHeight - height) / 2) + cascade;
+  return {
+    x: Math.min(Math.max(SPAWN_MIN_INSET, centeredX), Math.max(SPAWN_MIN_INSET, deskWidth - width)),
+    y: Math.min(Math.max(SPAWN_MIN_INSET, centeredY), Math.max(SPAWN_MIN_INSET, deskHeight - height)),
+  };
+}
+
+/** Bounds a resize is clamped into: per-app floor from Desktop's APP_MIN_SIZE,
+ * ceiling from the live desk. */
+export interface WindowSizeClamp {
+  minWidth: number;
+  minHeight: number;
+  maxWidth: number;
+  maxHeight: number;
+}
+
+/**
+ * The resize clamp, PURE. Guards the upper bound against a desk smaller than
+ * the min (max<min on a tiny viewport) so the clamp never inverts and pins the
+ * window to 0. resizeWindow is its only in-app caller (same result as before);
+ * exported for the same demo-local reuse as the two functions above.
+ */
+export function clampWindowSize(
+  width: number,
+  height: number,
+  clamp: WindowSizeClamp
+): { width: number; height: number } {
+  const maxWidth = Math.max(clamp.minWidth, clamp.maxWidth);
+  const maxHeight = Math.max(clamp.minHeight, clamp.maxHeight);
+  return {
+    width: Math.round(Math.min(Math.max(width, clamp.minWidth), maxWidth)),
+    height: Math.round(Math.min(Math.max(height, clamp.minHeight), maxHeight)),
+  };
+}
 
 export const useWindowStore = create<WindowStoreState>((set, get) => ({
   windows: {},
@@ -99,27 +178,11 @@ export const useWindowStore = create<WindowStoreState>((set, get) => ({
       return;
     }
 
-    // Never spawn a window larger than the desk. A window taller/wider than the
-    // desk pushes its bottom-right resize handle off the visible area and out of
-    // reach (Office's 660px default on a ~650px laptop desk did exactly this).
-    // Clamp the spawn size to desk-minus-margin, with the same max<min inversion
-    // guard resizeWindow uses (a hard floor here, since per-app minimums aren't
-    // available at open time: they stay enforced in the resize path).
-    const width = Math.min(defaults.width, Math.max(SPAWN_HARD_FLOOR, deskWidth - DESK_MARGIN));
-    const height = Math.min(defaults.height, Math.max(SPAWN_HARD_FLOOR, deskHeight - DESK_MARGIN));
-
-    // Center using the CLAMPED size so a clamped window still centers. The 16px
-    // floor is the existing top-left minimum; the added upper bound keeps the
-    // window fully on-desk so the cascade offset can't push a desk-sized
-    // window's bottom/right (and thus its resize handle) back off-screen (the
-    // literal bug, since Office opens at an unpredictable cascade step). For
-    // normal sub-desk windows deskDim − size stays larger than the cascaded
-    // center, so cascade is preserved untouched.
-    const cascade = (get().openCount % CASCADE_WRAP) * CASCADE_STEP;
-    const centeredX = Math.round((deskWidth - width) / 2) + cascade;
-    const centeredY = Math.round((deskHeight - height) / 2) + cascade;
-    const x = Math.min(Math.max(16, centeredX), Math.max(16, deskWidth - width));
-    const y = Math.min(Math.max(16, centeredY), Math.max(16, deskHeight - height));
+    // Never spawn a window larger than the desk (clampSpawnSize), then center
+    // the CLAMPED size and apply the cascade offset (cascadePlacement) so a
+    // clamped window still centers and still lands fully on-desk.
+    const { width, height } = clampSpawnSize(defaults, deskWidth, deskHeight);
+    const { x, y } = cascadePlacement(get().openCount, width, height, deskWidth, deskHeight);
     const zIndex = get().nextZIndex;
 
     set((s) => ({
@@ -152,12 +215,7 @@ export const useWindowStore = create<WindowStoreState>((set, get) => ({
     set((s) => {
       const w = s.windows[id];
       if (!w) return s;
-      // Guard the upper bound against a desk smaller than the min (max<min on a
-      // tiny viewport) so the clamp never inverts and pins the window to 0.
-      const maxWidth = Math.max(clamp.minWidth, clamp.maxWidth);
-      const maxHeight = Math.max(clamp.minHeight, clamp.maxHeight);
-      const nextWidth = Math.round(Math.min(Math.max(width, clamp.minWidth), maxWidth));
-      const nextHeight = Math.round(Math.min(Math.max(height, clamp.minHeight), maxHeight));
+      const { width: nextWidth, height: nextHeight } = clampWindowSize(width, height, clamp);
       if (nextWidth === w.width && nextHeight === w.height) return s;
       return { windows: { ...s.windows, [id]: { ...w, width: nextWidth, height: nextHeight } } };
     });

@@ -89,8 +89,9 @@ function useFailedCheckouts() {
 
 /** 25330 -> "25.3k". WEEKLY_ATTEMPTS runs in the tens of thousands (see
  * worldCanon.ts's ATTEMPT_VOLUME_PER_MINUTE), so counts show a compact form
- * instead of a long comma-separated string in tight spaces. */
-function formatAttemptCount(n: number): string {
+ * instead of a long comma-separated string in tight spaces. Exported so any
+ * surface reusing the breakdown/attempt chart formats counts identically. */
+export function formatAttemptCount(n: number): string {
   if (n >= 1000) return `${(n / 1000).toFixed(1)}k`;
   return n.toLocaleString();
 }
@@ -151,10 +152,22 @@ export function StatTile({
  * matching Priya's "All Apple Pay." Attempts-per-method are today's live volume
  * split by each method's share, so this refreshes on the same cadence as
  * everything else. */
-function PaymentMethodBreakdown({ rows, freshness }: { rows: PaymentMethodBreakdownRow[]; freshness: string }) {
-  const clockMinutes = useSimStore((s) => s.clockMinutes);
-  const totalToday = mondayAttemptsSoFar(clockMinutes);
-
+export function PaymentMethodBreakdownView({
+  rows,
+  freshness,
+  totalToday,
+  baselineRate = BASELINE_RATE,
+}: {
+  rows: PaymentMethodBreakdownRow[];
+  freshness: string;
+  /** Today's total checkout attempts; each row's own attempt count is this
+   * split by the row's share. */
+  totalToday: number;
+  /** Rate a method is considered healthy at. Defaults to the canon
+   * BASELINE_RATE — the only value the live dashboard ever passes — and is a
+   * prop purely so a surface running its own (scripted) rate band can say so. */
+  baselineRate?: number;
+}) {
   return (
     <div>
       <div className="mb-2 flex items-baseline justify-between gap-2">
@@ -164,7 +177,7 @@ function PaymentMethodBreakdown({ rows, freshness }: { rows: PaymentMethodBreakd
       <div className="flex flex-col divide-y divide-border-hairline">
         {rows.map((r) => {
           const attempts = Math.round(r.share * totalToday);
-          const degraded = r.successRate < BASELINE_RATE - 0.05;
+          const degraded = r.successRate < baselineRate - 0.05;
           // No attempts yet today means the rate curve's number isn't backed by
           // real volume: show a neutral dash instead of asserting a rate over
           // zero data (QA finding #13: "Apple Pay · 0 attempts · 98.8%" read as
@@ -187,8 +200,17 @@ function PaymentMethodBreakdown({ rows, freshness }: { rows: PaymentMethodBreakd
   );
 }
 
+/** Connected breakdown: unchanged name, props and behavior — it still reads
+ * today's total attempts off the live clock and renders the view above. */
+function PaymentMethodBreakdown({ rows, freshness }: { rows: PaymentMethodBreakdownRow[]; freshness: string }) {
+  const clockMinutes = useSimStore((s) => s.clockMinutes);
+  const totalToday = mondayAttemptsSoFar(clockMinutes);
+
+  return <PaymentMethodBreakdownView rows={rows} freshness={freshness} totalToday={totalToday} />;
+}
+
 type HeroState = "healthy" | "elevated" | "recovering" | "incident";
-type StatusBadge = { label: string; tone: Tone; Icon: LucideIcon };
+export type StatusBadge = { label: string; tone: Tone; Icon: LucideIcon };
 
 /** Single computed status chip for the checkout-rate card.
  *
@@ -205,7 +227,7 @@ type StatusBadge = { label: string; tone: Tone; Icon: LucideIcon };
  *    isRecoveringAt's window ends once the curve is back at baseline, and a
  *    plain fallback to "Incident active" after that window would wrongly
  *    re-declare the incident live. */
-function checkoutStatusBadge(
+export function checkoutStatusBadge(
   incidentStartMinutes: number | null,
   recovering: boolean,
   isBaseline: boolean,
