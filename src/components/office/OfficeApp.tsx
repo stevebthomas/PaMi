@@ -7,6 +7,7 @@ import { APP_DEFAULT_SIZE } from "@/components/desktop/Desktop";
 import { availableDmContacts, dmChannelId } from "@/lib/sim/dmContacts";
 import type { DmContactId } from "@/lib/sim/types";
 import { ENGINEERS, type Engineer } from "@/lib/sim/worldCanon";
+import { GenericAvatar } from "@/components/shared/PixelAvatar";
 
 /** Raj's actual squad of 5 (his prompt establishes "You manage a squad of 5
  * engineers") and each engineer's established work now live in worldCanon.ts,
@@ -21,30 +22,6 @@ import { ENGINEERS, type Engineer } from "@/lib/sim/worldCanon";
  * Theo are genuinely busy on their own work and have no reason to be pulled
  * onto a payments bug: not everyone in the company reacts to your incident. */
 const INCIDENT_ENGINEER_NAMES = new Set(["Jordan", "Chen"]);
-
-function GenericAvatar({ hair, skin, accent }: { hair: string; skin: string; accent: string }) {
-  const grid = [".HHHHHH.", "HHHHHHHH", ".SSSSSS.", "SSSSSSSS", "SSESSESS", "SSSSSSSS", ".AAAAAA.", "AAAAAAAA"];
-  const colorFor = (ch: string) => {
-    if (ch === "H") return hair;
-    if (ch === "S") return skin;
-    if (ch === "E") return "#241f33";
-    if (ch === "A") return accent;
-    return null;
-  };
-  return (
-    <div className="h-8 w-8 shrink-0 overflow-hidden rounded-full border border-border-hairline bg-surface">
-      <svg viewBox="0 0 8 8" shapeRendering="crispEdges" className="h-full w-full">
-        {grid.map((row, y) =>
-          row.split("").map((ch, x) => {
-            const fill = colorFor(ch);
-            if (!fill) return null;
-            return <rect key={`${x}-${y}`} x={x} y={y} width={1} height={1} fill={fill} />;
-          })
-        )}
-      </svg>
-    </div>
-  );
-}
 
 /** Small pill on every card: green when this engineer is a DM-available
  * registry contact, muted otherwise. Reads purely off the `available` flag the

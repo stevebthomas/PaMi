@@ -97,14 +97,14 @@ function formatAttemptCount(n: number): string {
 
 /** Semantic tones -> token text colors. Accent green is spent only on genuine
  * success/progress states (per DESIGN.md); volume figures stay neutral. */
-type Tone = "green" | "amber" | "red" | "neutral";
-const toneText: Record<Tone, string> = {
+export type Tone = "green" | "amber" | "red" | "neutral";
+export const toneText: Record<Tone, string> = {
   green: "text-accent-green",
   amber: "text-status-pending",
   red: "text-status-failed",
   neutral: "text-text-primary",
 };
-const toneBadge: Record<Tone, string> = {
+export const toneBadge: Record<Tone, string> = {
   green: "bg-accent-green/10 text-accent-green",
   amber: "bg-status-pending/10 text-status-pending",
   red: "bg-status-failed/10 text-status-failed",
@@ -115,15 +115,17 @@ const toneBadge: Record<Tone, string> = {
 // plain hairline stays — so green/red is spent only where the metric is
 // actually signaling, per DESIGN.md. Rendered alongside the base rounded border
 // so the corners follow the card radius (no square poke).
-const toneEdge: Record<Tone, string> = {
+export const toneEdge: Record<Tone, string> = {
   green: "border-t-2 border-t-accent-green",
   amber: "border-t-2 border-t-status-pending",
   red: "border-t-2 border-t-status-failed",
   neutral: "",
 };
 
-/** Compact metric tile for progressively-disclosed secondary stats. */
-function StatTile({
+/** Compact metric tile for progressively-disclosed secondary stats. Exported
+ * so any surface showing a Pulse-style figure uses this exact tile rather than
+ * a re-typed copy of its classes. */
+export function StatTile({
   label,
   value,
   caption,

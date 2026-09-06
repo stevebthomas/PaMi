@@ -17,18 +17,24 @@ const APPS: { id: AppId; label: string; enabled: boolean }[] = [
 /** Bottom dock, purely for opening/switching apps: system controls
  * (difficulty, +15m, battery, clock) live in StatusBar at the top instead,
  * matching how real desktop OSes split a top menu/status bar from a bottom
- * app dock. */
-export function Taskbar({
+ * app dock.
+ *
+ * Presentational core: the full app list, order, icons and badge styling,
+ * driven entirely by props so the dock can be rendered without a live
+ * session. `Taskbar` below is the store-connected wrapper Desktop uses. */
+export function TaskbarView({
   openApps,
   onSelectApp,
+  chattrBadgeCount = 0,
+  docsLaunching = false,
 }: {
-  openApps: Set<AppId>;
+  openApps: ReadonlySet<AppId>;
   onSelectApp: (app: AppId) => void;
+  /** Unread count on the Chattr tile; hidden at 0. */
+  chattrBadgeCount?: number;
+  /** Plays the Docs tile's launch hop. */
+  docsLaunching?: boolean;
 }) {
-  const pendingCount = useSimStore((s) => s.pendingResponseIds.size);
-  // Docs icon hops while its launch animation is in flight (see docsStore).
-  const docsLaunching = useDocsStore((s) => s.launching);
-
   return (
     <div className="flex h-14 shrink-0 items-center justify-center border-t border-border-hairline bg-surface px-3">
       {/* Dock: centered row of app icons, macOS-style. A small dot marks
@@ -56,9 +62,9 @@ export function Taskbar({
                 }`}
               >
                 <AppIcon id={app.id} sizeClassName="h-5 w-5" />
-                {app.id === "chattr" && pendingCount > 0 && (
+                {app.id === "chattr" && chattrBadgeCount > 0 && (
                   <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-accent-green px-1 text-caption leading-none tabular-nums text-white">
-                    {pendingCount}
+                    {chattrBadgeCount}
                   </span>
                 )}
               </div>
@@ -71,5 +77,28 @@ export function Taskbar({
         })}
       </div>
     </div>
+  );
+}
+
+/** The dock as the running sim uses it: same markup as TaskbarView, with the
+ * Chattr unread count and the Docs launch hop read from their stores. */
+export function Taskbar({
+  openApps,
+  onSelectApp,
+}: {
+  openApps: Set<AppId>;
+  onSelectApp: (app: AppId) => void;
+}) {
+  const pendingCount = useSimStore((s) => s.pendingResponseIds.size);
+  // Docs icon hops while its launch animation is in flight (see docsStore).
+  const docsLaunching = useDocsStore((s) => s.launching);
+
+  return (
+    <TaskbarView
+      openApps={openApps}
+      onSelectApp={onSelectApp}
+      chattrBadgeCount={pendingCount}
+      docsLaunching={docsLaunching}
+    />
   );
 }

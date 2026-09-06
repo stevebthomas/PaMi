@@ -219,6 +219,42 @@ export function SpriteIcon({
 /** Renders a persona's pixel portrait, or the plain letter-square fallback
  * for anyone without a sprite (system, or a player with no chosen avatar).
  *
+ * Presentational core: resolves entirely from its props and reads no store,
+ * so it can be rendered outside a live session (the player's sprite id is
+ * supplied explicitly via `playerSpriteId`). `PixelAvatar` below is the
+ * store-connected wrapper every in-sim call site uses.
+ */
+export function PixelAvatarView({
+  agentId,
+  sizeClassName = "h-8 w-8",
+  playerSpriteId = null,
+}: {
+  agentId: AgentId;
+  sizeClassName?: string;
+  /** Which PLAYER_SPRITES option to use for `agentId === "player"`. Null (or
+   * an id with no match) falls back to the plain letter square. */
+  playerSpriteId?: string | null;
+}) {
+  const playerOption = agentId === "player" ? PLAYER_SPRITES.find((p) => p.id === playerSpriteId) : undefined;
+
+  const sprite = agentId === "player" ? playerOption?.sprite : SPRITES[agentId];
+  const bgClassName = playerOption?.bgClassName ?? FALLBACK_COLORS[agentId];
+
+  if (!sprite) {
+    return (
+      <div
+        className={`flex shrink-0 items-center justify-center rounded-full border border-border-hairline text-label font-sans font-medium text-white ${sizeClassName} ${bgClassName}`}
+      >
+        {AGENT_NAMES[agentId].slice(0, 1)}
+      </div>
+    );
+  }
+
+  return <SpriteIcon sprite={sprite} bgClassName={bgClassName} sizeClassName={sizeClassName} label={AGENT_NAMES[agentId]} />;
+}
+
+/** Store-connected avatar: the component every in-sim surface renders.
+ *
  * Resolution for the player: PixelAvatar has ~15 call sites across Chattr,
  * the standup call, Ask Claude, and HR orientation. Rather than thread a new
  * prop through all of them, PixelAvatar reads the player's chosen sprite id
@@ -235,20 +271,33 @@ export function SpriteIcon({
  */
 export function PixelAvatar({ agentId, sizeClassName = "h-8 w-8" }: { agentId: AgentId; sizeClassName?: string }) {
   const playerAvatarId = useSimStore((s) => s.stateBag.playerAvatarId);
-  const playerOption = agentId === "player" ? PLAYER_SPRITES.find((p) => p.id === playerAvatarId) : undefined;
+  return <PixelAvatarView agentId={agentId} sizeClassName={sizeClassName} playerSpriteId={playerAvatarId} />;
+}
 
-  const sprite = agentId === "player" ? playerOption?.sprite : SPRITES[agentId];
-  const bgClassName = playerOption?.bgClassName ?? FALLBACK_COLORS[agentId];
-
-  if (!sprite) {
-    return (
-      <div
-        className={`flex shrink-0 items-center justify-center rounded-full border border-border-hairline text-label font-sans font-medium text-white ${sizeClassName} ${bgClassName}`}
-      >
-        {AGENT_NAMES[agentId].slice(0, 1)}
-      </div>
-    );
-  }
-
-  return <SpriteIcon sprite={sprite} bgClassName={bgClassName} sizeClassName={sizeClassName} label={AGENT_NAMES[agentId]} />;
+/** Desk portrait: the same 8x8 sprite idiom as above, but built from a plain
+ * hair/skin/accent triple instead of an AgentId lookup, so a face can be drawn
+ * for someone with no SPRITES entry of their own. This is what the Office
+ * floor's desk cards use (their palettes live in worldCanon's ENGINEERS). */
+export function GenericAvatar({ hair, skin, accent }: { hair: string; skin: string; accent: string }) {
+  const grid = [".HHHHHH.", "HHHHHHHH", ".SSSSSS.", "SSSSSSSS", "SSESSESS", "SSSSSSSS", ".AAAAAA.", "AAAAAAAA"];
+  const colorFor = (ch: string) => {
+    if (ch === "H") return hair;
+    if (ch === "S") return skin;
+    if (ch === "E") return "#241f33";
+    if (ch === "A") return accent;
+    return null;
+  };
+  return (
+    <div className="h-8 w-8 shrink-0 overflow-hidden rounded-full border border-border-hairline bg-surface">
+      <svg viewBox="0 0 8 8" shapeRendering="crispEdges" className="h-full w-full">
+        {grid.map((row, y) =>
+          row.split("").map((ch, x) => {
+            const fill = colorFor(ch);
+            if (!fill) return null;
+            return <rect key={`${x}-${y}`} x={x} y={y} width={1} height={1} fill={fill} />;
+          })
+        )}
+      </svg>
+    </div>
+  );
 }
