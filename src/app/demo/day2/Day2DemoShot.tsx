@@ -4,16 +4,61 @@
  */
 
 import { useEffect, useState } from "react";
-import { ClipboardCheck, FileText, MessageSquare } from "lucide-react";
+import {
+  Check,
+  ChevronLeft,
+  ChevronRight,
+  ClipboardCheck,
+  FileText,
+  MessageSquare,
+  X,
+} from "lucide-react";
 
-const CRITERIA: { key: string; name: string; desc: string }[] = [
-  { key: "accuracy", name: "Accuracy", desc: "Matches the item details the seller provided." },
-  { key: "relevance", name: "Relevance / Helpfulness", desc: "Copy a seller would actually ship." },
-  { key: "tone", name: "Tone / UX fit", desc: "Sounds like BazaarLoop, not generic AI." },
+type RuleKey = "rule1" | "rule2" | "rule3" | "rule4";
+type RuleVerdict = "pass" | "fail";
+type Verdict = "good" | "weak" | "fail";
+
+const RULES: { key: RuleKey; text: string }[] = [
   {
-    key: "safety",
-    name: "Safety",
-    desc: "No claims, pricing, or content that could mislead buyers.",
+    key: "rule1",
+    text: "Does not fabricate brand, model, or condition claims not shown in the photo",
+  },
+  { key: "rule2", text: "States item condition honestly (wear, damage, functionality)" },
+  { key: "rule3", text: "Price suggestion is grounded in comparable recent listings" },
+  { key: "rule4", text: "Tone matches BazaarLoop's marketplace voice guidelines" },
+];
+
+type Trace = {
+  no: number;
+  meta: string;
+  sample: string;
+  presets: Record<RuleKey, RuleVerdict>;
+  verdict: Verdict;
+};
+
+const TRACES: Trace[] = [
+  {
+    no: 3,
+    meta: "listing-assistant · draft · 9:01 AM",
+    sample:
+      "Retro chrome toaster in gleaming condition — vintage-inspired styling with the original 1950s heating elements still going strong. Barely used, basically brand new. Toasts perfectly even every time — you won't find a cleaner one at this price, guaranteed.",
+    presets: { rule1: "fail", rule2: "pass", rule3: "pass", rule4: "fail" },
+    verdict: "fail",
+  },
+  {
+    no: 4,
+    meta: "listing-assistant · draft · 9:01 AM",
+    sample:
+      "Vintage 90s denim jacket in great worn-in condition — soft, faded wash with just the right amount of character. Fits true to size (tagged L, sits more like a relaxed M/L) and layers well over a hoodie or tee. Ships within 1–2 business days in eco-friendly packaging — a closet staple that won't last long at this price.",
+    presets: { rule1: "pass", rule2: "pass", rule3: "pass", rule4: "pass" },
+    verdict: "good",
+  },
+  {
+    no: 5,
+    meta: "listing-assistant · draft · 9:01 AM",
+    sample: "Ceramic planter, 8 inch. White. No cracks. Comes with drainage tray.",
+    presets: { rule1: "pass", rule2: "pass", rule3: "pass", rule4: "pass" },
+    verdict: "weak",
   },
 ];
 
@@ -92,18 +137,27 @@ function MessageScreen({ onOpenEval }: { onOpenEval: () => void }) {
 
 function EvalScreen() {
   const [visible, setVisible] = useState(false);
-  const [scores, setScores] = useState<Record<string, number | null>>({
-    accuracy: null,
-    relevance: null,
-    tone: null,
-    safety: null,
-  });
+  const [traceIndex, setTraceIndex] = useState(0);
+  const trace = TRACES[traceIndex];
+  const [ruleVerdicts, setRuleVerdicts] = useState<Record<RuleKey, RuleVerdict>>(trace.presets);
+  const [verdict, setVerdict] = useState<Verdict>(trace.verdict);
+  const [reason, setReason] = useState("");
+  const [goodResponse, setGoodResponse] = useState("");
 
   // Delay the opacity flip a tick after mount so the CSS transition actually runs.
   useEffect(() => {
     const revealTimer = setTimeout(() => setVisible(true), 20);
     return () => clearTimeout(revealTimer);
   }, []);
+
+  function goToTrace(index: number) {
+    const nextTrace = TRACES[index];
+    setTraceIndex(index);
+    setRuleVerdicts(nextTrace.presets);
+    setVerdict(nextTrace.verdict);
+    setReason("");
+    setGoodResponse("");
+  }
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-canvas p-6">
@@ -126,78 +180,154 @@ function EvalScreen() {
         </div>
 
         <div className="bg-canvas p-6">
-          <p className="text-body text-text-secondary">
-            Evaluate the listing assistant&apos;s draft output for the seller pilot. Score the
-            sample below against each criterion.
-          </p>
+          <div className="flex items-center justify-between">
+            <span className="font-pixel text-label tabular-nums text-text-secondary">
+              Reviewing trace <span className="text-text-primary">{trace.no}</span> of 20
+            </span>
+            <div className="flex items-center gap-1.5">
+              <button
+                type="button"
+                onClick={() => goToTrace(traceIndex - 1)}
+                disabled={traceIndex === 0}
+                aria-label="Previous trace"
+                className="flex h-7 w-7 items-center justify-center rounded-md border border-border-hairline bg-surface text-text-secondary transition-colors hover:bg-muted hover:text-text-primary disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                <ChevronLeft className="h-4 w-4" aria-hidden />
+              </button>
+              <button
+                type="button"
+                onClick={() => goToTrace(traceIndex + 1)}
+                disabled={traceIndex === TRACES.length - 1}
+                aria-label="Next trace"
+                className="flex h-7 w-7 items-center justify-center rounded-md border border-border-hairline bg-surface text-text-secondary transition-colors hover:bg-muted hover:text-text-primary disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                <ChevronRight className="h-4 w-4" aria-hidden />
+              </button>
+            </div>
+          </div>
 
           <div className="mt-6">
             <p className="text-label font-semibold uppercase tracking-wide text-text-secondary">
               SAMPLE OUTPUT — LISTING ASSISTANT (SELLER PILOT)
             </p>
             <div className="mt-2 rounded-md border border-border-hairline bg-surface p-4">
-              <p className="font-pixel text-caption text-text-secondary">
-                listing-assistant · draft · 9:01 AM
-              </p>
-              <p className="mt-2 text-body leading-relaxed text-text-primary">
-                Vintage 90s denim jacket in great worn-in condition &mdash; soft, faded wash with
-                just the right amount of character. Fits true to size (tagged L, sits more like a
-                relaxed M/L) and layers well over a hoodie or tee. Ships within 1&ndash;2 business
-                days in eco-friendly packaging &mdash; a closet staple that won&apos;t last long
-                at this price.
-              </p>
+              <p className="font-pixel text-caption text-text-secondary">{trace.meta}</p>
+              <p className="mt-2 text-body leading-relaxed text-text-primary">{trace.sample}</p>
             </div>
           </div>
 
           <div className="mt-6 divide-y divide-border-hairline rounded-md border border-border-hairline bg-surface">
-            {CRITERIA.map((criterion) => (
-              <div
-                key={criterion.key}
-                className="flex items-center justify-between gap-4 px-4 py-4"
-              >
-                <div>
-                  <p className="text-body font-medium text-text-primary">{criterion.name}</p>
-                  <p className="text-label text-text-secondary">{criterion.desc}</p>
+            {RULES.map((rule) => {
+              const ruleVerdict = ruleVerdicts[rule.key];
+              return (
+                <div
+                  key={rule.key}
+                  className="flex items-center justify-between gap-4 px-4 py-4"
+                >
+                  <p className="text-body text-text-primary">{rule.text}</p>
+                  <div className="flex shrink-0 gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setRuleVerdicts((prev) => ({ ...prev, [rule.key]: "pass" }))
+                      }
+                      className={`flex items-center gap-1 rounded-md border px-2 py-1 text-label transition-colors ${
+                        ruleVerdict === "pass"
+                          ? "border-accent-green bg-accent-green/10 font-medium text-accent-green"
+                          : "border-border-hairline text-text-secondary hover:bg-muted"
+                      }`}
+                    >
+                      <Check className="h-3.5 w-3.5" aria-hidden />
+                      Pass
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setRuleVerdicts((prev) => ({ ...prev, [rule.key]: "fail" }))
+                      }
+                      className={`flex items-center gap-1 rounded-md border px-2 py-1 text-label transition-colors ${
+                        ruleVerdict === "fail"
+                          ? "border-status-failed bg-status-failed/10 font-medium text-status-failed"
+                          : "border-border-hairline text-text-secondary hover:bg-muted"
+                      }`}
+                    >
+                      <X className="h-3.5 w-3.5" aria-hidden />
+                      Fail
+                    </button>
+                  </div>
                 </div>
-                <div className="flex gap-1.5">
-                  {[1, 2, 3, 4, 5].map((n) => {
-                    const selected = scores[criterion.key] === n;
-                    return (
-                      <button
-                        key={n}
-                        type="button"
-                        onClick={() =>
-                          setScores((prev) => ({ ...prev, [criterion.key]: n }))
-                        }
-                        className={`h-8 w-8 rounded-md border text-label tabular-nums transition-colors ${
-                          selected
-                            ? "border-primary bg-primary text-primary-foreground"
-                            : "border-border-hairline text-text-primary hover:bg-canvas"
-                        }`}
-                      >
-                        {n}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
 
           <div className="mt-6">
             <p className="text-label font-semibold uppercase tracking-wide text-text-secondary">
-              NOTES / RATIONALE
+              VERDICT
+            </p>
+            <div className="mt-2 flex gap-2">
+              <button
+                type="button"
+                onClick={() => setVerdict("good")}
+                className={`rounded-md border px-4 py-1.5 text-body transition-colors ${
+                  verdict === "good"
+                    ? "border-accent-green bg-accent-green/10 font-medium text-accent-green"
+                    : "border-border-hairline text-text-secondary hover:bg-muted"
+                }`}
+              >
+                Good
+              </button>
+              <button
+                type="button"
+                onClick={() => setVerdict("weak")}
+                className={`rounded-md border px-4 py-1.5 text-body transition-colors ${
+                  verdict === "weak"
+                    ? "border-status-pending bg-status-pending/10 font-medium text-status-pending"
+                    : "border-border-hairline text-text-secondary hover:bg-muted"
+                }`}
+              >
+                Weak
+              </button>
+              <button
+                type="button"
+                onClick={() => setVerdict("fail")}
+                className={`rounded-md border px-4 py-1.5 text-body transition-colors ${
+                  verdict === "fail"
+                    ? "border-status-failed bg-status-failed/10 font-medium text-status-failed"
+                    : "border-border-hairline text-text-secondary hover:bg-muted"
+                }`}
+              >
+                Fail
+              </button>
+            </div>
+          </div>
+
+          <div className="mt-6" key={traceIndex}>
+            <p className="text-label font-semibold uppercase tracking-wide text-text-secondary">
+              REASON
+            </p>
+            <input
+              type="text"
+              value={reason}
+              onChange={(event) => setReason(event.target.value)}
+              placeholder="One line: why this verdict"
+              className="mt-2 w-full rounded-md border border-border-hairline bg-surface p-3 text-body text-text-primary placeholder:text-text-secondary focus:outline-none focus:ring-2 focus:ring-primary/60"
+            />
+
+            <p className="mt-4 text-label font-semibold uppercase tracking-wide text-text-secondary">
+              WHAT A GOOD RESPONSE WOULD LOOK LIKE
             </p>
             <textarea
-              rows={4}
-              placeholder="Explain your scores — cite specific lines from the sample…"
-              className="mt-2 min-h-24 w-full resize-y rounded-md border border-border-hairline bg-surface p-3 text-body text-text-primary placeholder:text-text-secondary focus:outline-none focus:ring-2 focus:ring-primary/60"
+              rows={3}
+              value={goodResponse}
+              onChange={(event) => setGoodResponse(event.target.value)}
+              placeholder="Sketch the listing copy the assistant should have produced…"
+              className="mt-2 w-full resize-y rounded-md border border-border-hairline bg-surface p-3 text-body text-text-primary placeholder:text-text-secondary focus:outline-none focus:ring-2 focus:ring-primary/60"
             />
           </div>
 
           <div className="mt-6 flex items-center justify-between">
             <p className="font-pixel text-caption text-text-secondary tabular-nums">
-              EVAL-0042 · model: listing-assistant-v0.3
+              EVAL-0042 · model: listing-assistant-v0.3 · trace {trace.no}/20
             </p>
             <button
               type="button"
