@@ -2,19 +2,24 @@
 /*
  * DEMO/FILMING SCAFFOLDING — NOT REAL AD/GAME CONTENT — safe to delete after ad shoot is done.
  *
- * macOS-style notification stack. Every banner shown here is pushed by the
- * script in script.ts: hardcoded for filming, no real logic, no notification
- * system behind it. The engine owns the timing (2600ms auto-dismiss, 300ms
- * fade/slide out) and clears the whole stack on reset.
+ * macOS-style notification stack. The real app has no notification system, so
+ * the banner shell itself is demo-only — but the sender's portrait is the real
+ * PixelAvatar, the same sprite the message thread underneath is drawing, so a
+ * banner and the line it previews always show the same face.
+ *
+ * Every banner shown here is pushed by the script in script.ts: hardcoded for
+ * filming, no real logic. The engine owns the timing (2600ms auto-dismiss,
+ * 300ms fade/slide out) and clears the whole stack on reset.
  */
 
 import { useEffect, useState } from "react";
-import { Activity, MessageSquare } from "lucide-react";
-import type { BannerApp } from "./script";
+import { PixelAvatarView } from "@/components/shared/PixelAvatar";
+import type { AgentId } from "@/lib/sim/types";
+import { DEMO_PLAYER_SPRITE_ID } from "./ScriptedApps";
 
 export type BannerItem = {
   id: number;
-  app: BannerApp;
+  agentId: AgentId;
   sender: string;
   preview: string;
   /** Flipped by the engine ~300ms before removal so the exit can animate. */
@@ -31,7 +36,6 @@ function Banner({ item }: { item: BannerItem }) {
     return () => clearTimeout(enterTimer);
   }, []);
 
-  const Icon = item.app === "pulse" ? Activity : MessageSquare;
   const visible = entered && !item.leaving;
 
   return (
@@ -40,9 +44,7 @@ function Banner({ item }: { item: BannerItem }) {
         visible ? "translate-x-0 opacity-100" : "translate-x-3 opacity-0"
       }`}
     >
-      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-        <Icon className="h-4 w-4" strokeWidth={2} aria-hidden />
-      </div>
+      <PixelAvatarView agentId={item.agentId} sizeClassName="h-8 w-8" playerSpriteId={DEMO_PLAYER_SPRITE_ID} />
       <div className="min-w-0 flex-1">
         <div className="text-label font-semibold text-text-primary">{item.sender}</div>
         <div className="mt-0.5 line-clamp-2 text-label leading-snug text-text-secondary">
