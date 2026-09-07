@@ -4,28 +4,48 @@
  *
  * The ad-mode engine and desktop layout.
  *
- * ADVANCEMENT IS FULLY MANUAL. Nothing on this route moves the beat index on a
- * timer: a beat's own animations (typing, indicators, the auto-assign, banner
- * auto-dismiss) play on their own clocks, and when they are done the take HOLDS
- * on that beat indefinitely until the operator presses a key. The only two
- * callers of `advance` are the ArrowRight branches below.
+ * THE AD PLAYS ITSELF, HANDS-FREE. On mount the take starts at beat 0 and runs
+ * to the end with nobody touching anything: a beat plays its entry hold, its
+ * exchange, its autos and its scripted assignment, and the moment its LAST
+ * chain finishes the next beat is queued one GAP_MS later (see
+ * `scheduleAutoAdvance`). That between-beats gap is the same flat two seconds
+ * the blanket rule gives every other pair of visible motions, so the seam
+ * between two beats is paced exactly like a seam inside one. The FINAL beat
+ * (the eval screen) completes and STAYS: there is no wrap-around.
  *
- * A PRESS DOES NOT CUT. Every beat carries an ENTRY HOLD (one GAP_MS — see the
- * GAP_MS block in script.ts, which is now the single pacing number for the
- * whole ad): the press selects the beat, the previous beat's finished frame —
- * clock included — stays on camera for that hold, and only then does the new
- * beat's patch land and its own exchange/autos begin. It is a hold, not an
- * advance: nothing moves the beat index but a keypress, and ArrowRight during
- * the hold still lands the whole beat and steps forward off the one press.
+ * NO BEAT WAITS FOR A HUMAN. The two Office beats make their own pick through
+ * `autoAssign`, every player line is typed by the engine through the real
+ * composer, and nothing anywhere awaits a click — so a hands-free run cannot
+ * deadlock. The actor may still take any of it over on camera (assigning by
+ * hand, opening Pulse from the chip, dragging windows); doing so composes with
+ * playback instead of stopping it.
  *
- * Hotkeys (global, route level):
- *   ArrowRight NEXT BEAT, always, in ONE press. If the beat is mid-playback the
- *              press first fast-forwards it — the player's line is typed out and
- *              sent instantly, every indicator is skipped, every message and
- *              banner of the beat lands at once — and then advances off the same
- *              press. Animations never block or delay the advance. Clamps at the
- *              last beat.
- *   ArrowLeft  BACK ONE BEAT, for retakes. Cancels whatever is playing, rebuilds
+ * THE HOTKEYS ARE UNCHANGED, and they always win over the timer: every one of
+ * them retires the session the pending advance was scheduled under, and the
+ * advance re-checks that identity before it fires, so a press and the timer can
+ * never both move the beat index.
+ *
+ * A BEAT ARRIVING DOES NOT CUT. Every beat carries an ENTRY HOLD (one GAP_MS —
+ * see the GAP_MS block in script.ts, which is now the single pacing number for
+ * the whole ad): the beat is selected (by the auto-advance, or by a press), the
+ * PREVIOUS beat's finished frame — clock included — stays on camera for that
+ * hold, and only then does the new beat's patch land and its own exchange/autos
+ * begin. It is a hold, not a delay before an advance: the index has already
+ * moved, and ArrowRight during the hold still lands the whole beat and steps
+ * forward off the one press.
+ *
+ * Hotkeys (global, route level). Same three, same meanings; they now interrupt
+ * a movie that is already running rather than driving a still one:
+ *   ArrowRight NEXT BEAT, always, in ONE press, EARLY. If the beat is
+ *              mid-playback the press first fast-forwards it — the player's
+ *              line is typed out and sent instantly, every indicator is
+ *              skipped, every message and banner of the beat lands at once —
+ *              and then advances off the same press. Animations never block or
+ *              delay the advance. During the between-beats gap it simply takes
+ *              the jump the timer was about to take, now. Clamps at the last
+ *              beat.
+ *   ArrowLeft  BACK ONE BEAT, for retakes; playback then RESUMES from the
+ *              re-entered beat on its own. Cancels whatever is playing, rebuilds
  *              the scene by FOLDING the completed state of beats 0..n-2 (see
  *              script.ts's completeStep/completedTimeline: every delay treated
  *              as zero, no banners, no timers) plus a from-scratch replay of the
@@ -34,7 +54,9 @@
  *              action — cancel and re-enter the previous beat — because the fold
  *              is authoritative, so a half-played beat has nothing worth
  *              salvaging. No-op at beat 0.
- *   r / R      cancel every timer and animation, reset to beat 0
+ *   r / R      cancel every timer and animation, reset to beat 0 — the load
+ *              frame, which paints instantly — and START PLAYING AGAIN from the
+ *              top, with the first auto-advance one GAP_MS later.
  *
  * ONE capture-phase listener implements all three, deliberately:
  *   - CAPTURE, because during a player line the real composer has focus (so the
@@ -344,6 +366,9 @@ export default function AdModeShot() {
    * closes over a stale `scene`). Only the scripted chip press needs it: it is
    * skipped when the actor already opened Pulse by hand. */
   const pulseOpenRef = useRef(false);
+  /** The pending BETWEEN-BEATS advance (see scheduleAutoAdvance). At most one
+   * exists at a time, and every control path clears it. */
+  const autoAdvanceTimer = useRef<number | null>(null);
 
   const pushBanner = useCallback((spec: BannerSpec) => {
     const id = bannerId.current++;
@@ -358,25 +383,136 @@ export default function AdModeShot() {
     );
   }, []);
 
+  /* ---------------------------------------------------- auto-advance timer */
+
+  /**
+   * PLAYBACK IS HANDS-FREE. Cancels the pending between-beats advance. Every
+   * hotkey action, every reset and the unmount go through here (via `enterStep`
+   * or `cancelSession`), so an operator's press can never race the timer that
+   * was about to make the same jump. Manual DESK interaction — dragging a
+   * window, clicking a dock tile or a channel — deliberately does NOT come
+   * through here: the actor can browse while the movie runs and it keeps
+   * rolling.
+   */
+  const clearAutoAdvance = useCallback(() => {
+    if (autoAdvanceTimer.current !== null) {
+      window.clearTimeout(autoAdvanceTimer.current);
+      autoAdvanceTimer.current = null;
+    }
+  }, []);
+
+  /**
+   * SELECTS a beat. It deliberately does NOT put the beat on screen.
+   *
+   * The visible change is the beat's `apply` patch, and that is now deferred by
+   * the beat's ENTRY HOLD (`entryHoldMs` in script.ts): the timeline effect
+   * below applies it once the hold expires. So a press moves the HUD and starts
+   * the clock on the hold, while the camera keeps looking at the PREVIOUS
+   * beat's finished frame — including its status-bar clock, which now flips
+   * with the beat's landing rather than on the keypress.
+   *
+   * The single entry point, so arriving by ArrowRight and arriving by ArrowLeft
+   * are the same event as far as the timeline effect is concerned: it re-runs
+   * on the index change either way and plays the beat, hold included, from the
+   * top.
+   *
+   * `from` is the state the step will patch (the retake's rebuilt fold). It is
+   * ALSO what has to be on camera during a retake's hold — the previous beat's
+   * rebuilt end state — so it goes up now and is patched when the hold expires.
+   * Without it the step patches whatever is on screen, which is the forward
+   * case and already the right picture.
+   */
+  const enterStep = useCallback(
+    (index: number, from?: SceneState) => {
+      // Selecting a beat — by hotkey OR by the auto-advance itself — retires
+      // any queued advance, so the movie can never step twice off one
+      // completion.
+      clearAutoAdvance();
+      stepRef.current = index;
+      // A beat being re-entered may still carry the previous visit's HUD
+      // verdict under the same beat/run key, which would read as "already
+      // finished".
+      setActiveOverride(null);
+      setStepIndex(index);
+      entryBaseRef.current = from ?? null;
+      if (from) setScene(from);
+    },
+    [clearAutoAdvance],
+  );
+
+  const advance = useCallback(() => {
+    const next = stepRef.current + 1;
+    if (next >= SCRIPT.length) return;
+    enterStep(next);
+  }, [enterStep]);
+
+  /**
+   * THE BETWEEN-BEATS GAP. Scheduled by `runChain` the moment a beat's LAST
+   * chain finishes — entry hold, exchange, autos, auto-assign and any reaction
+   * all done — so the next beat lands one GAP_MS later and the whole ad plays
+   * itself. That gap is the same flat two seconds every other pair of motions
+   * gets: the beat's final frame is a motion, and the next beat landing is the
+   * next one.
+   *
+   * IT CANNOT DOUBLE-FIRE OR OVERTAKE THE OPERATOR. Three guards, in order:
+   *   - only one timer exists at a time (`clearAutoAdvance` first);
+   *   - the LAST beat schedules nothing, so the ad ends on the eval screen and
+   *     stays there rather than wrapping around;
+   *   - the callback re-checks SESSION IDENTITY before advancing. Every
+   *     ArrowRight/ArrowLeft/R retires the session it was scheduled under (a
+   *     new one is created per beat entry), so a timer that somehow survived a
+   *     manual jump wakes, sees a different current session or a different beat
+   *     on the HUD, and retires without touching anything.
+   */
+  const scheduleAutoAdvance = useCallback(
+    (session: Session) => {
+      clearAutoAdvance();
+      // The final beat completes and HOLDS. No wrap-around, ever.
+      if (session.beat >= SCRIPT.length - 1) return;
+      autoAdvanceTimer.current = window.setTimeout(() => {
+        autoAdvanceTimer.current = null;
+        if (sessionRef.current !== session || session.cancelled) return;
+        if (stepRef.current !== session.beat) return;
+        advance();
+      }, GAP_MS);
+    },
+    [advance, clearAutoAdvance],
+  );
+
   /* ------------------------------------------------------- timeline chains */
 
-  const runChain = useCallback((session: Session, body: () => Promise<void>) => {
-    session.running += 1;
-    timelineActiveRef.current = true;
-    const chain = body().finally(() => {
-      session.running -= 1;
-      // Only the CURRENT session may clear the HUD flag: a cancelled session's
-      // chains unwinding must not stomp a freshly-started beat.
-      if (session.running <= 0 && sessionRef.current === session) {
-        timelineActiveRef.current = false;
-        setActiveOverride({ beat: session.beat, run: session.run, active: false });
-      }
-    });
-    // Tracked so a fast-forward can await the whole beat (see settleSession).
-    // allSettled is what consumes the rejection, so a throwing chain surfaces
-    // as a failed take rather than an unhandled rejection storm.
-    session.chains.push(chain);
-  }, []);
+  const runChain = useCallback(
+    (session: Session, body: () => Promise<void>) => {
+      session.running += 1;
+      timelineActiveRef.current = true;
+      // The beat is playing again, so any advance queued by an earlier
+      // completion is void. This is what keeps a LATE chain — an assign
+      // reaction the actor triggers by hand after the beat's own chains have
+      // run out — from being cut off by the auto-advance it just outlived.
+      // Guarded on identity like everything else here: a chain belonging to a
+      // RETIRED session must never cancel the current beat's queued advance,
+      // because nothing would ever reschedule it and the movie would stall.
+      if (sessionRef.current === session) clearAutoAdvance();
+      const chain = body().finally(() => {
+        session.running -= 1;
+        // Only the CURRENT session may clear the HUD flag: a cancelled
+        // session's chains unwinding must not stomp a freshly-started beat.
+        if (session.running <= 0 && sessionRef.current === session) {
+          timelineActiveRef.current = false;
+          setActiveOverride({ beat: session.beat, run: session.run, active: false });
+          // THE BEAT IS DONE: queue the next one. Same identity rule — a
+          // retired session's chains unwinding must not drive playback.
+          scheduleAutoAdvance(session);
+        }
+      });
+      // Tracked so a fast-forward can await the whole beat (see
+      // settleSession). allSettled is what consumes the rejection, so a
+      // throwing chain surfaces as a failed take rather than an unhandled
+      // rejection storm.
+      session.chains.push(chain);
+    },
+    [clearAutoAdvance, scheduleAutoAdvance],
+  );
 
   /**
    * The scripted send. This is the very handler MessageInputView's Enter branch
@@ -489,6 +625,9 @@ export default function AdModeShot() {
   );
 
   const cancelSession = useCallback(() => {
+    // Cancelling the beat cancels its queued successor: reset, retake and
+    // unmount all land here, and none of them may leave a timer behind.
+    clearAutoAdvance();
     const session = sessionRef.current;
     sessionRef.current = null;
     timelineActiveRef.current = false;
@@ -499,44 +638,8 @@ export default function AdModeShot() {
     // A cancel mid-press must not strand the chip depressed.
     setPulseChipPressed(false);
     releaseAll(session);
-  }, []);
+  }, [clearAutoAdvance]);
 
-  /**
-   * SELECTS a beat. It deliberately does NOT put the beat on screen.
-   *
-   * The visible change is the beat's `apply` patch, and that is now deferred by
-   * the beat's ENTRY HOLD (`entryHoldMs` in script.ts): the timeline effect
-   * below applies it once the hold expires. So a press moves the HUD and starts
-   * the clock on the hold, while the camera keeps looking at the PREVIOUS
-   * beat's finished frame — including its status-bar clock, which now flips
-   * with the beat's landing rather than on the keypress.
-   *
-   * The single entry point, so arriving by ArrowRight and arriving by ArrowLeft
-   * are the same event as far as the timeline effect is concerned: it re-runs
-   * on the index change either way and plays the beat, hold included, from the
-   * top.
-   *
-   * `from` is the state the step will patch (the retake's rebuilt fold). It is
-   * ALSO what has to be on camera during a retake's hold — the previous beat's
-   * rebuilt end state — so it goes up now and is patched when the hold expires.
-   * Without it the step patches whatever is on screen, which is the forward
-   * case and already the right picture.
-   */
-  const enterStep = useCallback((index: number, from?: SceneState) => {
-    stepRef.current = index;
-    // A beat being re-entered may still carry the previous visit's HUD verdict
-    // under the same beat/run key, which would read as "already finished".
-    setActiveOverride(null);
-    setStepIndex(index);
-    entryBaseRef.current = from ?? null;
-    if (from) setScene(from);
-  }, []);
-
-  const advance = useCallback(() => {
-    const next = stepRef.current + 1;
-    if (next >= SCRIPT.length) return;
-    enterStep(next);
-  }, [enterStep]);
 
   /**
    * ArrowRight while a timeline is running: land the whole beat AND advance, off
@@ -1097,15 +1200,16 @@ export default function AdModeShot() {
 
       <Banners items={banners} />
 
-      {/* Operator HUD. Deliberately tiny and dim; crop it out or ignore it. The
-          "typing…" state is the cue that the beat is still playing, so the next
-          ArrowRight will land it AND step forward off the one press. */}
+      {/* Operator HUD. Deliberately tiny and dim; crop it out or ignore it.
+          The mode word is the honest state of the movie: `auto` while a beat is
+          playing itself, `auto · gap` during the two-second seam before the
+          next beat lands, and `end` on the final beat, which holds forever.
+          ArrowRight is a SKIP now, not a "next" — playback advances on its
+          own. */}
       <div className="pointer-events-none fixed bottom-1 right-2 z-50 font-mono text-caption tabular-nums text-text-secondary opacity-40">
-        {`${stepIndex}/${SCRIPT.length - 1} ${step.label}${
-          timelineActive ? " · typing…" : ""
-        } · right arrow ${
-          timelineActive ? "skip+next" : "next"
-        } · left arrow back · r reset`}
+        {`${stepIndex}/${SCRIPT.length - 1} ${step.label} · ${
+          stepIndex >= SCRIPT.length - 1 ? "end" : timelineActive ? "auto" : "auto · gap"
+        } · right arrow skip · left arrow back · r reset`}
       </div>
     </div>
   );

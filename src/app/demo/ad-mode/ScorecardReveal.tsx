@@ -105,7 +105,10 @@ export function ScorecardReveal() {
 
 /**
  * Day 2 card. Same visual pattern as the day2 shot's TransitionScreen, but
- * static: it never auto-advances, the operator steps past it on ArrowRight.
+ * static: the CARD itself never advances anything and has no timer of its own
+ * beyond its progress bar. It is dismissed by the next beat landing — which the
+ * engine's hands-free playback brings along on its own clock, or the operator
+ * brings early with ArrowRight.
  */
 export function Day2Transition() {
   const [filled, setFilled] = useState(false);
