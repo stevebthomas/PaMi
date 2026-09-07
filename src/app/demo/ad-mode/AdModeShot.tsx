@@ -10,8 +10,9 @@
  * on that beat indefinitely until the operator presses a key. The only two
  * callers of `advance` are the ArrowRight branches below.
  *
- * A PRESS DOES NOT CUT. Every beat carries an ENTRY HOLD (see ENTRY_HOLD_MS in
- * script.ts): the press selects the beat, the previous beat's finished frame —
+ * A PRESS DOES NOT CUT. Every beat carries an ENTRY HOLD (one GAP_MS — see the
+ * GAP_MS block in script.ts, which is now the single pacing number for the
+ * whole ad): the press selects the beat, the previous beat's finished frame —
  * clock included — stays on camera for that hold, and only then does the new
  * beat's patch land and its own exchange/autos begin. It is a hold, not an
  * advance: nothing moves the beat index but a keypress, and ArrowRight during
@@ -106,6 +107,7 @@ import { Day2Transition, ScorecardReveal } from "./ScorecardReveal";
 import {
   EVAL_BATCH_TOTAL,
   EVAL_DOC_TITLE,
+  GAP_MS,
   PULSE_CHIP_PRESS_MS,
   PULSE_CHIP_PRESS_STEP_ID,
   entryHoldMs,
@@ -142,6 +144,17 @@ const AD_TRACES: Trace[] = [
   },
 ];
 
+/**
+ * A banner's on-screen DWELL, and its exit fade.
+ *
+ * FLAGGED EXCEPTION to the blanket GAP_MS rule (exception 3 in script.ts's
+ * GAP_MS block). This is not the gap between two motions — it is how long one
+ * card stays up — and it deliberately OUTLASTS GAP_MS: banners now arrive
+ * exactly GAP_MS apart in the STACKING burst, so a 2000ms dwell would start
+ * banner N leaving in the very frame banner N+1 arrives, and the stack would
+ * never be seen to push (see Banners.tsx). 2600 leaves 600ms of overlap, which
+ * is what puts two cards on screen together and makes the push readable.
+ */
 const BANNER_HOLD_MS = 2600;
 const BANNER_EXIT_MS = 300;
 
@@ -424,7 +437,9 @@ export default function AdModeShot() {
 
   const runNpcLine = useCallback(
     async (session: Session, line: NpcLine) => {
-      const hold = line.indicatorMs ?? npcIndicatorMs(line.text.length);
+      // Flat GAP_MS for every line, unless the line pins its own hold (Theo's
+      // away reply is the one that does). See script.ts's npcIndicatorMs.
+      const hold = npcIndicatorMs(line);
       setScene((s) => ({ ...s, typing: { channel: line.channel, agentId: line.agentId } }));
       await sleep(session, hold);
       if (session.cancelled) return;
@@ -437,12 +452,37 @@ export default function AdModeShot() {
     [pushBanner],
   );
 
+  /**
+   * One exchange, played in order, with THE BLANKET GAP between its lines.
+   *
+   * Every line of an exchange is two visible motions (something starts — the
+   * composer filling, or "X is typing…" — and then the message lands), and the
+   * director's rule spaces motions flat: `runNpcLine`/`runPlayerLine` own the
+   * start->land gap, and this loop owns the land->next-start one. So a
+   * three-line exchange reads as start, land, pause, start, land, pause… all on
+   * the same two-second metronome.
+   *
+   * `leadInMs` is the gap from whatever caused the exchange to its first line
+   * starting. A STEP-level exchange is caused by the beat's patch landing, so
+   * it passes GAP_MS. An exchange owned by an `auto` or an assign reaction
+   * passes 0: that chain's own `delayMs` — itself a GAP_MS — already IS the gap
+   * from the previous motion, and paying it twice would double-space those
+   * beats (and desynchronise the STACKING burst's banner cadence).
+   */
   const runExchange = useCallback(
-    async (session: Session, events: ExchangeEvent[]) => {
+    async (session: Session, events: ExchangeEvent[], leadInMs = 0) => {
+      let gapMs = leadInMs;
       for (const event of events) {
         if (session.cancelled) return;
+        if (gapMs > 0) {
+          await sleep(session, gapMs);
+          if (session.cancelled) return;
+        }
         if (event.kind === "player") await runPlayerLine(session, event);
         else await runNpcLine(session, event);
+        // Every line after the first is one flat gap behind the one that just
+        // landed.
+        gapMs = GAP_MS;
       }
     },
     [runPlayerLine, runNpcLine],
@@ -465,7 +505,7 @@ export default function AdModeShot() {
    * SELECTS a beat. It deliberately does NOT put the beat on screen.
    *
    * The visible change is the beat's `apply` patch, and that is now deferred by
-   * the beat's ENTRY HOLD (see ENTRY_HOLD_MS in script.ts): the timeline effect
+   * the beat's ENTRY HOLD (`entryHoldMs` in script.ts): the timeline effect
    * below applies it once the hold expires. So a press moves the HUD and starts
    * the clock on the hold, while the camera keeps looking at the PREVIOUS
    * beat's finished frame — including its status-bar clock, which now flips
@@ -737,12 +777,14 @@ export default function AdModeShot() {
      * The beat's own timelines, started only once the beat is VISIBLE (see the
      * entry chain below). Sequencing them after the entry hold rather than
      * alongside it is what keeps every scripted delay meaning what it says: an
-     * `auto` at +1.7s is 1.7s after the audience can see the beat, not 1.7s
-     * after a keypress they cannot.
+     * `auto` at one GAP_MS is two seconds after the audience can SEE the beat,
+     * not two seconds after a keypress they cannot.
      */
     const startBeatChains = () => {
+      // GAP_MS lead-in: the beat's picture has just landed, and its first
+      // scripted line is the next visible motion after it.
       const exchange = step.exchange;
-      if (exchange) runChain(session, () => runExchange(session, exchange));
+      if (exchange) runChain(session, () => runExchange(session, exchange, GAP_MS));
 
       // The scripted assignment: the beat makes the pick itself so the ad plays
       // without anyone touching the mouse, and Derek's reaction follows it. The

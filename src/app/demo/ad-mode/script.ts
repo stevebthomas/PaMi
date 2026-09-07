@@ -33,9 +33,12 @@
  * at beat entry. A banner attached to the step (or to an `auto`) is not tied to
  * a message and keeps its original beat-entry / timer timing.
  *
- * Pacing is data, not code: PLAYER_TYPING and NPC_TYPING below are the global
- * knobs, and any single line can override them (`typing` on a player line,
- * `indicatorMs` on an NPC line) without touching the engine.
+ * Pacing is data, not code, and as of the director's blanket-gap note it is ONE
+ * number: GAP_MS below is the flat two-second gap between every two consecutive
+ * visible motions in the take — entry holds, exchange lines, autos, assign
+ * lead-ins, the lot. PLAYER_TYPING keeps the per-character cadence (a duration,
+ * not a gap), and any single line can still override the defaults (`typing` on
+ * a player line, `indicatorMs` on an NPC line) without touching the engine.
  *
  * FOLDING. `completeStep` / `completedTimeline` at the bottom of this file
  * replay the very same step/auto/exchange/assign data as a pure reduction, with
@@ -168,22 +171,90 @@ export type StatePatch = (s: SceneState) => SceneState;
 /* ------------------------------------------------------ typing/pacing config */
 
 /**
+ * GAP_MS — THE ONE PACING NUMBER IN THE AD.
+ *
+ * DIRECTOR'S INSTRUCTION, and it supersedes every per-beat judgement call this
+ * file used to make: between any two consecutive VISIBLE motions or state
+ * changes on camera, anywhere in the take, there is a flat two-second gap. Not
+ * a band, not a length-scaled formula, not a per-beat table — one number.
+ *
+ * WHAT THIS COVERS (all of it now reads GAP_MS, not a local constant):
+ *   - every beat's ENTRY HOLD, i.e. keypress -> the beat's picture landing
+ *     (`entryHoldMs` below);
+ *   - the gap from a beat landing to the first line of its exchange starting to
+ *     type / to show a typing indicator (the engine's step-exchange lead-in);
+ *   - inside an exchange, indicator-appears -> message-lands, and
+ *     message-lands -> the next line's indicator/typing starting (the engine
+ *     sleeps GAP_MS between consecutive exchange events);
+ *   - the pause between a player line's last character and the Enter that sends
+ *     it (`PLAYER_TYPING.sendPauseMs`);
+ *   - every `auto` delay: the STACKING burst's three pings (and therefore the
+ *     banner-to-banner stagger in the stack), the PULSE PAYOFF recovery walk
+ *     (17 -> 12 -> 6 -> 3) and the RECKONING scorecard;
+ *   - every scripted `autoAssign` lead-in and every `onAssign` reaction delay,
+ *     with the one flagged exception below.
+ *
+ * WHAT IT DOES NOT COVER — the two kinds of number that are NOT inter-event
+ * gaps, and are therefore left alone on purpose:
+ *
+ *   DURATIONS of one continuous animation. The player's per-character typing
+ *   cadence and its punctuation pause (PLAYER_TYPING, below — the characters of
+ *   one line are one motion, not N), the Pulse count-up (PULSE_COUNT_UP_MS), the
+ *   "Open Pulse" chip flash (PULSE_CHIP_PRESS_MS), the banner slide-down push
+ *   (BANNER_PUSH_MS in Banners.tsx), the scorecard's staggered bar fills and the
+ *   Day 2 progress bar (ScorecardReveal.tsx), and every CSS fade.
+ *
+ *   SIMULTANEOUS CAUSE-AND-EFFECT pairs, which are deliberately the SAME frame
+ *   and so have no gap between them at all:
+ *     · the "Open Pulse" chip releasing and the Pulse window opening (STACKING);
+ *     · a message landing and its banner appearing (every banner in the ad);
+ *     · a message landing and its own `apply` (an unread ring, a badge count);
+ *     · an NPC's indicator clearing and the line it was announcing landing;
+ *     · an `auto`'s own patch and the start of the exchange it owns — the
+ *       STACKING burst's first ping climbs the Pulse numbers in the same frame
+ *       Priya's indicator opens, which costs nothing because that indicator is
+ *       in a DM behind the front window and is not on camera at all;
+ *     · a beat's clock flip and the rest of that beat's patch (the RECKONING
+ *       clock-flips-with-the-landing rule, which stands).
+ *
+ * THE EXCEPTIONS, in full. There are exactly three, and each is flagged where
+ * it lives:
+ *   1. beat 0 ("first-fire") has a ZERO entry hold: it is the LOAD FRAME and
+ *      must paint instantly on mount, on R and on an ArrowLeft back to 0.
+ *   2. THEO'S AWAY REPLY still fires 400ms after the assignment, with no typing
+ *      indicator at all — see the WRONG PICK beat. It is a CHARACTER POINT, not
+ *      pacing: an out-of-office auto-responder answers instantly, and stretching
+ *      it to two seconds (or giving it an indicator) turns a machine into a
+ *      person and kills the joke. RECOMMENDED TO KEEP; flip it to GAP_MS here if
+ *      the director wants the blanket rule with no carve-outs at all.
+ *   3. BANNER_HOLD_MS (AdModeShot.tsx) stays at 2600ms — a banner's on-screen
+ *      DWELL, which must outlast GAP_MS or the next banner would arrive exactly
+ *      as the previous one starts leaving and the stack would never be seen to
+ *      push.
+ */
+export const GAP_MS = 2000;
+
+/**
  * Player typing cadence, in milliseconds. Retune the ad's on-camera typing
  * speed here; no engine change is needed.
  *
  *  perCharMinMs/perCharMaxMs  per-character delay, drawn uniformly at random
  *                             per character so the rhythm reads human rather
- *                             than metronomic
+ *                             than metronomic. A DURATION (one line typing is
+ *                             one motion), so the blanket gap rule leaves it be.
  *  punctuationPauseMs         added AFTER any PUNCTUATION character, the little
- *                             beat a person takes at a comma or a full stop
+ *                             beat a person takes at a comma or a full stop.
+ *                             Part of the same cadence, so also untouched.
  *  sendPauseMs                the pause between the last character and the
- *                             Enter keypress
+ *                             Enter keypress. This one IS an inter-event gap —
+ *                             the finished line and the sent message are two
+ *                             separate things to look at — so it is GAP_MS.
  */
 export const PLAYER_TYPING = {
   perCharMinMs: 30,
   perCharMaxMs: 70,
   punctuationPauseMs: 250,
-  sendPauseMs: 420,
+  sendPauseMs: GAP_MS,
 };
 
 export type PlayerTypingConfig = typeof PLAYER_TYPING;
@@ -196,48 +267,26 @@ export type PlayerTypingOverride = Partial<PlayerTypingConfig>;
 export const PUNCTUATION = /[.,!?;:]/;
 
 /**
- * NPC typing-indicator hold, in milliseconds:
+ * THE NPC TYPING INDICATOR HOLD IS NOW FLAT — INSTRUCTED CHANGE.
  *
- *   clamp((baseMs + perCharMs * messageLength) * (1 ± jitterRatio), minMs, maxMs)
+ * This file used to scale the hold with the line's length:
  *
- * Long messages hold longer, so a two-line correction from Priya reads as
- * genuinely being composed, while the clamp stops a paragraph from stalling a
- * take. Any single NPC line can bypass the whole formula with `indicatorMs`.
+ *   clamp((600 + 18 * messageLength) * (1 ± 0.2), 900, 3800)
+ *
+ * so a long correction from Priya read as genuinely being composed. The
+ * director's blanket rule replaces it: indicator-appears and message-lands are
+ * two consecutive visible motions like any other pair, so the hold is GAP_MS
+ * for every NPC line in the ad, regardless of length, with no jitter (which
+ * also makes every take frame-identical). The formula above is recorded here
+ * verbatim so it can be restored in one edit if the director wants it back.
+ *
+ * THE PER-LINE OVERRIDE MECHANISM IS UNCHANGED: any NpcLine may still pin its
+ * own `indicatorMs`, and one does — Theo's away reply uses `indicatorMs: 0`
+ * (exception 2 in the GAP_MS block above).
  */
-export const NPC_TYPING = {
-  baseMs: 600,
-  perCharMs: 18,
-  /** ±20% random wobble applied before the clamp. */
-  jitterRatio: 0.2,
-  minMs: 900,
-  maxMs: 3800,
-};
-
-export type NpcTypingConfig = typeof NPC_TYPING;
 
 /* ------------------------------------------------------------- beat pacing */
 
-/**
- * The three deliberate HOLDS in the back half of the ad. They are the only
- * places the take asks the audience to wait on purpose, so they live together
- * here as one tunable block rather than as magic numbers inside their beats.
- *
- * All three are ordinary within-beat timings — the recovery pair are `auto`
- * delays and so is the scorecard — which means they cost no extra keypress,
- * ArrowRight mid-hold still flushes the beat and advances off the one press,
- * and the fold treats every one of them as already landed.
- *
- * Retune here after a recording pass; nothing else needs to change.
- */
-/** PULSE PAYOFF sits on the unchanged spike this long before the first
- * recovery step, so the fix reads as a consequence of Raj's message rather
- * than a cut. */
-export const RECOVERY_HOLD_MS = 2600;
-/** Gap between the three recovery steps (17 -> 12 -> 6 -> 3). */
-export const RECOVERY_STEP_MS = 1200;
-/** RECKONING holds on the plain recovered desktop this long before the
- * scorecard overlay renders and starts its own bar-fill. */
-export const SCORECARD_HOLD_MS = 2200;
 /**
  * How long the scripted Pulse hero (and the failure-rate tile) takes to COUNT
  * from the previous reading to the new one. Purely a render decoration in
@@ -246,23 +295,6 @@ export const SCORECARD_HOLD_MS = 2200;
  * scripted value; it just stops the digits from teleporting.
  */
 export const PULSE_COUNT_UP_MS = 500;
-/**
- * The STACKING burst's banner cadence. Notifications piling on top of each
- * other in the same half-second read as one event, not three people; these two
- * knobs space them so each banner gets its own moment and the stack visibly
- * PUSHES down (see Banners.tsx) between arrivals.
- *
- * Each ping's banner lands at `delayMs + indicatorMs`, so all three lines pin
- * the SAME `BURST_INDICATOR_MS` and their autos sit one `BURST_GAP_MS` apart:
- * the gap between banners is then exactly BURST_GAP_MS, with no dependence on
- * the length-scaled formula and therefore no take-to-take variation.
- *
- * With the values below the three banners land at 2.5s, 4.4s and 6.3s after
- * beat entry.
- */
-export const BURST_FIRST_MS = 1700;
-export const BURST_GAP_MS = 1900;
-export const BURST_INDICATOR_MS = 800;
 
 /* --------------------------------------------------------- entry holds */
 
@@ -288,45 +320,25 @@ export const BURST_INDICATOR_MS = 800;
  * "typing…" cue is lit while it runs. And because it is TIMING ONLY, the fold
  * is untouched: `completeStep` never reads this table.
  *
- * ONE TABLE, keyed by step id, so a director can retune the whole ad's pacing
- * from a single screen and see all seventeen numbers side by side. Recording
- * bias is deliberately LONG: post can trim a hold, it cannot invent one.
+ * ONE NUMBER, NOT A TABLE — INSTRUCTED CHANGE. This used to be a seventeen-row
+ * table that graded each beat's hold by how big its change was (2000 for a
+ * reveal, 1600 for a structural change, 1200 for an ordinary one, 600 for the
+ * reckoning). The director's blanket rule replaces all of it: a keypress and
+ * the beat it lands are two consecutive visible motions like any other pair, so
+ * EVERY beat holds GAP_MS. The only entry left is the load frame.
+ *
+ * A pleasant side effect: the old table's failure mode — a new beat added
+ * without a row, silently reintroducing the jump cut — is now impossible, so
+ * `entryHoldMs` no longer needs its dev-only guard against an unpaced beat.
  */
-export const ENTRY_HOLD_MS: Record<string, number> = {
-  // The opening frame is the LOAD state. It must paint immediately on mount, on
-  // R and on an ArrowLeft back to 0, so this beat alone never holds.
-  "first-fire": 0,
 
-  // Big reveals: the shot changes character, so the previous frame gets a long
-  // beat of stillness first.
-  stacking: 2000, //          Pulse arrives, already red — the ad's first reveal
-  "misread-1": 2000, //       the two confusable numbers come up together
-  "closer-transition": 2000, //the day boundary
-  "evals-doc": 2000, //       the document, and the number the ad ends on
-  eval: 2000, //              the final overlay
-
-  // Structural changes: a window opens or closes, or a card un-flips.
-  "whos-taking-this": 1600, //Chattr covers the spike
-  "wrong-pick": 1600, //      Pulse off the desk, Office on
-  "course-correct": 1600, //  holds on Theo's "Assigned ✓" before it clears
-  "raj-root-cause": 1600, //  the two-hour jump into the afternoon
-  "derek-evals": 1600, //     the Day 2 card clears to the workspace
-
-  // Ordinary changes: a front swap, a channel switch, a clock tick.
-  "misread-2": 1200,
-  "misread-3": 1200,
-  "misread-4": 1200,
-  "misread-5": 1200,
-  // Short on purpose: the REAL dwell on this beat is RECOVERY_HOLD_MS, which
-  // sits on the spike AFTER Pulse comes forward. This one only covers the cut
-  // itself (Raj's DM -> Pulse in front), so the two holds are two different
-  // frames rather than one long stare at the same one.
-  "pulse-payoff": 1200,
-  // Shortest of all, for the same reason: SCORECARD_HOLD_MS already holds 2.2s
-  // on the recovered desk. This exists only so the CLOCK flips with the beat's
-  // landing instead of on the keypress.
-  reckoning: 600,
-};
+/**
+ * The beats that land INSTANTLY, with no hold at all. Exactly one, and it is
+ * exception 1 in the GAP_MS block: beat 0 is the LOAD FRAME, so it must paint
+ * on mount, on R and on an ArrowLeft back to 0 without a two-second stare at a
+ * blank desk first.
+ */
+export const INSTANT_ENTRY_STEP_IDS = new Set<string>(["first-fire"]);
 
 /**
  * How long the "Open Pulse" chip under Priya's message shows its pressed state
@@ -346,21 +358,10 @@ export const PULSE_CHIP_PRESS_MS = 300;
 /** The one beat that presses the chip on the actor's behalf. */
 export const PULSE_CHIP_PRESS_STEP_ID = "stacking";
 
-/** Fallback for a beat with no table entry. Only reachable if a new step is
- * added without pacing it; `entryHoldMs` complains about that in dev. */
-export const DEFAULT_ENTRY_HOLD_MS = 1200;
-
-/** This beat's entry hold. Dev-loud about an unpaced beat, because a missing
- * entry silently reintroduces the jump cut this table exists to remove. */
+/** This beat's entry hold: GAP_MS for every beat in the ad, and 0 for the load
+ * frame. Every new beat is paced correctly by construction. */
 export function entryHoldMs(step: Step): number {
-  const hold = ENTRY_HOLD_MS[step.id];
-  if (hold === undefined) {
-    if (process.env.NODE_ENV !== "production") {
-      throw new Error(`ad-mode: beat "${step.id}" has no ENTRY_HOLD_MS entry`);
-    }
-    return DEFAULT_ENTRY_HOLD_MS;
-  }
-  return hold;
+  return INSTANT_ENTRY_STEP_IDS.has(step.id) ? 0 : GAP_MS;
 }
 
 /** Delay before the next character of a scripted player line. */
@@ -370,11 +371,10 @@ export function playerCharDelayMs(char: string, cfg: PlayerTypingConfig = PLAYER
   return Math.round(base + (PUNCTUATION.test(char) ? cfg.punctuationPauseMs : 0));
 }
 
-/** How long the real typing indicator holds before an NPC line lands. */
-export function npcIndicatorMs(length: number, cfg: NpcTypingConfig = NPC_TYPING): number {
-  const base = cfg.baseMs + cfg.perCharMs * length;
-  const jitter = 1 + (Math.random() * 2 - 1) * cfg.jitterRatio;
-  return Math.round(Math.min(cfg.maxMs, Math.max(cfg.minMs, base * jitter)));
+/** How long the real typing indicator holds before an NPC line lands: GAP_MS,
+ * unless the line pins its own `indicatorMs` (see the flat-hold note above). */
+export function npcIndicatorMs(line: { indicatorMs?: number }): number {
+  return line.indicatorMs ?? GAP_MS;
 }
 
 /* --------------------------------------------------------------- exchanges */
@@ -1011,19 +1011,27 @@ export const SCRIPT: Step[] = [
     // the message it previews and each unread ring points at something that
     // exists.
     //
-    // ONE BANNER AT A TIME. All three holds are PINNED to the same
-    // BURST_INDICATOR_MS and the autos sit BURST_GAP_MS apart, so the banners
-    // land BURST_GAP_MS apart too — far enough that each one arrives, is read,
-    // and visibly PUSHES the previous one down the stack before the next
-    // appears (see Banners.tsx), instead of three notifications materialising
-    // as one block. Pinning also makes the Priya -> Raj -> Derek order exact:
-    // nothing here depends on the length-scaled formula's random jitter, so no
-    // take can show the pile-up out of order. The holds are invisible anyway —
-    // Pulse is front and #incidents is the open channel — but they are still
-    // real, so clicking Chattr mid-hold shows the indicator like the live app.
+    // ONE BANNER AT A TIME, ON THE BLANKET GAP. The three autos sit one GAP_MS
+    // apart and every indicator hold is the flat GAP_MS, so the whole beat is a
+    // metronome of visible motions two seconds apart:
+    //
+    //   0s  the beat lands: Pulse opens, already red at 9%
+    //   2s  the climb: badge 3 -> 7, 9% -> 17% over 361 attempts
+    //   4s  Priya's banner (her line lands in the same frame)
+    //   6s  Raj's banner
+    //   8s  Derek's banner, and the badge going to 12 with it
+    //
+    // Each banner therefore arrives, is read, and visibly PUSHES the previous
+    // one down the stack (see Banners.tsx) before the next appears, instead of
+    // three notifications materialising as one block. It is also exact: with
+    // the length-scaled formula and its jitter gone, no take can show the
+    // pile-up out of order or at a different rhythm. The indicator holds are
+    // invisible anyway — Pulse is front and #incidents is the open channel —
+    // but they are still real, so clicking Chattr mid-hold shows the indicator
+    // like the live app.
     autos: [
       {
-        delayMs: BURST_FIRST_MS,
+        delayMs: GAP_MS,
         apply: (s) => markUnread(setPulse({ ...s, chattrBadge: 7 }, 600, 17, 361), "incidents"),
         exchange: [
           {
@@ -1033,7 +1041,6 @@ export const SCRIPT: Step[] = [
             sender: "Priya",
             time: "9:42 AM",
             text: "support queue is filling up with checkout complaints",
-            indicatorMs: BURST_INDICATOR_MS,
             apply: (s) => markUnread(s, "dm-priya"),
             banner: {
               agentId: "priya",
@@ -1044,7 +1051,7 @@ export const SCRIPT: Step[] = [
         ],
       },
       {
-        delayMs: BURST_FIRST_MS + BURST_GAP_MS,
+        delayMs: GAP_MS * 2,
         // The engineering side hearing about it independently: Raj is already
         // in the logs before anyone has asked him to be.
         exchange: [
@@ -1055,7 +1062,6 @@ export const SCRIPT: Step[] = [
             sender: "Raj",
             time: "9:43 AM",
             text: "Saw the Pulse spike. Pulling logs now. Give me a few.",
-            indicatorMs: BURST_INDICATOR_MS,
             apply: (s) => markUnread(s, "dm-raj"),
             banner: {
               agentId: "raj",
@@ -1066,7 +1072,7 @@ export const SCRIPT: Step[] = [
         ],
       },
       {
-        delayMs: BURST_FIRST_MS + BURST_GAP_MS * 2,
+        delayMs: GAP_MS * 3,
         // Derek's DM goes through the same engine as every other NPC line even
         // though Pulse is front and the indicator is therefore invisible: if
         // the actor clicks Chattr mid-hold, the indicator is there, exactly
@@ -1079,7 +1085,6 @@ export const SCRIPT: Step[] = [
             sender: "Derek",
             time: "9:41 AM",
             text: "Just saw the alert. What's the plan?",
-            indicatorMs: BURST_INDICATOR_MS,
             apply: (s) => markUnread({ ...s, chattrBadge: 12 }, "dm-derek"),
             banner: {
               agentId: "derek",
@@ -1149,27 +1154,37 @@ export const SCRIPT: Step[] = [
     // The answer to Derek's question, and it is the wrong one. Office opens in
     // front of Chattr (Pulse steps off the desk for this beat).
     //
-    // The beat plays ITSELF: `autoAssign` flips Theo's card to "Assigned ✓"
-    // 1.2s in — the same UI a click leaves behind — and `onAssign` then lands
+    // The beat plays ITSELF: `autoAssign` flips Theo's card to "Assigned ✓" one
+    // GAP_MS in — the same UI a click leaves behind — and `onAssign` then lands
     // the consequence. Only Theo gets a reaction; the roster card next to the
     // button already says "Out today", which is the joke.
     //
     // THE CONSEQUENCE COMES FROM THEO, NOT FROM DEREK. Nobody narrates the
     // mistake: the assignment simply bounces back off an out-of-office
-    // auto-reply, and the player is left to notice. It fires 400ms after the
-    // assignment lands and, uniquely in this script, with `indicatorMs: 0` — no
-    // length-scaled "Theo is typing" hold — because an away-reply is a machine
-    // answering instantly, not a person composing. The banner is the only way
-    // it reads on camera (Office is front, and Theo's DM is not the thread on
-    // screen), so it carries Theo's own sprite.
+    // auto-reply, and the player is left to notice.
+    //
+    // ****  THE ONE PACING EXCEPTION IN THE AD  ****
+    // It fires 400ms after the assignment lands — NOT the blanket GAP_MS — and,
+    // uniquely in this script, with `indicatorMs: 0`, so there is no "Theo is
+    // typing" hold at all. That pair of numbers is a CHARACTER POINT, not
+    // pacing: an out-of-office auto-responder answers instantly, and the whole
+    // joke is that the reply comes back faster than a person could possibly
+    // have read the assignment. Stretch it to two seconds, or give it an
+    // indicator, and Theo stops being a machine. RECOMMENDED TO KEEP. To drop
+    // the carve-out and go fully flat instead: `delayMs: GAP_MS` here and
+    // delete the `indicatorMs: 0` below.
+    //
+    // The banner is the only way it reads on camera (Office is front, and
+    // Theo's DM is not the thread on screen), so it carries Theo's own sprite.
     //
     // The actor can still beat the script to it: clicking any Assign button
     // first claims the beat's one assignment and cancels the auto, and clicking
     // Theo runs this exact same reaction (see AdModeShot's assignClaimed).
     apply: (s) => show({ ...s, day: 1, minutes: 607 }, ["chattr", "office"], "office"),
-    autoAssign: { person: "Theo", delayMs: 1200 },
+    autoAssign: { person: "Theo", delayMs: GAP_MS },
     onAssign: {
       person: "Theo",
+      // EXCEPTION (flagged above): an instant automated auto-responder.
       delayMs: 400,
       exchange: [
         {
@@ -1208,16 +1223,17 @@ export const SCRIPT: Step[] = [
     // the camera can already see — and it answers the promise the player made
     // him two minutes earlier.
     //
-    // Symmetrical with WRONG PICK: the script assigns Raj itself 1.5s in and
-    // Derek's confirmation follows 1.5s after that, unless the actor clicks an
-    // Assign button first — in which case that click claims the beat's one
-    // assignment, the auto is cancelled, and clicking Raj plays this same
-    // reaction.
+    // Symmetrical with WRONG PICK, and now on the blanket gap throughout: the
+    // script assigns Raj itself one GAP_MS in, Derek's indicator appears one
+    // GAP_MS after the card flips, and his line lands one GAP_MS after that —
+    // unless the actor clicks an Assign button first, in which case that click
+    // claims the beat's one assignment, the auto is cancelled, and clicking Raj
+    // plays this same reaction.
     apply: (s) => show({ ...s, day: 1, minutes: 610, assignedTo: null }, ["chattr", "office"]),
-    autoAssign: { person: "Raj", delayMs: 1500 },
+    autoAssign: { person: "Raj", delayMs: GAP_MS },
     onAssign: {
       person: "Raj",
-      delayMs: 1500,
+      delayMs: GAP_MS,
       exchange: [
         {
           kind: "npc",
@@ -1318,9 +1334,11 @@ export const SCRIPT: Step[] = [
     // The correction lands in #incidents, directly under the line it corrects,
     // and #incidents is the thread on screen — so this is the one NPC line in
     // the ad whose indicator is actually VISIBLE while it holds. It is also the
-    // longest line in the ad, so it holds the longest: the length-scaled
-    // formula finally gets to be on camera. No banner, per the same
-    // visible-channel rule — the audience is watching it arrive.
+    // longest line in the ad, and under the blanket rule it holds for exactly
+    // the same GAP_MS as every other line rather than scaling with its length —
+    // so the audience watches "Priya is typing…" for two seconds and then gets
+    // the whole correction at once. No banner, per the same visible-channel
+    // rule — the audience is watching it arrive.
     apply: (s) => ({
       ...show({ ...s, day: 1, minutes: 705 }, ["chattr", "pulse"], "chattr"),
       activeChannel: "incidents",
@@ -1351,7 +1369,7 @@ export const SCRIPT: Step[] = [
     // staggered behind — still showing the spike Raj is about to explain, and
     // already in place for the payoff beat that follows.
     //
-    // Normal length-scaled indicator, and no banner: this is the thread on
+    // The standard flat GAP_MS indicator, and no banner: this is the thread on
     // screen, so the audience watches Raj compose it rather than being told
     // about it by a notification.
     apply: (s) => read(show({ ...s, day: 1, minutes: 835 }, ["pulse", "chattr"], "chattr"), "dm-raj"),
@@ -1380,18 +1398,20 @@ export const SCRIPT: Step[] = [
     //
     // THE BEAT OPENS ON A HELD BREATH. Arriving straight from Raj's "should
     // settle in the next few minutes", an instant recovery would make the fix
-    // look like a cut rather than a consequence — so the first RECOVERY_HOLD_MS
-    // of this beat sit on the UNCHANGED spike (17% / 468, red, "Incident
-    // active"), the system still visibly hurting, before the walk starts. The
-    // three steps then land RECOVERY_STEP_MS apart. Every number on the way is
-    // a real recorded sample, so the sparkline still draws the true hump; only
-    // the on-screen digits are eased (see ScriptedPulse's count-up).
+    // look like a cut rather than a consequence — so the beat's first GAP_MS
+    // sits on the UNCHANGED spike (17% / 468, red, "Incident active"), the
+    // system still visibly hurting, before the walk starts. The three steps
+    // then land one GAP_MS apart each, like every other pair of motions in the
+    // ad: 0s at 17%, 2s at 12%, 4s at 6%, 6s back to baseline. Every number on
+    // the way is a real recorded sample, so the sparkline still draws the true
+    // hump; only the on-screen digits are eased (see ScriptedPulse's count-up,
+    // a 500ms DURATION that runs inside each step and is not a gap).
     apply: (s) => setPulse(show({ ...s, day: 1, minutes: 850 }, ["chattr", "pulse"]), 850, 17, 468),
     autos: [
-      { delayMs: RECOVERY_HOLD_MS, apply: (s) => setPulse(s, 860, 12, 468) },
-      { delayMs: RECOVERY_HOLD_MS + RECOVERY_STEP_MS, apply: (s) => setPulse(s, 870, 6, 468) },
+      { delayMs: GAP_MS, apply: (s) => setPulse(s, 860, 12, 468) },
+      { delayMs: GAP_MS * 2, apply: (s) => setPulse(s, 870, 6, 468) },
       {
-        delayMs: RECOVERY_HOLD_MS + RECOVERY_STEP_MS * 2,
+        delayMs: GAP_MS * 3,
         apply: (s) => setPulse(s, 880, DEMO_BASELINE_FAILURE_PCT, 468),
       },
     ],
@@ -1403,14 +1423,17 @@ export const SCRIPT: Step[] = [
     label: "RECKONING",
     // The day lands before it is graded. The beat ENTERS with no overlay at
     // all — the recovered desk, Pulse still on it at a green 97% — and holds
-    // there for SCORECARD_HOLD_MS so the recovery gets a moment to be true
-    // before the verdict slides over it. The overlay then arrives through the
+    // there one GAP_MS so the recovery gets a moment to be true before the
+    // verdict slides over it. (The clock flip is part of the beat's landing,
+    // so it still happens with the picture rather than on the keypress; the
+    // scorecard is then the next motion, GAP_MS later.) The overlay arrives
+    // through the
     // ordinary auto/session path, so ArrowRight mid-hold flushes it and
     // advances off the one press, and the FOLD counts the scorecard as part of
     // this beat's completed state (an auto is replayed by `completeStep`), the
     // same as it was when the patch set it at entry.
     apply: (s) => ({ ...s, day: 1, minutes: 1005 }),
-    autos: [{ delayMs: SCORECARD_HOLD_MS, apply: (s) => ({ ...s, overlay: "scorecard" }) }],
+    autos: [{ delayMs: GAP_MS, apply: (s) => ({ ...s, overlay: "scorecard" }) }],
   },
 
   /* 13 */
