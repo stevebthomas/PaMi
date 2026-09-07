@@ -8,8 +8,12 @@
  * banner and the line it previews always show the same face.
  *
  * Every banner shown here is pushed by the script in script.ts: hardcoded for
- * filming, no real logic. The engine owns the timing (2600ms auto-dismiss,
- * 300ms fade/slide out) and clears the whole stack on reset.
+ * filming, no real logic. EVERY NPC MESSAGE IN THE AD PUSHES ONE (the
+ * director's policy; player lines never do), so this stack is the ad's running
+ * commentary and a banner that fails to show is a hole in the shot — which is
+ * why the arrival no longer depends on a timer at all (see Banner below). The
+ * engine owns the timing (2600ms auto-dismiss, 300ms fade/slide out) and clears
+ * the whole stack on reset.
  *
  * THE STACK PUSHES. macOS does not re-flow a notification stack instantly, and
  * neither does this one: each banner is absolutely positioned at a MEASURED
@@ -31,7 +35,7 @@
  * Banners never gate anything: the engine does not know this file exists.
  */
 
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useLayoutEffect, useRef, useState } from "react";
 import { PixelAvatarView } from "@/components/shared/PixelAvatar";
 import type { AgentId } from "@/lib/sim/types";
 import { DEMO_PLAYER_SPRITE_ID } from "./ScriptedApps";
@@ -53,26 +57,48 @@ const BANNER_GAP_PX = 8;
  * a push, short enough that the next arrival never catches it. */
 const BANNER_PUSH_MS = 350;
 
+/**
+ * THE ENTER IS A CSS ANIMATION, AND THE RESTING STATE IS VISIBLE.
+ *
+ * This used to be a React state flip on a 20ms timer ("paint the off state
+ * once, then flip a tick later so the transition runs"), which made INVISIBLE
+ * the default and one tiny timer the only thing standing between a banner and
+ * never being seen. That is a bad bet for a filming route: browsers clamp
+ * sub-second timers hard in a backgrounded or occluded tab (measured: the 20ms
+ * tick lands at ~1000ms there, i.e. nearly half a banner's life spent at
+ * opacity 0, with the fade itself frozen). A take recorded in a window that is
+ * not frontmost would show a stack of blank slots.
+ *
+ * Now the card's resting state is the VISIBLE one and the arrival is a keyframe
+ * animation off it. No state, no timer, nothing to miss.
+ *
+ * DELIBERATELY NO `fill-mode`. With `both`, an animation that has not started
+ * yet paints its `from` frame — which is the invisible one, i.e. exactly the
+ * failure this rewrite exists to remove, just moved from a timer to the
+ * compositor. With the default `none`, anything outside the animation's own
+ * running window falls back to the element's class value, which is
+ * `opacity-100`: a banner whose animation never runs is simply THERE. The style
+ * is also dropped the moment the banner starts leaving, so a finished
+ * animation's specificity can never outrank the exit fade.
+ */
+const BANNER_ENTER_MS = 300;
+const BANNER_ENTER_KEYFRAMES = `@keyframes ad-banner-in {
+  from { opacity: 0; transform: translateX(12px); }
+  to { opacity: 1; transform: translateX(0); }
+}`;
+
 function Banner({ item }: { item: BannerItem }) {
-  const [entered, setEntered] = useState(false);
-
-  // Same trick the day2 shot uses: paint the off state once, then flip a tick
-  // later so the CSS transition actually runs.
-  useEffect(() => {
-    const enterTimer = setTimeout(() => setEntered(true), 20);
-    return () => clearTimeout(enterTimer);
-  }, []);
-
-  const visible = entered && !item.leaving;
-
   return (
     // The enter/exit fade+slide lives HERE, on the inner card, and the stack
     // offset lives on the wrapper outside it: two transforms on two elements,
     // so the arrival animation and the push can never fight over one property.
     <div
       className={`flex w-full items-start gap-3 rounded-xl border border-border-hairline bg-surface/95 p-3 shadow-lg backdrop-blur transition-all duration-300 ease-out ${
-        visible ? "translate-x-0 opacity-100" : "translate-x-3 opacity-0"
+        item.leaving ? "translate-x-3 opacity-0" : "translate-x-0 opacity-100"
       }`}
+      style={
+        item.leaving ? undefined : { animation: `ad-banner-in ${BANNER_ENTER_MS}ms ease-out` }
+      }
     >
       <PixelAvatarView agentId={item.agentId} sizeClassName="h-8 w-8" playerSpriteId={DEMO_PLAYER_SPRITE_ID} />
       <div className="min-w-0 flex-1">
@@ -140,6 +166,9 @@ export function Banners({ items }: { items: BannerItem[] }) {
       className="pointer-events-none fixed right-4 top-12 z-50"
       style={{ width: BANNER_WIDTH_PX }}
     >
+      {/* Demo-local keyframes: the arrival animation above, kept in this file
+          so the shoot adds nothing to the app's global stylesheet. */}
+      <style>{BANNER_ENTER_KEYFRAMES}</style>
       {placed.map(({ item, top }) => (
         <div
           key={item.id}

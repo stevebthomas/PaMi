@@ -94,12 +94,35 @@ export type ChattrMessage = {
    * ScriptedChattr.
    */
   pulseChip?: true;
+  /**
+   * The ad's second bespoke chip: "Open Office", under Derek's "Do it." line.
+   * Identical in every respect to `pulseChip` (same real attachment-chip
+   * markup, same pressed state, same open-or-raise click path) except that it
+   * carries the OFFICE app's own AppIcon glyph. Rendered by ScriptedChattr for
+   * exactly the same reason: the shared component hardcodes the doc icon.
+   *
+   * NOTE FOR THE DIRECTOR: the referenced spec file
+   * `ad-mode-office-reference-button.md` does not exist anywhere in this repo
+   * (searched the whole tree). This chip is therefore built by MIRRORING the
+   * Open Pulse chip spec above, point for point. If that document turns up and
+   * says something different, this is the place to reconcile it.
+   */
+  officeChip?: true;
   /** Thread history: this line was already on screen before the take started,
    * so it renders instantly and never runs through the typing engine. Only
    * INITIAL_SCENE seeds carry it. */
   history?: true;
 };
 
+/**
+ * A notification banner.
+ *
+ * POLICY (director): EVERY NPC MESSAGE IN THE AD FIRES ONE, and a player line
+ * never does. There is no longer a visible-channel exemption — a line landing
+ * in the thread already on camera banners exactly like one landing in a thread
+ * that is not. `assertEveryNpcLineBanners` at the bottom of this file enforces
+ * it, so a new NPC line cannot be added silently without its banner.
+ */
 export type BannerSpec = { agentId: AgentId; sender: string; preview: string };
 
 /** Who the REAL typing indicator is showing for, and in which channel. The
@@ -341,22 +364,38 @@ export const PULSE_COUNT_UP_MS = 500;
 export const INSTANT_ENTRY_STEP_IDS = new Set<string>(["first-fire"]);
 
 /**
- * How long the "Open Pulse" chip under Priya's message shows its pressed state
+ * How long a bespoke chip ("Open Pulse", "Open Office") shows its pressed state
  * when the script presses it for the actor.
  *
- * It sits INSIDE the STACKING beat's entry sequence, between that beat's entry
+ * It sits INSIDE the pressing beat's entry sequence, between that beat's entry
  * hold and its patch: the previous frame holds, the chip depresses, and the
- * chip releases in the same update that opens Pulse. So the window arriving
- * reads as CAUSED by the button rather than as a cut. Skipped entirely when
- * Pulse is already open, which is what happens when the actor pressed the chip
+ * chip releases in the same update that opens the app. So the window arriving
+ * reads as CAUSED by the button rather than as a cut. Skipped entirely when the
+ * app is already open, which is what happens when the actor pressed the chip
  * themselves earlier in the take — the ad never double-presses.
  *
  * Presentation only: the pressed state is React state in AdModeShot, never
  * SceneState, so it is not part of any beat's folded result.
  */
-export const PULSE_CHIP_PRESS_MS = 300;
-/** The one beat that presses the chip on the actor's behalf. */
-export const PULSE_CHIP_PRESS_STEP_ID = "stacking";
+export const CHIP_PRESS_MS = 300;
+
+/**
+ * WHICH BEAT PRESSES WHICH CHIP on the actor's behalf, keyed by step id.
+ *
+ * Two entries, one per bespoke chip, and they work identically: the named
+ * beat's entry sequence depresses that chip between the entry hold and the
+ * patch, and releases it in the SAME update that opens the app — so the window
+ * arriving reads as CAUSED by the button. Both are skipped when the app is
+ * already on the desk, which is exactly the case where the actor pressed the
+ * chip themselves; the ad never presses a button twice.
+ */
+export const SCRIPTED_CHIP_PRESS: Record<string, FrontApp> = {
+  // Priya's 9:14 line -> "Open Pulse" -> the dashboard, already red.
+  stacking: "pulse",
+  // Derek's "Do it." line -> "Open Office" -> the roster the wrong pick is
+  // made on. Mirrors the Pulse chip exactly (see ChattrMessage.officeChip).
+  "wrong-pick": "office",
+};
 
 /** This beat's entry hold: GAP_MS for every beat in the ad, and 0 for the load
  * frame. Every new beat is paced correctly by construction. */
@@ -406,6 +445,10 @@ export type NpcLine = {
   text: string;
   /** Document chip rendered under this line when it lands. */
   attachment?: MessageAttachment;
+  /** Renders the "Open Office" chip under this line when it lands. Same
+   * mechanism as the `pulseChip` seed carries for Priya's opening line, but on
+   * a line that arrives DURING the take rather than one seeded as history. */
+  officeChip?: true;
   /** Hard override of the computed indicator hold, in ms. Skips the formula. */
   indicatorMs?: number;
   /** Extra patch folded into the SAME update the message lands in (unread
@@ -719,6 +762,9 @@ function say(
   time: string,
   text: string,
   attachment?: MessageAttachment,
+  /** Bespoke chips this line renders under its body. Optional, and spread as
+   * given, so a line without one is byte-identical to what it was before. */
+  chips?: { pulseChip?: true; officeChip?: true },
 ): SceneState {
   const existing = s.messages[channel];
   if (!existing) {
@@ -732,7 +778,7 @@ function say(
     ...s,
     messages: {
       ...s.messages,
-      [channel]: [...existing, { id, agentId, sender, time, text, attachment }],
+      [channel]: [...existing, { id, agentId, sender, time, text, attachment, ...chips }],
     },
   };
 }
@@ -743,7 +789,16 @@ export function landLine(s: SceneState, line: ExchangeEvent): SceneState {
   const landed =
     line.kind === "player"
       ? say(s, line.channel, PLAYER_AGENT_ID, PLAYER_SENDER, line.time, line.text)
-      : say(s, line.channel, line.agentId, line.sender, line.time, line.text, line.attachment);
+      : say(
+          s,
+          line.channel,
+          line.agentId,
+          line.sender,
+          line.time,
+          line.text,
+          line.attachment,
+          line.officeChip ? { officeChip: true } : undefined,
+        );
   return line.apply ? line.apply(landed) : landed;
 }
 
@@ -1132,10 +1187,16 @@ export const SCRIPT: Step[] = [
         time: "10:05 AM",
         text: "Should I assign someone from engineering?",
       },
-      // No banner: this thread is the one on screen, so the line lands in front
-      // of the camera already. A banner here would announce a message the
-      // audience is watching arrive — the same visible-channel rule the engine
-      // applies to the typing indicator.
+      // EVERY NPC LINE BANNERS NOW (director's policy, replacing this file's
+      // old visible-channel rule: a line landing in the thread on screen used
+      // to stay silent so a notification never announced a message the audience
+      // was already watching arrive). The rule is gone — an NPC message is an
+      // NPC message, and each one gets its banner.
+      //
+      // This line also carries the ad's second bespoke chip: "Open Office",
+      // sitting under the very instruction that sends the player to the roster.
+      // The WRONG PICK beat presses it on camera (SCRIPTED_CHIP_PRESS), and the
+      // actor can press it themselves at any point after it lands.
       {
         kind: "npc",
         channel: "dm-derek",
@@ -1143,6 +1204,12 @@ export const SCRIPT: Step[] = [
         sender: "Derek",
         time: "10:06 AM",
         text: "Do it. I want an update before this hits #general.",
+        officeChip: true,
+        banner: {
+          agentId: "derek",
+          sender: "Derek",
+          preview: "Do it. I want an update before this hits #general.",
+        },
       },
     ],
   },
@@ -1337,8 +1404,8 @@ export const SCRIPT: Step[] = [
     // longest line in the ad, and under the blanket rule it holds for exactly
     // the same GAP_MS as every other line rather than scaling with its length —
     // so the audience watches "Priya is typing…" for two seconds and then gets
-    // the whole correction at once. No banner, per the same visible-channel
-    // rule — the audience is watching it arrive.
+    // the whole correction at once. It banners as well, like every other NPC
+    // line now does.
     apply: (s) => ({
       ...show({ ...s, day: 1, minutes: 705 }, ["chattr", "pulse"], "chattr"),
       activeChannel: "incidents",
@@ -1351,6 +1418,14 @@ export const SCRIPT: Step[] = [
         sender: "Priya",
         time: "11:45 AM",
         text: "That's not the right metric. 400 is the total attempts, not failures. Actual failure rate is closer to 3%. I'll update Derek with that.",
+        // Banners on every NPC line now, this one included — see the policy
+        // note at beat 2. The preview is the correction's first sentence, which
+        // is the beat of it that has to read at banner size.
+        banner: {
+          agentId: "priya",
+          sender: "Priya",
+          preview: "That's not the right metric. 400 is the total attempts, not failures.",
+        },
       },
     ],
   },
@@ -1369,9 +1444,9 @@ export const SCRIPT: Step[] = [
     // staggered behind — still showing the spike Raj is about to explain, and
     // already in place for the payoff beat that follows.
     //
-    // The standard flat GAP_MS indicator, and no banner: this is the thread on
-    // screen, so the audience watches Raj compose it rather than being told
-    // about it by a notification.
+    // The standard flat GAP_MS indicator, and — under the every-NPC-line policy
+    // — a banner too, even though this is the thread on screen and the audience
+    // is watching Raj compose it.
     apply: (s) => read(show({ ...s, day: 1, minutes: 835 }, ["pulse", "chattr"], "chattr"), "dm-raj"),
     exchange: [
       {
@@ -1381,6 +1456,13 @@ export const SCRIPT: Step[] = [
         sender: "Raj",
         time: "1:55 PM",
         text: "Confirmed. Apple Pay token validation is timing out on their end, not ours. We shipped a retry buffer to absorb it. Rate should settle in the next few minutes.",
+        // Banner, per the every-NPC-line policy. Previewed down to the finding
+        // itself: the fix, not the paragraph explaining it.
+        banner: {
+          agentId: "raj",
+          sender: "Raj",
+          preview: "Confirmed. Apple Pay token validation is timing out on their end, not ours.",
+        },
       },
     ],
   },
@@ -1538,6 +1620,37 @@ export function assertThreadsGrow(
     }
   }
 }
+
+/**
+ * THE BANNER POLICY, ENFORCED: every scripted NPC line carries a banner, and no
+ * player line does.
+ *
+ * Asserted rather than trusted because the failure mode is silent on camera —
+ * a message simply arrives with no notification, which looks like a dropped
+ * banner rather than like a missing three lines of data. Walks every exchange
+ * the script owns: step exchanges, `auto` exchanges and assign-reaction
+ * exchanges. Called once at module load (below), so a bad line fails the take
+ * at import time rather than mid-shoot.
+ */
+export function assertEveryNpcLineBanners(script: Step[] = SCRIPT): void {
+  const check = (line: ExchangeEvent, where: string) => {
+    if (line.kind === "npc" && !line.banner) {
+      throw new Error(`ad-mode: NPC line "${line.text.slice(0, 40)}…" in ${where} has no banner`);
+    }
+    if (line.kind === "player" && "banner" in line && line.banner) {
+      throw new Error(`ad-mode: player line in ${where} must not banner`);
+    }
+  };
+  for (const step of script) {
+    for (const line of step.exchange ?? []) check(line, `beat "${step.id}"`);
+    for (const auto of step.autos ?? []) {
+      for (const line of auto.exchange ?? []) check(line, `beat "${step.id}" auto +${auto.delayMs}ms`);
+    }
+    for (const line of step.onAssign?.exchange ?? []) check(line, `beat "${step.id}" onAssign`);
+  }
+}
+
+assertEveryNpcLineBanners();
 
 /**
  * The assignment half of a completed beat: the card is flipped, and the step's

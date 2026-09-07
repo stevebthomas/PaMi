@@ -130,8 +130,8 @@ import {
   EVAL_BATCH_TOTAL,
   EVAL_DOC_TITLE,
   GAP_MS,
-  PULSE_CHIP_PRESS_MS,
-  PULSE_CHIP_PRESS_STEP_ID,
+  CHIP_PRESS_MS,
+  SCRIPTED_CHIP_PRESS,
   entryHoldMs,
   INITIAL_SCENE,
   PLAYER_TYPING,
@@ -309,12 +309,12 @@ export default function AdModeShot() {
   /** Bumped on reset so keyed overlays remount and replay their animations. */
   const [runKey, setRunKey] = useState(0);
   /**
-   * The "Open Pulse" chip's scripted pressed state. PRESENTATION ONLY — it is
-   * React state here rather than a SceneState field precisely so it stays out
-   * of the fold: no beat's completed result records whether a button was shown
-   * depressed for 300ms.
+   * Which bespoke chip ("Open Pulse" / "Open Office") the script is holding
+   * depressed, or null. PRESENTATION ONLY — it is React state here rather than
+   * a SceneState field precisely so it stays out of the fold: no beat's
+   * completed result records whether a button was shown depressed for 300ms.
    */
-  const [pulseChipPressed, setPulseChipPressed] = useState(false);
+  const [chipPressed, setChipPressed] = useState<FrontApp | null>(null);
   /**
    * Operator-HUD "typing…" state, and the thing ArrowRight branches on. Derived
    * rather than stored: a beat that declares an exchange or autos IS running a
@@ -362,10 +362,10 @@ export default function AdModeShot() {
    * hold expires. Only a retake sets it (the rebuilt fold); forward, the patch
    * applies to whatever is on screen, so this stays null. */
   const entryBaseRef = useRef<SceneState | null>(null);
-  /** Whether Pulse is on the desk, readable from inside a timeline chain (which
-   * closes over a stale `scene`). Only the scripted chip press needs it: it is
-   * skipped when the actor already opened Pulse by hand. */
-  const pulseOpenRef = useRef(false);
+  /** Which apps are on the desk, readable from inside a timeline chain (which
+   * closes over a stale `scene`). Only the scripted chip presses need it: a
+   * press is skipped when the actor already opened that app by hand. */
+  const openWindowsRef = useRef<readonly FrontApp[]>(INITIAL_SCENE.windows);
   /** The pending BETWEEN-BEATS advance (see scheduleAutoAdvance). At most one
    * exists at a time, and every control path clears it. */
   const autoAdvanceTimer = useRef<number | null>(null);
@@ -582,7 +582,21 @@ export default function AdModeShot() {
       // ONE state update clears the indicator and lands the line (plus the
       // line's own patch), so the indicator and the message it was announcing
       // can never be on screen at the same time.
-      setScene((s) => landLine({ ...s, typing: null }, line));
+      //
+      // ONLY THIS LINE'S OWN INDICATOR IS CLEARED. Under the flat gap two NPC
+      // chains meet exactly: in the STACKING burst, each ping's line lands in
+      // the very frame the NEXT ping's indicator goes up. Blanket-clearing
+      // `typing` here wiped that fresh indicator — the second chain then held
+      // for two seconds with nothing on screen. Clearing only when the pending
+      // indicator is this line's keeps the invariant that matters (never an
+      // indicator next to the message it announced) without stealing another
+      // channel's.
+      setScene((s) =>
+        landLine(
+          { ...s, typing: s.typing && s.typing.channel !== line.channel ? s.typing : null },
+          line,
+        ),
+      );
       if (line.banner) pushBanner(line.banner);
     },
     [pushBanner],
@@ -635,8 +649,8 @@ export default function AdModeShot() {
     session.cancelled = true;
     pendingSendRef.current = null;
     composerRef.current?.blur();
-    // A cancel mid-press must not strand the chip depressed.
-    setPulseChipPressed(false);
+    // A cancel mid-press must not strand a chip depressed.
+    setChipPressed(null);
     releaseAll(session);
   }, [clearAutoAdvance]);
 
@@ -719,7 +733,7 @@ export default function AdModeShot() {
     assignClaimed.current = false;
     pendingSendRef.current = null;
     entryBaseRef.current = null;
-    setPulseChipPressed(false);
+    setChipPressed(null);
     stepRef.current = 0;
     setActiveOverride(null);
     setStepIndex(0);
@@ -738,11 +752,11 @@ export default function AdModeShot() {
     setRunKey((k) => k + 1);
   }, [cancelSession, desk]);
 
-  // Mirror of "is Pulse on the desk", for the scripted chip press (see
-  // pulseOpenRef). A plain projection of scene state, never a second source of
-  // truth for it.
+  // Mirror of the open window set, for the scripted chip presses (see
+  // openWindowsRef). A plain projection of scene state, never a second source
+  // of truth for it.
   useEffect(() => {
-    pulseOpenRef.current = scene.windows.includes("pulse");
+    openWindowsRef.current = scene.windows;
   }, [scene.windows]);
 
   /* -------------------------------------------------------- window layout */
@@ -941,16 +955,19 @@ export default function AdModeShot() {
       await sleep(session, entryHoldMs(step));
       if (session.cancelled) return;
       // THE SCRIPTED CHIP PRESS. Between the entry hold and the patch, so the
-      // beat reads as caused: the previous frame holds, the "Open Pulse" chip
-      // under Priya's line visibly depresses, and it releases in the SAME
-      // update that opens the window (both setStates are in one synchronous
-      // block, so React batches them into one frame). Skipped when Pulse is
-      // already on the desk, which is exactly the case where the actor pressed
-      // the chip themselves — the ad never presses a button twice.
-      if (step.id === PULSE_CHIP_PRESS_STEP_ID && !pulseOpenRef.current) {
-        setPulseChipPressed(true);
-        await sleep(session, PULSE_CHIP_PRESS_MS);
-        setPulseChipPressed(false);
+      // beat reads as caused: the previous frame holds, the chip this beat owns
+      // (SCRIPTED_CHIP_PRESS — "Open Pulse" under Priya's line at STACKING,
+      // "Open Office" under Derek's at WRONG PICK) visibly depresses, and it
+      // releases in the SAME update that opens the window (both setStates are
+      // in one synchronous block, so React batches them into one frame).
+      // Skipped when that app is already on the desk, which is exactly the case
+      // where the actor pressed the chip themselves — the ad never presses a
+      // button twice.
+      const chipApp = SCRIPTED_CHIP_PRESS[step.id];
+      if (chipApp && !openWindowsRef.current.includes(chipApp)) {
+        setChipPressed(chipApp);
+        await sleep(session, CHIP_PRESS_MS);
+        setChipPressed(null);
         if (session.cancelled) return;
       }
       const base = entryBaseRef.current;
@@ -1066,6 +1083,13 @@ export default function AdModeShot() {
     handleSelectApp("pulse");
   }
 
+  /** The "Open Office" chip. Identical to the Pulse one in every respect — the
+   * same open-or-raise call the dock tile makes — so pressing it on camera puts
+   * Office into the SPLIT beside Chattr exactly as the WRONG PICK beat does. */
+  function handleOpenOffice() {
+    handleSelectApp("office");
+  }
+
   function handleComposerChange(next: string) {
     setScene((prev) => ({ ...prev, composer: next }));
   }
@@ -1120,7 +1144,8 @@ export default function AdModeShot() {
             onSelectChannel={handleSelectChannel}
             onOpenDoc={handleOpenDoc}
             onOpenPulse={handleOpenPulse}
-            pulseChipPressed={pulseChipPressed}
+            onOpenOffice={handleOpenOffice}
+            chipPressed={chipPressed}
           />
         );
     }
