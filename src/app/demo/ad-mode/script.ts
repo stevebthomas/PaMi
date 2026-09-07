@@ -171,26 +171,28 @@ export type SceneState = {
 };
 
 /**
- * The ONLY scripted Pulse inputs. Everything the dashboard shows — the hero
- * success rate, the failed-checkout count, the per-payment-method rows, the
- * funnel tiles, the weekly bar chart's live Monday bar, the status badge — is
- * DERIVED from these three numbers by `derivePulse` below, in one place. No
- * beat sets a second, independently-authored figure, so no two tiles on screen
- * can ever disagree.
+ * THE ONLY SCRIPTED PULSE INPUT IS A CLOCK READING.
+ *
+ * Everything the dashboard shows — the hero success rate, the failed-checkout
+ * count, the attempts counter, the per-payment-method rows, the funnel tiles,
+ * the weekly bar chart's live Monday bar, the sparkline and the status badge —
+ * is DERIVED from this one number by `derivePulse`, through the incident
+ * timeline below. No beat states a rate, a count or a sample of its own, so no
+ * beat can contradict the incident and no two tiles on screen can disagree.
  */
 export type PulseState = {
-  /** Checkout FAILURE rate, in percent (the ad is written around it: 3 -> 17
-   * -> 6 -> 3, with one deliberate 3.1 misread). The dashboard displays its
-   * complement, the success rate, like the real Pulse does. */
-  rate: number;
-  /** Checkout attempts today. Scripted value, not derived. */
-  attempts: number;
-  /** Sim minute the tiles claim to be showing: drives the sparkline "now" dot
-   * and the "data as of" freshness stamp. */
+  /**
+   * Sim minute the tiles are showing. Normally the beat's own clock — `at()`
+   * moves both together — and it may never lag behind it.
+   *
+   * Exactly TWO beats let it run ahead, and both do it for the same reason: the
+   * metrics progress WITHIN the beat while the status bar holds at the beat's
+   * landing time. STACKING climbs the reading to 10:00 as the burst arrives
+   * (9% -> the 17% plateau), and PULSE PAYOFF walks it to 2:20, 2:30 and 2:40
+   * while the bar holds at 2:10. The trace suite asserts that no other beat
+   * does.
+   */
   t: number;
-  /** Sparkline series, as FAILURE rates (same orientation as `rate`).
-   * Scripted samples only, no real data behind it. */
-  history: { t: number; rate: number }[];
 };
 
 export type StatePatch = (s: SceneState) => SceneState;
@@ -686,6 +688,124 @@ export const DEMO_BASELINE_FAILURE_PCT = 100 - DEMO_BASELINE_SUCCESS_PCT;
  * the badge turns red and the sparkline goes to status colour). */
 export const DEMO_ALARM_FAILURE_PCT = 9;
 
+/** Where the incident tops out and STAYS until the fix ships. Every frame of
+ * the ad between the burst and Raj's retry buffer reads this number. */
+export const DEMO_PEAK_FAILURE_PCT = 17;
+
+/* ------------------------------------------------------ the incident timeline */
+
+/**
+ * THE INCIDENT, AS ONE FUNCTION OF THE CLOCK. Single source of truth for what
+ * the dashboard says at any sim minute of the take.
+ *
+ * WHY IT EXISTS (director's note, and the bug it kills): beats used to state
+ * their own failure rate, and the misread beat stated 3.1% at 11:20 — so the
+ * dashboard HEALED ITSELF at mid-morning and stayed healed through the
+ * reassignment, the whole misread sequence and Priya's correction, hours before
+ * Raj shipped anything. The recovery beat then "recovered" a system that was
+ * already fine. No per-beat patch can reintroduce that now: a beat cannot state
+ * a rate, it can only say what time it is.
+ *
+ * THE SHAPE, in the ad's own terms:
+ *
+ *   3%   before 9:15 AM      healthy morning, the baseline the day starts from
+ *   9%   9:15 - 10:00        the first degraded readings; Priya's 9:14 line has
+ *                            just reported it and the badge is already red
+ *   17%  10:00 - 2:20 PM     THE PLATEAU. The incident is live and it does not
+ *                            improve on its own: through Derek's questions, the
+ *                            wrong pick, Theo's away reply, the reassignment,
+ *                            all five misread beats and Priya's correction, the
+ *                            hero holds at 83% success
+ *   12%  2:20 - 2:30 PM  \
+ *   6%   2:30 - 2:40 PM   >  the recovery walk, and the ONLY descent in the ad:
+ *   3%   2:40 PM onward   /  it starts after Raj's 1:55 PM "we shipped a retry
+ *                            buffer ... should settle in the next few minutes"
+ *
+ * The walk's three steps are the PULSE PAYOFF beat's autos, one GAP_MS apart,
+ * so the pacing is unchanged: the beat holds on the untouched plateau, then the
+ * numbers step down on the metronome.
+ */
+export const RECOVERY_FIRST_MINUTE = 860; // 2:20 PM
+
+/** The timeline as a step table, read by `failureRateAt`: the rate in force
+ * from each minute until the next entry. Ordered, and the only place any
+ * failure figure appears in this file. */
+export const INCIDENT_TIMELINE: { fromMinute: number; failurePct: number }[] = [
+  { fromMinute: DAY_START_MINUTE, failurePct: DEMO_BASELINE_FAILURE_PCT },
+  { fromMinute: INCIDENT_MINUTE, failurePct: DEMO_ALARM_FAILURE_PCT },
+  { fromMinute: 600, failurePct: DEMO_PEAK_FAILURE_PCT },
+  { fromMinute: RECOVERY_FIRST_MINUTE, failurePct: 12 },
+  { fromMinute: RECOVERY_FIRST_MINUTE + 10, failurePct: 6 },
+  { fromMinute: RECOVERY_FIRST_MINUTE + 20, failurePct: DEMO_BASELINE_FAILURE_PCT },
+];
+
+/** The checkout FAILURE rate the scripted world is running at, at this sim
+ * minute. Piecewise constant; the last entry at or before `minutes` wins. */
+export function failureRateAt(minutes: number): number {
+  let rate = INCIDENT_TIMELINE[0].failurePct;
+  for (const entry of INCIDENT_TIMELINE) {
+    if (minutes >= entry.fromMinute) rate = entry.failurePct;
+    else break;
+  }
+  return rate;
+}
+
+/**
+ * Checkout attempts today, also a function of the clock: a monotone series
+ * anchored at the scripted counts the ad is written around and interpolated
+ * between them, so the counter climbs through the day instead of jumping
+ * whenever a beat happened to state a new figure.
+ *
+ * 407 at 11:20 AM is load-bearing: it is one half of the MISREAD beat's pair of
+ * confusable numbers (407 attempts sitting next to a 17% failure rate), the
+ * number the player then misquotes to Derek as "around 400 checkouts affected".
+ */
+const ATTEMPTS_ANCHORS: { minute: number; attempts: number }[] = [
+  { minute: DAY_START_MINUTE, attempts: 120 },
+  { minute: INCIDENT_MINUTE, attempts: 289 },
+  { minute: 600, attempts: 361 },
+  { minute: 680, attempts: 407 },
+  { minute: 850, attempts: 468 },
+  { minute: DAY_END_MINUTE, attempts: 548 },
+];
+
+export function attemptsAt(minutes: number): number {
+  const first = ATTEMPTS_ANCHORS[0];
+  const last = ATTEMPTS_ANCHORS[ATTEMPTS_ANCHORS.length - 1];
+  if (minutes <= first.minute) return first.attempts;
+  if (minutes >= last.minute) return last.attempts;
+  for (let i = 1; i < ATTEMPTS_ANCHORS.length; i += 1) {
+    const a = ATTEMPTS_ANCHORS[i - 1];
+    const b = ATTEMPTS_ANCHORS[i];
+    if (minutes <= b.minute) {
+      const span = b.minute - a.minute;
+      const progress = span === 0 ? 1 : (minutes - a.minute) / span;
+      return Math.round(a.attempts + (b.attempts - a.attempts) * progress);
+    }
+  }
+  return last.attempts;
+}
+
+/**
+ * The sparkline series: the timeline function, sampled. Every point is
+ * `failureRateAt` of its own minute, so the drawn curve and the tile can never
+ * disagree — which also retires the old `record: false` special case, whose
+ * only job was to keep one hand-set tile value (the 3.1% misread) out of a
+ * hand-written series.
+ *
+ * Sampled on the dashboard's own refresh cadence, with the CURRENT reading
+ * always appended last so the "now" dot sits exactly on the number the hero is
+ * showing, even between cadence steps.
+ */
+export function incidentHistory(t: number): { t: number; rate: number }[] {
+  const points: { t: number; rate: number }[] = [];
+  for (let m = DAY_START_MINUTE; m < t; m += SAMPLE_STEP_MINUTES) {
+    points.push({ t: m, rate: failureRateAt(m) });
+  }
+  points.push({ t, rate: failureRateAt(t) });
+  return points;
+}
+
 /**
  * Share of checkout attempts per payment method. Mirrors the live model's split
  * (worldCanon.APPLE_PAY_SHARE = 0.35, pulseMetrics' GOOGLE_PAY_SHARE = 0.17,
@@ -754,8 +874,9 @@ export type DerivedPulse = {
 };
 
 /**
- * The SINGLE derivation. Given a beat's scripted (failure rate, attempts, t,
- * history), produce every number the dashboard shows.
+ * The SINGLE derivation. Given a beat's clock reading, produce every number the
+ * dashboard shows: the rate and the attempts come from the incident timeline
+ * and the attempts anchors, and the sparkline is that same timeline sampled.
  *
  * Apple Pay's rate is solved, not invented: with card/Google Pay pinned at
  * baseline, the share-weighted blend must equal the scripted overall rate, so
@@ -766,20 +887,25 @@ export type DerivedPulse = {
  * other rails sit at 97% — the same "all Apple Pay" shape the live breakdown
  * has, at the ad's louder scale.
  *
- * Incident phase comes from the RECORDED series, not the tile number, so the
- * misread beat (`record: false`: 3.1% on the tile over an unchanged 17% series)
- * still reads as a live incident rather than briefly declaring itself resolved.
+ * Incident phase still comes from the SERIES rather than from the single tile
+ * value, so "Incident active" / "Recovering" / "Back to baseline" follow the
+ * shape of the day rather than one reading. With the timeline as the one
+ * source, the series and the tile are the same function evaluated at different
+ * minutes, so they cannot disagree.
  */
 export function derivePulse(pulse: PulseState): DerivedPulse {
-  const failureRatePct = pulse.rate;
+  // EVERY figure below comes from the beat's clock reading, through the
+  // incident timeline. Nothing here is a scripted per-beat number.
+  const failureRatePct = failureRateAt(pulse.t);
   const successRatePct = 100 - failureRatePct;
-  const attempts = pulse.attempts;
+  const attempts = attemptsAt(pulse.t);
   const failedCheckouts = Math.round((attempts * failureRatePct) / 100);
+  const history = incidentHistory(pulse.t);
 
   const applePayRate =
     DEMO_BASELINE_SUCCESS_PCT - (failureRatePct - DEMO_BASELINE_FAILURE_PCT) / APPLE_PAY_SHARE;
 
-  const recordedRates = pulse.history.map((h) => h.rate);
+  const recordedRates = history.map((h) => h.rate);
   const peakFailure = Math.max(...recordedRates);
   const latestFailure = recordedRates[recordedRates.length - 1];
   // Declared once the series has actually been to alarm level; from then on the
@@ -806,7 +932,7 @@ export function derivePulse(pulse: PulseState): DerivedPulse {
     freshness: `data as of ${formatClock(
       Math.floor(pulse.t / SAMPLE_STEP_MINUTES) * SAMPLE_STEP_MINUTES,
     )}`,
-    successHistory: pulse.history.map((h) => ({ t: h.t, rate: 100 - h.rate })),
+    successHistory: history.map((h) => ({ t: h.t, rate: 100 - h.rate })),
     incidentStartMinutes: declared ? INCIDENT_MINUTE : null,
     recovering,
     isBaseline,
@@ -912,28 +1038,23 @@ function read(s: SceneState, channel: ChannelId): SceneState {
 }
 
 /**
- * Sets the two Pulse numbers. `record: false` shows a value on the tile WITHOUT
- * appending it to the sparkline series: used once, at the misread beat, where
- * the script deliberately puts 3.1% next to 407 attempts. Folding that reading
- * into the series would turn the recovery hump into a spike/dip/spike and lose
- * the shape the closer is built around. Scripted values, no real data.
+ * Moves the dashboard's READING to sim minute `t`. That is the whole of what a
+ * beat may say about Pulse: the rate, the attempts count and the sparkline all
+ * follow from the incident timeline at that minute (see `derivePulse`).
+ *
+ * `at` is the ordinary form — it sets the status-bar clock and the dashboard
+ * reading together, which is what every beat wants. `setPulse` on its own is
+ * for the ONE case where they differ: the recovery walk's steps, which are
+ * readings taken after the beat's own landing time.
  */
-function setPulse(
-  s: SceneState,
-  t: number,
-  rate: number,
-  attempts: number,
-  record = true,
-): SceneState {
-  return {
-    ...s,
-    pulse: {
-      t,
-      rate,
-      attempts,
-      history: record ? [...s.pulse.history, { t, rate }] : s.pulse.history,
-    },
-  };
+function setPulse(s: SceneState, t: number): SceneState {
+  return { ...s, pulse: { t } };
+}
+
+/** The beat's clock: status bar and dashboard reading in one move, so a beat
+ * cannot advance time without the metrics following it. */
+function at(s: SceneState, minutes: number, day?: number): SceneState {
+  return setPulse({ ...s, minutes, ...(day === undefined ? {} : { day }) }, minutes);
 }
 
 /* --------------------------------------------------------- the eval batch */
@@ -1064,29 +1185,17 @@ export const INITIAL_SCENE: SceneState = {
     "dm-theo": [],
   },
   /**
-   * Scripted Pulse values. Hardcoded for filming, no real logic.
+   * The dashboard's opening reading: 9:15 AM, INCIDENT_MINUTE itself.
    *
-   * THE TAKE OPENS INSIDE THE INCIDENT, so these are already degraded: Priya's
-   * 9:14 line above has reported the spike and the clock reads 9:15, so the
-   * dashboard's own numbers have to agree with the message the audience just
-   * read. The series carries two healthy PRE-incident samples (8:30 and 9:00,
-   * both earlier than Priya's message) so the sparkline has a line to draw and
-   * a baseline to fall away from, and then the first degraded reading at 9:15 —
-   * INCIDENT_MINUTE, the minute the sparkline draws its incident marker at. No
-   * sample at or after 9:15 is ever healthy again until the recovery at the
-   * PULSE PAYOFF beat, so nothing between Priya's message and the reveal can
-   * put a healthy frame on camera.
+   * THE TAKE OPENS INSIDE THE INCIDENT and the numbers follow from that one
+   * minute through the timeline: 9% failure over 289 attempts, badge red,
+   * sparkline already off its baseline. Priya's 9:14 line has reported the
+   * spike and the clock reads 9:15, so the board and the message agree by
+   * construction rather than by two hand-set figures happening to match. No
+   * frame between here and the PULSE PAYOFF beat can show a healthy dashboard,
+   * because no frame between here and 2:20 PM evaluates to one.
    */
-  pulse: {
-    rate: DEMO_ALARM_FAILURE_PCT,
-    attempts: 289,
-    t: INCIDENT_MINUTE,
-    history: [
-      { t: 510, rate: 2.6 },
-      { t: 540, rate: 3 },
-      { t: INCIDENT_MINUTE, rate: DEMO_ALARM_FAILURE_PCT },
-    ],
-  },
+  pulse: { t: INCIDENT_MINUTE },
   assignedTo: null,
 };
 
@@ -1137,12 +1246,7 @@ export const SCRIPT: Step[] = [
     // on entry, then the three stakeholder pings below.
     apply: (s) =>
       markUnread(
-        setPulse(
-          show({ ...s, day: 1, minutes: 580, chattrBadge: 3 }, ["chattr", "pulse"]),
-          580,
-          DEMO_ALARM_FAILURE_PCT,
-          322,
-        ),
+        show(at({ ...s, chattrBadge: 3 }, 580, 1), ["chattr", "pulse"]),
         "incidents",
       ),
     // The automated burst: THREE stakeholders piling on while the actor just
@@ -1174,7 +1278,10 @@ export const SCRIPT: Step[] = [
     autos: [
       {
         delayMs: GAP_MS,
-        apply: (s) => markUnread(setPulse({ ...s, chattrBadge: 7 }, 600, 17, 361), "incidents"),
+        // The reading moves to 10:00, which is where the timeline's plateau
+        // begins: 9% -> 17% over a climbing attempts count, with the badge and
+        // the sparkline following. No figure is stated here.
+        apply: (s) => markUnread(setPulse({ ...s, chattrBadge: 7 }, 600), "incidents"),
         exchange: [
           {
             kind: "npc",
@@ -1258,7 +1365,7 @@ export const SCRIPT: Step[] = [
     // the player types his reply on camera, and Derek's sign-off lands with a
     // VISIBLE typing indicator, because by then his DM is the open channel.
     apply: (s) =>
-      show({ ...s, day: 1, minutes: 605, chattrBadge: 0, unread: [] }, ["chattr", "pulse"], "chattr"),
+      show(at({ ...s, chattrBadge: 0, unread: [] }, 605, 1), ["chattr", "pulse"], "chattr"),
     exchange: [
       {
         kind: "npc",
@@ -1347,7 +1454,7 @@ export const SCRIPT: Step[] = [
     // The actor can still beat the script to it: clicking any Assign button
     // first claims the beat's one assignment and cancels the auto, and clicking
     // Theo runs this exact same reaction (see AdModeShot's assignClaimed).
-    apply: (s) => show({ ...s, day: 1, minutes: 607 }, ["chattr", "office"], "office"),
+    apply: (s) => show(at(s, 607, 1), ["chattr", "office"], "office"),
     autoAssign: { person: "Theo", delayMs: GAP_MS },
     onAssign: {
       person: "Theo",
@@ -1396,7 +1503,7 @@ export const SCRIPT: Step[] = [
     // unless the actor clicks an Assign button first, in which case that click
     // claims the beat's one assignment, the auto is cancelled, and clicking Raj
     // plays this same reaction.
-    apply: (s) => show({ ...s, day: 1, minutes: 610, assignedTo: null }, ["chattr", "office"]),
+    apply: (s) => show(at({ ...s, assignedTo: null }, 610, 1), ["chattr", "office"]),
     autoAssign: { person: "Raj", delayMs: GAP_MS },
     onAssign: {
       person: "Raj",
@@ -1419,10 +1526,14 @@ export const SCRIPT: Step[] = [
   {
     id: "misread-1",
     label: "MISREAD 1 of 5",
-    // 3.1% next to 407 attempts: the two confusable numbers, side by side.
-    // Pulse front, Chattr staggered behind it.
-    apply: (s) =>
-      setPulse(show({ ...s, day: 1, minutes: 680 }, ["chattr", "pulse"]), 680, 3.1, 407, false),
+    // THE TWO CONFUSABLE NUMBERS, side by side on the board: 407 checkout
+    // ATTEMPTS today next to a 17% FAILURE RATE, in the pair of tiles directly
+    // under the hero. That adjacency is the whole beat — it is what makes the
+    // player's "around 400 checkouts affected" two beats later a plausible
+    // misread rather than a random error. Both figures come from the beat's own
+    // clock (11:20 AM) through the incident timeline: 407 is an attempts
+    // anchor, 17% is the plateau. Pulse right, Chattr left in the split.
+    apply: (s) => show(at(s, 680, 1), ["chattr", "pulse"]),
   },
 
   /* 6 */
@@ -1434,7 +1545,7 @@ export const SCRIPT: Step[] = [
     // Chattr forward, Pulse still open behind with the number the player is
     // about to misquote.
     apply: (s) =>
-      read(show({ ...s, day: 1, minutes: 685 }, ["chattr", "pulse"], "chattr"), "dm-derek"),
+      read(show(at(s, 685, 1), ["chattr", "pulse"], "chattr"), "dm-derek"),
     exchange: [
       {
         kind: "player",
@@ -1452,7 +1563,7 @@ export const SCRIPT: Step[] = [
     // Front stays on Derek's DM, so Priya's indicator (in #incidents) is
     // correctly hidden and the banner is the only way this lands.
     apply: (s) => ({
-      ...show({ ...s, day: 1, minutes: 700 }, ["chattr", "pulse"], "chattr"),
+      ...show(at(s, 700, 1), ["chattr", "pulse"], "chattr"),
       activeChannel: "dm-derek",
     }),
     exchange: [
@@ -1483,7 +1594,7 @@ export const SCRIPT: Step[] = [
     // in a side DM. Opening the channel is also what clears the unread ring the
     // previous beat left on it, exactly like the real app.
     apply: (s) =>
-      read(show({ ...s, day: 1, minutes: 702 }, ["chattr", "pulse"], "chattr"), "incidents"),
+      read(show(at(s, 702, 1), ["chattr", "pulse"], "chattr"), "incidents"),
     exchange: [
       {
         kind: "player",
@@ -1507,7 +1618,7 @@ export const SCRIPT: Step[] = [
     // the whole correction at once. It banners as well, like every other NPC
     // line now does.
     apply: (s) => ({
-      ...show({ ...s, day: 1, minutes: 705 }, ["chattr", "pulse"], "chattr"),
+      ...show(at(s, 705, 1), ["chattr", "pulse"], "chattr"),
       activeChannel: "incidents",
     }),
     exchange: [
@@ -1517,7 +1628,14 @@ export const SCRIPT: Step[] = [
         agentId: "priya",
         sender: "Priya",
         time: "11:45 AM",
-        text: "That's not the right metric. 400 is the total attempts, not failures. Actual failure rate is closer to 3%. I'll update Derek with that.",
+        // DIALOGUE CHANGED WITH THE TIMELINE FIX (flagged for the director).
+        // She used to say "Actual failure rate is closer to 3%", which was
+        // written against the old self-healing dashboard: with the incident
+        // held at its plateau until Raj ships, a 3% correction would contradict
+        // the 17% on the tile right next to her. Same voice, same correction,
+        // same job in the scene (the player quoted a total as a failure count)
+        // and now the true number.
+        text: "That's not the right metric. 400 is the total attempts, not failures. We're sitting at about a 17% failure rate. I'll update Derek with that.",
         // Banners on every NPC line now, this one included — see the policy
         // note at beat 2. The preview is the correction's first sentence, which
         // is the beat of it that has to read at banner size.
@@ -1554,7 +1672,7 @@ export const SCRIPT: Step[] = [
     // His indicator is off camera throughout (his DM is not the open channel
     // while he composes), so it starts with the beat's patch and the first
     // thing the audience sees is the message itself, one GAP_MS in.
-    apply: (s) => show({ ...s, day: 1, minutes: 835 }, ["pulse", "chattr"], "chattr"),
+    apply: (s) => show(at(s, 835, 1), ["pulse", "chattr"], "chattr"),
     exchange: [
       {
         kind: "npc",
@@ -1601,14 +1719,14 @@ export const SCRIPT: Step[] = [
     // the way is a real recorded sample, so the sparkline still draws the true
     // hump; only the on-screen digits are eased (see ScriptedPulse's count-up,
     // a 500ms DURATION that runs inside each step and is not a gap).
-    apply: (s) => setPulse(show({ ...s, day: 1, minutes: 850 }, ["chattr", "pulse"]), 850, 17, 468),
+    apply: (s) => show(at(s, 850, 1), ["chattr", "pulse"]),
+    // The walk is three READINGS, not three figures: each step moves the
+    // dashboard's clock to the next point of the timeline's recovery and the
+    // board re-derives. The status bar holds at 2:10, the beat's landing time.
     autos: [
-      { delayMs: GAP_MS, apply: (s) => setPulse(s, 860, 12, 468) },
-      { delayMs: GAP_MS * 2, apply: (s) => setPulse(s, 870, 6, 468) },
-      {
-        delayMs: GAP_MS * 3,
-        apply: (s) => setPulse(s, 880, DEMO_BASELINE_FAILURE_PCT, 468),
-      },
+      { delayMs: GAP_MS, apply: (s) => setPulse(s, RECOVERY_FIRST_MINUTE) },
+      { delayMs: GAP_MS * 2, apply: (s) => setPulse(s, RECOVERY_FIRST_MINUTE + 10) },
+      { delayMs: GAP_MS * 3, apply: (s) => setPulse(s, RECOVERY_FIRST_MINUTE + 20) },
     ],
   },
 
@@ -1627,7 +1745,7 @@ export const SCRIPT: Step[] = [
     // advances off the one press, and the FOLD counts the scorecard as part of
     // this beat's completed state (an auto is replayed by `completeStep`), the
     // same as it was when the patch set it at entry.
-    apply: (s) => ({ ...s, day: 1, minutes: 1005 }),
+    apply: (s) => at(s, 1005, 1),
     autos: [{ delayMs: GAP_MS, apply: (s) => ({ ...s, overlay: "scorecard" }) }],
   },
 
@@ -1637,7 +1755,7 @@ export const SCRIPT: Step[] = [
     label: "CLOSER, DAY 2",
     // A new day starts from a clean desk: only Chattr is open behind the
     // transition card, exactly like the real Desktop's login.
-    apply: (s) => show({ ...s, day: 2, minutes: 540, overlay: "day2" }, ["chattr"]),
+    apply: (s) => show(at({ ...s, overlay: "day2" }, 540, 2), ["chattr"]),
   },
 
   /* 14 */
@@ -1663,7 +1781,7 @@ export const SCRIPT: Step[] = [
     // previous beat put up — this is the first beat of Day 2 proper, so it owns
     // clearing it (the beat that used to do that was the deleted Maya
     // follow-up).
-    apply: (s) => show({ ...s, minutes: 543, overlay: "none" }, ["chattr"]),
+    apply: (s) => show(at({ ...s, overlay: "none" }, 543), ["chattr"]),
     exchange: [
       {
         kind: "npc",
@@ -1709,7 +1827,7 @@ export const SCRIPT: Step[] = [
     // after the final beat (see AdModeShot's scheduleAutoAdvance), so the take
     // rests on the open document until the operator resets. ArrowRight at this
     // beat still fast-forwards its entry hold, and then clamps.
-    apply: (s) => show({ ...s, minutes: 545 }, ["chattr", "docs"], "docs"),
+    apply: (s) => show(at(s, 545), ["chattr", "docs"], "docs"),
   },
 ];
 
