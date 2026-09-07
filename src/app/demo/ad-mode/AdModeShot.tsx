@@ -10,6 +10,13 @@
  * on that beat indefinitely until the operator presses a key. The only two
  * callers of `advance` are the ArrowRight branches below.
  *
+ * A PRESS DOES NOT CUT. Every beat carries an ENTRY HOLD (see ENTRY_HOLD_MS in
+ * script.ts): the press selects the beat, the previous beat's finished frame —
+ * clock included — stays on camera for that hold, and only then does the new
+ * beat's patch land and its own exchange/autos begin. It is a hold, not an
+ * advance: nothing moves the beat index but a keypress, and ArrowRight during
+ * the hold still lands the whole beat and steps forward off the one press.
+ *
  * Hotkeys (global, route level):
  *   ArrowRight NEXT BEAT, always, in ONE press. If the beat is mid-playback the
  *              press first fast-forwards it — the player's line is typed out and
@@ -99,6 +106,9 @@ import { Day2Transition, ScorecardReveal } from "./ScorecardReveal";
 import {
   EVAL_BATCH_TOTAL,
   EVAL_DOC_TITLE,
+  PULSE_CHIP_PRESS_MS,
+  PULSE_CHIP_PRESS_STEP_ID,
+  entryHoldMs,
   INITIAL_SCENE,
   PLAYER_TYPING,
   SCRIPT,
@@ -264,6 +274,13 @@ export default function AdModeShot() {
   /** Bumped on reset so keyed overlays remount and replay their animations. */
   const [runKey, setRunKey] = useState(0);
   /**
+   * The "Open Pulse" chip's scripted pressed state. PRESENTATION ONLY — it is
+   * React state here rather than a SceneState field precisely so it stays out
+   * of the fold: no beat's completed result records whether a button was shown
+   * depressed for 300ms.
+   */
+  const [pulseChipPressed, setPulseChipPressed] = useState(false);
+  /**
    * Operator-HUD "typing…" state, and the thing ArrowRight branches on. Derived
    * rather than stored: a beat that declares an exchange or autos IS running a
    * timeline from the moment it is entered, and only the two events that can
@@ -306,6 +323,14 @@ export default function AdModeShot() {
   /** The player line the next scripted send should post. Read by the composer's
    * onSend, so the send path never has to inspect the textarea's value. */
   const pendingSendRef = useRef<PlayerLine | null>(null);
+  /** The state the CURRENT beat's patch should be applied to when its entry
+   * hold expires. Only a retake sets it (the rebuilt fold); forward, the patch
+   * applies to whatever is on screen, so this stays null. */
+  const entryBaseRef = useRef<SceneState | null>(null);
+  /** Whether Pulse is on the desk, readable from inside a timeline chain (which
+   * closes over a stale `scene`). Only the scripted chip press needs it: it is
+   * skipped when the actor already opened Pulse by hand. */
+  const pulseOpenRef = useRef(false);
 
   const pushBanner = useCallback((spec: BannerSpec) => {
     const id = bannerId.current++;
@@ -431,35 +456,41 @@ export default function AdModeShot() {
     session.cancelled = true;
     pendingSendRef.current = null;
     composerRef.current?.blur();
+    // A cancel mid-press must not strand the chip depressed.
+    setPulseChipPressed(false);
     releaseAll(session);
   }, []);
 
   /**
-   * Puts a beat on screen: the index, the scene it starts from and its
-   * beat-entry banner. The single entry point, so arriving by ArrowRight and
-   * arriving by ArrowLeft are the same event as far as the beat's own timeline
-   * effect is concerned — it re-runs on the index change either way and plays
-   * the beat from the top.
+   * SELECTS a beat. It deliberately does NOT put the beat on screen.
    *
-   * `from` is the state to patch (the retake's rebuilt fold); without it the
-   * step patches whatever is on screen, which is the forward case.
+   * The visible change is the beat's `apply` patch, and that is now deferred by
+   * the beat's ENTRY HOLD (see ENTRY_HOLD_MS in script.ts): the timeline effect
+   * below applies it once the hold expires. So a press moves the HUD and starts
+   * the clock on the hold, while the camera keeps looking at the PREVIOUS
+   * beat's finished frame — including its status-bar clock, which now flips
+   * with the beat's landing rather than on the keypress.
+   *
+   * The single entry point, so arriving by ArrowRight and arriving by ArrowLeft
+   * are the same event as far as the timeline effect is concerned: it re-runs
+   * on the index change either way and plays the beat, hold included, from the
+   * top.
+   *
+   * `from` is the state the step will patch (the retake's rebuilt fold). It is
+   * ALSO what has to be on camera during a retake's hold — the previous beat's
+   * rebuilt end state — so it goes up now and is patched when the hold expires.
+   * Without it the step patches whatever is on screen, which is the forward
+   * case and already the right picture.
    */
-  const enterStep = useCallback(
-    (index: number, from?: SceneState) => {
-      const step = SCRIPT[index];
-      stepRef.current = index;
-      // A beat being re-entered may still carry the previous visit's HUD verdict
-      // under the same beat/run key, which would read as "already finished".
-      setActiveOverride(null);
-      setStepIndex(index);
-      setScene(from ? step.apply(from) : step.apply);
-      // Step-level banners are the ones NOT tied to a scripted message, so they
-      // still fire at beat entry. Message-tied banners fire when their line
-      // lands.
-      if (step.banner) pushBanner(step.banner);
-    },
-    [pushBanner],
-  );
+  const enterStep = useCallback((index: number, from?: SceneState) => {
+    stepRef.current = index;
+    // A beat being re-entered may still carry the previous visit's HUD verdict
+    // under the same beat/run key, which would read as "already finished".
+    setActiveOverride(null);
+    setStepIndex(index);
+    entryBaseRef.current = from ?? null;
+    if (from) setScene(from);
+  }, []);
 
   const advance = useCallback(() => {
     const next = stepRef.current + 1;
@@ -519,13 +550,21 @@ export default function AdModeShot() {
     const prior = completedTimeline(target - 1);
     const base = prior.length > 0 ? prior[prior.length - 1] : INITIAL_SCENE;
     if (desk) {
-      // Beat n-1's ENTRY scene is folded in too, so the layout the effect below
-      // computes for it is already the current one and its pass is a no-op.
-      const placed = [...prior, SCRIPT[target].apply(base)].reduce(
+      // Replayed only as far as beat n-2's END — which is exactly the frame the
+      // retake now HOLDS on, because beat n-1's patch does not land until its
+      // entry hold expires. Placing n-1's windows here instead would open them
+      // during the hold, i.e. the jump cut the hold exists to remove; the sync
+      // effect places them when the patch lands.
+      const replayed = prior.reduce(
         (acc, s) => syncLayout(acc, s.windows, s.frontApp, desk),
         EMPTY_LAYOUT,
       );
-      setLayout(placed);
+      // One final sync against the frame actually going on screen. A no-op when
+      // `prior` already ended there, and the thing that places beat 0's window
+      // when `prior` is EMPTY (ArrowLeft all the way back): without it the desk
+      // would stay blank, because the sync effect below is keyed on the SCENE
+      // changing and going back to beat 0 does not change it.
+      setLayout(syncLayout(replayed, base.windows, base.frontApp, desk));
     }
     enterStep(target, base);
   }, [cancelSession, desk, enterStep]);
@@ -536,6 +575,8 @@ export default function AdModeShot() {
     bannerTimers.current = [];
     assignClaimed.current = false;
     pendingSendRef.current = null;
+    entryBaseRef.current = null;
+    setPulseChipPressed(false);
     stepRef.current = 0;
     setActiveOverride(null);
     setStepIndex(0);
@@ -543,10 +584,23 @@ export default function AdModeShot() {
     setBanners([]);
     // Wipes every placed window AND the cascade/z counters, so take two opens
     // Chattr dead-centre again rather than continuing the previous take's
-    // cascade. The sync effect below immediately re-places beat 0's window set.
-    setLayout(EMPTY_LAYOUT);
+    // cascade — and re-places beat 0's window set in the SAME update. Leaving
+    // that to the sync effect below is not enough: that effect is keyed on the
+    // scene changing, and resetting from an already-at-beat-0 take (a false
+    // start, the most common reason to hit R) does not change it, so the desk
+    // would come back empty.
+    setLayout(
+      desk ? syncLayout(EMPTY_LAYOUT, INITIAL_SCENE.windows, INITIAL_SCENE.frontApp, desk) : EMPTY_LAYOUT,
+    );
     setRunKey((k) => k + 1);
-  }, [cancelSession]);
+  }, [cancelSession, desk]);
+
+  // Mirror of "is Pulse on the desk", for the scripted chip press (see
+  // pulseOpenRef). A plain projection of scene state, never a second source of
+  // truth for it.
+  useEffect(() => {
+    pulseOpenRef.current = scene.windows.includes("pulse");
+  }, [scene.windows]);
 
   /* -------------------------------------------------------- window layout */
 
@@ -679,39 +733,89 @@ export default function AdModeShot() {
     const session = createSession(stepIndex, runKey);
     sessionRef.current = session;
 
-    const exchange = step.exchange;
-    if (exchange) runChain(session, () => runExchange(session, exchange));
+    /**
+     * The beat's own timelines, started only once the beat is VISIBLE (see the
+     * entry chain below). Sequencing them after the entry hold rather than
+     * alongside it is what keeps every scripted delay meaning what it says: an
+     * `auto` at +1.7s is 1.7s after the audience can see the beat, not 1.7s
+     * after a keypress they cannot.
+     */
+    const startBeatChains = () => {
+      const exchange = step.exchange;
+      if (exchange) runChain(session, () => runExchange(session, exchange));
 
-    // The scripted assignment: the beat makes the pick itself so the ad plays
-    // without anyone touching the mouse, and Derek's reaction follows it. The
-    // claim check is what makes it lose gracefully to a manual click — the
-    // actor's Assign already took the beat's one assignment, and its reaction
-    // is already running, so this chain just retires.
-    const autoAssign = step.autoAssign;
-    if (autoAssign) {
-      runChain(session, async () => {
-        await sleep(session, autoAssign.delayMs);
-        if (session.cancelled || assignClaimed.current) return;
-        assignClaimed.current = true;
-        setScene((s) => (s.assignedTo ? s : { ...s, assignedTo: autoAssign.person }));
-        const reaction = step.onAssign;
-        if (reaction && reaction.person === autoAssign.person) {
-          await playAssignReaction(session, reaction);
-        }
-      });
-    }
+      // The scripted assignment: the beat makes the pick itself so the ad plays
+      // without anyone touching the mouse, and Derek's reaction follows it. The
+      // claim check is what makes it lose gracefully to a manual click — the
+      // actor's Assign already took the beat's one assignment, and its reaction
+      // is already running, so this chain just retires.
+      const autoAssign = step.autoAssign;
+      if (autoAssign) {
+        runChain(session, async () => {
+          await sleep(session, autoAssign.delayMs);
+          if (session.cancelled || assignClaimed.current) return;
+          assignClaimed.current = true;
+          setScene((s) => (s.assignedTo ? s : { ...s, assignedTo: autoAssign.person }));
+          const reaction = step.onAssign;
+          if (reaction && reaction.person === autoAssign.person) {
+            await playAssignReaction(session, reaction);
+          }
+        });
+      }
 
-    for (const auto of step.autos ?? []) {
-      runChain(session, async () => {
-        await sleep(session, auto.delayMs);
+      for (const auto of step.autos ?? []) {
+        runChain(session, async () => {
+          await sleep(session, auto.delayMs);
+          if (session.cancelled) return;
+          if (auto.apply) setScene(auto.apply);
+          // An auto's own banner is not tied to a scripted message, so it keeps
+          // firing on this timer.
+          if (auto.banner) pushBanner(auto.banner);
+          if (auto.exchange) await runExchange(session, auto.exchange);
+        });
+      }
+    };
+
+    /**
+     * THE ENTRY CHAIN. Hold on the previous beat's frame, then land this one.
+     *
+     * Everything the audience sees change at a beat boundary happens on the far
+     * side of this sleep: the scene patch (clock, windows, front app, channel,
+     * Pulse numbers, overlay) and the step-level banner. It is an ordinary
+     * `sleep(session, …)`, so it inherits the whole control surface for free —
+     * ArrowRight mid-hold sets `fast`, the sleep resolves without a timer, the
+     * patch and every remaining chain flush, and the advance follows off the
+     * same press; ArrowLeft or R cancel it before it can touch the scene.
+     *
+     * The beat's own chains start INSIDE this one, after the patch. They are
+     * registered on the same session, and `settleSession` re-drains, so a
+     * fast-forward still awaits chains that this one only started as it
+     * unwound.
+     */
+    runChain(session, async () => {
+      await sleep(session, entryHoldMs(step));
+      if (session.cancelled) return;
+      // THE SCRIPTED CHIP PRESS. Between the entry hold and the patch, so the
+      // beat reads as caused: the previous frame holds, the "Open Pulse" chip
+      // under Priya's line visibly depresses, and it releases in the SAME
+      // update that opens the window (both setStates are in one synchronous
+      // block, so React batches them into one frame). Skipped when Pulse is
+      // already on the desk, which is exactly the case where the actor pressed
+      // the chip themselves — the ad never presses a button twice.
+      if (step.id === PULSE_CHIP_PRESS_STEP_ID && !pulseOpenRef.current) {
+        setPulseChipPressed(true);
+        await sleep(session, PULSE_CHIP_PRESS_MS);
+        setPulseChipPressed(false);
         if (session.cancelled) return;
-        if (auto.apply) setScene(auto.apply);
-        // An auto's own banner is not tied to a scripted message, so it keeps
-        // firing on this timer.
-        if (auto.banner) pushBanner(auto.banner);
-        if (auto.exchange) await runExchange(session, auto.exchange);
-      });
-    }
+      }
+      const base = entryBaseRef.current;
+      entryBaseRef.current = null;
+      setScene(base ? step.apply(base) : step.apply);
+      // Step-level banners are the ones NOT tied to a scripted message. They
+      // fire with the beat's landing, which is what beat entry now means.
+      if (step.banner) pushBanner(step.banner);
+      startBeatChains();
+    });
 
     // Covers the step change (forward OR back), the reset (runKey) and unmount,
     // and also kills any assign-reaction chain started against this same session
@@ -808,6 +912,15 @@ export default function AdModeShot() {
     handleSelectApp("docs");
   }
 
+  /** The "Open Pulse" chip. Deliberately the SAME call the dock tile makes, so
+   * a chip press and a dock click put the window in the same place and leave
+   * the same scene state behind — which is what lets a manual press compose
+   * with the fold (ArrowLeft and R rebuild from the script and simply discard
+   * it, exactly as they discard any other manual window opening). */
+  function handleOpenPulse() {
+    handleSelectApp("pulse");
+  }
+
   function handleComposerChange(next: string) {
     setScene((prev) => ({ ...prev, composer: next }));
   }
@@ -818,11 +931,14 @@ export default function AdModeShot() {
   const progress = dayProgress(scene);
   const ambientTint = getAmbientTint(progress);
 
-  // Entering a beat that declares an exchange, autos or a scripted assignment
-  // starts its timeline, so that is the default; the override only speaks for
+  // Every beat with an entry hold is running a timeline from the moment it is
+  // entered — the hold itself is one — as is any beat that declares an
+  // exchange, autos or a scripted assignment. So that is the default, and the
+  // operator's "typing…" cue is lit through the hold too, which is exactly when
+  // they most need to know a skip is available. The override only speaks for
   // the beat it was written in (see activeOverride).
   const beatHasTimeline = Boolean(
-    step.exchange?.length || step.autos?.length || step.autoAssign,
+    entryHoldMs(step) > 0 || step.exchange?.length || step.autos?.length || step.autoAssign,
   );
   const timelineActive =
     activeOverride && activeOverride.beat === stepIndex && activeOverride.run === runKey
@@ -858,6 +974,8 @@ export default function AdModeShot() {
             composerRef={composerRef}
             onSelectChannel={handleSelectChannel}
             onOpenDoc={handleOpenDoc}
+            onOpenPulse={handleOpenPulse}
+            pulseChipPressed={pulseChipPressed}
           />
         );
     }

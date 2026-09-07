@@ -96,6 +96,8 @@ export function ScriptedChattr({
   composerRef,
   onSelectChannel,
   onOpenDoc,
+  onOpenPulse,
+  pulseChipPressed,
 }: {
   activeChannel: ChannelId;
   unread: ChannelId[];
@@ -109,6 +111,12 @@ export function ScriptedChattr({
   /** Clicking a message's document chip. Raises the scripted Docs window, the
    * same thing the real chip's onOpen does (minus the store write). */
   onOpenDoc: () => void;
+  /** Clicking the "Open Pulse" chip. Opens or raises the Pulse window through
+   * exactly the path the dock tile uses. */
+  onOpenPulse: () => void;
+  /** The scripted press: true while the STACKING beat is showing the chip
+   * depressed on the actor's behalf. */
+  pulseChipPressed: boolean;
 }) {
   const unreadIds = useMemo(() => new Set<string>(unread), [unread]);
   const items: MessageListItem[] = messages.map((m) => ({
@@ -116,7 +124,20 @@ export function ScriptedChattr({
     agentId: m.agentId,
     name: m.sender,
     timeLabel: m.time,
-    body: m.text,
+    body: m.pulseChip ? (
+      <>
+        {m.text}
+        {/* A <span> stays phrasing content whatever its display, so this rides
+            inside MessageListView's own body paragraph without breaking it —
+            which is how the ad adds a chip the shared component has no icon
+            for, while changing nothing shared. */}
+        <span className="mt-1.5 flex">
+          <OpenPulseChip pressed={pulseChipPressed} onClick={onOpenPulse} />
+        </span>
+      </>
+    ) : (
+      m.text
+    ),
     // The REAL attachment chip: same markup, same FileText icon, same hover
     // treatment the live thread gives a document.
     attachments: m.attachment
@@ -148,6 +169,43 @@ export function ScriptedChattr({
         />
       </div>
     </div>
+  );
+}
+
+/**
+ * The "Open Pulse" chip under Priya's 9:14 line.
+ *
+ * MARKUP AND CLASSES ARE THE REAL ATTACHMENT CHIP'S, copied from
+ * MessageListView's own `attachments` button token for token (the rounded
+ * hairline border, `bg-surface`, `px-2 py-1 text-label`, the `size-3.5`
+ * secondary-toned leading icon, the `hover:bg-muted`), so it reads as the same
+ * component family as a document chip. Two deliberate differences:
+ *
+ *  - the ICON is `Activity`, which is what AppIcon maps `pulse` to, so the chip
+ *    carries the same mark as the Pulse dock tile and window title bar rather
+ *    than the doc FileText the shared chip hardcodes. That icon is the entire
+ *    reason this is rendered here instead of through `attachments`;
+ *  - it has a PRESSED state, driven either by a real pointer (`active:`) or by
+ *    the script (`pressed`), because the STACKING beat presses it on camera.
+ *
+ * It is a real button at every point in the take: clicking it opens or raises
+ * Pulse through the same path as the dock tile.
+ */
+function OpenPulseChip({ pressed, onClick }: { pressed: boolean; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={cn(
+        "inline-flex items-center gap-1.5 rounded-md border border-border-hairline px-2 py-1 text-label text-text-primary",
+        "transition-[background-color,transform] duration-150 ease-out",
+        "hover:bg-muted active:scale-[0.97] active:bg-muted",
+        pressed ? "scale-[0.97] bg-muted" : "bg-surface",
+      )}
+    >
+      <Activity className="size-3.5 text-text-secondary" aria-hidden />
+      Open Pulse
+    </button>
   );
 }
 

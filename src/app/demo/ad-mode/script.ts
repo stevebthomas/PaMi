@@ -81,6 +81,16 @@ export type ChattrMessage = {
   text: string;
   /** Document chip(s) rendered under the body, exactly like the live thread. */
   attachment?: MessageAttachment;
+  /**
+   * Renders the ad's one bespoke chip under this line: "Open Pulse", which
+   * opens/raises the Pulse window. Unlike `attachment` (a document, rendered
+   * through MessageListView's own generic chip surface) this one needs the
+   * PULSE app icon rather than the doc FileText, and that icon is hardcoded
+   * inside the shipping component — so the ad renders it itself, from the same
+   * class string, rather than changing a shared component for a demo. See
+   * ScriptedChattr.
+   */
+  pulseChip?: true;
   /** Thread history: this line was already on screen before the take started,
    * so it renders instantly and never runs through the typing engine. Only
    * INITIAL_SCENE seeds carry it. */
@@ -253,6 +263,105 @@ export const PULSE_COUNT_UP_MS = 500;
 export const BURST_FIRST_MS = 1700;
 export const BURST_GAP_MS = 1900;
 export const BURST_INDICATOR_MS = 800;
+
+/* --------------------------------------------------------- entry holds */
+
+/**
+ * THE ENTRY HOLD: the pause between the operator's ArrowRight and the beat's
+ * visible change actually landing.
+ *
+ * Without it every beat cut on the keypress — the clock flipped, windows opened
+ * and closed, Pulse's numbers changed and channels switched all in the same
+ * frame as the press. On camera that reads as a jump cut per beat. With it the
+ * previous beat's finished frame HOLDS for a moment, and only then does the new
+ * one land, so the edit has something to cut on and the eye has time to arrive
+ * before the picture changes.
+ *
+ * MECHANICALLY it is the beat's `apply` patch, deferred: `enterStep` puts the
+ * beat on the HUD but changes nothing on screen, and the timeline effect's
+ * first chain sleeps this long and only then applies the patch (and the
+ * step-level banner), after which the beat's exchange/autos start as before —
+ * so their own delays still count from the moment the beat is visibly on
+ * screen, not from the keypress. Because it goes through `sleep(session, …)`
+ * like every other scripted delay, ArrowRight mid-hold flushes it and advances
+ * off the one press, ArrowLeft replays it, R cancels it, and the HUD's
+ * "typing…" cue is lit while it runs. And because it is TIMING ONLY, the fold
+ * is untouched: `completeStep` never reads this table.
+ *
+ * ONE TABLE, keyed by step id, so a director can retune the whole ad's pacing
+ * from a single screen and see all seventeen numbers side by side. Recording
+ * bias is deliberately LONG: post can trim a hold, it cannot invent one.
+ */
+export const ENTRY_HOLD_MS: Record<string, number> = {
+  // The opening frame is the LOAD state. It must paint immediately on mount, on
+  // R and on an ArrowLeft back to 0, so this beat alone never holds.
+  "first-fire": 0,
+
+  // Big reveals: the shot changes character, so the previous frame gets a long
+  // beat of stillness first.
+  stacking: 2000, //          Pulse arrives, already red — the ad's first reveal
+  "misread-1": 2000, //       the two confusable numbers come up together
+  "closer-transition": 2000, //the day boundary
+  "evals-doc": 2000, //       the document, and the number the ad ends on
+  eval: 2000, //              the final overlay
+
+  // Structural changes: a window opens or closes, or a card un-flips.
+  "whos-taking-this": 1600, //Chattr covers the spike
+  "wrong-pick": 1600, //      Pulse off the desk, Office on
+  "course-correct": 1600, //  holds on Theo's "Assigned ✓" before it clears
+  "raj-root-cause": 1600, //  the two-hour jump into the afternoon
+  "derek-evals": 1600, //     the Day 2 card clears to the workspace
+
+  // Ordinary changes: a front swap, a channel switch, a clock tick.
+  "misread-2": 1200,
+  "misread-3": 1200,
+  "misread-4": 1200,
+  "misread-5": 1200,
+  // Short on purpose: the REAL dwell on this beat is RECOVERY_HOLD_MS, which
+  // sits on the spike AFTER Pulse comes forward. This one only covers the cut
+  // itself (Raj's DM -> Pulse in front), so the two holds are two different
+  // frames rather than one long stare at the same one.
+  "pulse-payoff": 1200,
+  // Shortest of all, for the same reason: SCORECARD_HOLD_MS already holds 2.2s
+  // on the recovered desk. This exists only so the CLOCK flips with the beat's
+  // landing instead of on the keypress.
+  reckoning: 600,
+};
+
+/**
+ * How long the "Open Pulse" chip under Priya's message shows its pressed state
+ * when the script presses it for the actor.
+ *
+ * It sits INSIDE the STACKING beat's entry sequence, between that beat's entry
+ * hold and its patch: the previous frame holds, the chip depresses, and the
+ * chip releases in the same update that opens Pulse. So the window arriving
+ * reads as CAUSED by the button rather than as a cut. Skipped entirely when
+ * Pulse is already open, which is what happens when the actor pressed the chip
+ * themselves earlier in the take — the ad never double-presses.
+ *
+ * Presentation only: the pressed state is React state in AdModeShot, never
+ * SceneState, so it is not part of any beat's folded result.
+ */
+export const PULSE_CHIP_PRESS_MS = 300;
+/** The one beat that presses the chip on the actor's behalf. */
+export const PULSE_CHIP_PRESS_STEP_ID = "stacking";
+
+/** Fallback for a beat with no table entry. Only reachable if a new step is
+ * added without pacing it; `entryHoldMs` complains about that in dev. */
+export const DEFAULT_ENTRY_HOLD_MS = 1200;
+
+/** This beat's entry hold. Dev-loud about an unpaced beat, because a missing
+ * entry silently reintroduces the jump cut this table exists to remove. */
+export function entryHoldMs(step: Step): number {
+  const hold = ENTRY_HOLD_MS[step.id];
+  if (hold === undefined) {
+    if (process.env.NODE_ENV !== "production") {
+      throw new Error(`ad-mode: beat "${step.id}" has no ENTRY_HOLD_MS entry`);
+    }
+    return DEFAULT_ENTRY_HOLD_MS;
+  }
+  return hold;
+}
 
 /** Delay before the next character of a scripted player line. */
 export function playerCharDelayMs(char: string, cfg: PlayerTypingConfig = PLAYER_TYPING): number {
@@ -780,6 +889,11 @@ export const INITIAL_SCENE: SceneState = {
         time: "9:14 AM",
         text: "Heads up. Seeing a spike in failed checkouts on Apple Pay. Volume's climbing fast. Can someone take a look?",
         history: true,
+        // The affordance the whole first act hangs off: it is on screen from
+        // the LOAD FRAME, so "someone take a look" has something to press. The
+        // actor can press it at any time, and the STACKING beat presses it on
+        // camera if they don't (see PULSE_CHIP_PRESS_MS).
+        pulseChip: true,
       },
     ],
     // Empty. #design-review carries no scripted content at all: the Day-2 half
