@@ -211,8 +211,9 @@ export type StatePatch = (s: SceneState) => SceneState;
  *   - the gap from a beat landing to the first line of its exchange starting to
  *     type / to show a typing indicator (the engine's step-exchange lead-in);
  *   - inside an exchange, indicator-appears -> message-lands, and
- *     message-lands -> the next line's indicator/typing starting (the engine
- *     sleeps GAP_MS between consecutive exchange events);
+ *     message-lands -> the next event starting (the engine sleeps GAP_MS
+ *     between consecutive exchange events) — including the scripted channel
+ *     SWITCH, which is an exchange event like any other (see SwitchEvent);
  *   - the pause between a player line's last character and the Enter that sends
  *     it (`PLAYER_TYPING.sendPauseMs`);
  *   - every `auto` delay: the STACKING burst's three pings (and therefore the
@@ -237,16 +238,10 @@ export type StatePatch = (s: SceneState) => SceneState;
  *     · a message landing and its banner appearing (every banner in the ad);
  *     · a message landing and its own `apply` (an unread ring, a badge count);
  *     · an NPC's indicator clearing and the line it was announcing landing;
- *     · A SCRIPTED CUT INTO A THREAD and the indicator that motivates it. When
- *       a beat's patch switches the view to a channel and the first thing that
- *       beat does is an NPC line landing THERE, the cut and the "X is typing…"
- *       are one composed motion, not two: the reason the camera moved to that
- *       thread IS the incoming activity. Paying the flat gap first left the
- *       shot staring at a near-empty thread for two seconds, so the cut read as
- *       happening before the conversation existed. Same rationale as a message
- *       and its banner. The indicator -> message gap stays GAP_MS as normal.
- *       See `stepExchangeLeadInMs`, which decides this from the script's own
- *       data rather than per-beat by hand;
+ *     · a beat's patch and the start of an OFF-CAMERA typing indicator — an
+ *       indicator in a thread that is not on screen is not a motion at all, so
+ *       it rides with the patch and the message it announces lands one GAP_MS
+ *       later, on the metronome (see `stepExchangeLeadInMs`);
  *     · an `auto`'s own patch and the start of the exchange it owns — the
  *       STACKING burst's first ping climbs the Pulse numbers in the same frame
  *       Priya's indicator opens, which costs nothing because that indicator is
@@ -419,19 +414,25 @@ export function entryHoldMs(step: Step): number {
 
 /**
  * THE STEP EXCHANGE'S LEAD-IN: the gap from a beat's picture landing to the
- * first line of its exchange starting. GAP_MS like everything else — EXCEPT for
- * the cut-into-a-thread pair documented in the GAP_MS block above, where it is
- * ZERO and the indicator rides with the cut.
+ * first event of its exchange starting. GAP_MS like everything else — EXCEPT
+ * when that first event's typing indicator would be OFF CAMERA, in which case
+ * it is ZERO.
  *
- * THE CONDITION, all three parts required, so this stays a rule rather than a
- * list of hand-picked beats:
- *   1. the beat's patch CHANGES the channel on screen (an actual cut — a beat
- *      that stays in the thread it was already in has nothing to motivate);
- *   2. the first line of its exchange is an NPC line (incoming activity is what
- *      motivates a cut; the player deciding to type is not — a person reads the
- *      thread first, so those beats keep the full gap);
- *   3. that line lands in the channel just cut to (a line landing elsewhere is
- *      announced by its banner, and the cut is not about it).
+ * WHY. The blanket rule spaces VISIBLE motions. The engine only renders the
+ * typing indicator when its channel is the one on screen (same rule the live
+ * app has), so an NPC line landing in a BACKGROUND thread has exactly one
+ * visible motion — the message landing, with its banner and unread ring — and
+ * starting its invisible indicator with the beat's patch costs the audience
+ * nothing. Paying the gap first instead would put FOUR seconds of stillness
+ * between the beat landing and its banner, which is the hole the flat rule
+ * exists to prevent. So:
+ *
+ *   first event is an NPC line in the channel ON SCREEN  -> GAP_MS (the
+ *     audience watches "X is typing…" appear, which is a motion of its own)
+ *   first event is an NPC line in ANY OTHER channel      -> 0 (nothing to see
+ *     until the message lands one GAP_MS later)
+ *   first event is a player line, or a switch            -> GAP_MS (the player
+ *     starting to type is visible, and a person reads before replying)
  *
  * DERIVED FROM THE SCRIPT, not the live scene: it folds the beats before this
  * one and asks what the patch does, so the answer is the same on every take,
@@ -439,21 +440,20 @@ export function entryHoldMs(step: Step): number {
  * beats cannot change the ad's pacing. Memoised, since it is a pure function of
  * SCRIPT.
  */
-let cutInLeadIns: number[] | null = null;
+let stepLeadIns: number[] | null = null;
 
 export function stepExchangeLeadInMs(index: number): number {
-  if (!cutInLeadIns) {
+  if (!stepLeadIns) {
     const folded = completedTimeline(SCRIPT.length - 1);
-    cutInLeadIns = SCRIPT.map((step, i) => {
+    stepLeadIns = SCRIPT.map((step, i) => {
       const first = step.exchange?.[0];
       if (!first || first.kind !== "npc") return GAP_MS;
       const before = i === 0 ? INITIAL_SCENE : folded[i - 1];
-      const after = step.apply(before);
-      const cut = after.activeChannel !== before.activeChannel;
-      return cut && after.activeChannel === first.channel ? 0 : GAP_MS;
+      const onScreen = step.apply(before).activeChannel;
+      return onScreen === first.channel ? GAP_MS : 0;
     });
   }
-  return cutInLeadIns[index] ?? GAP_MS;
+  return stepLeadIns[index] ?? GAP_MS;
 }
 
 /** Delay before the next character of a scripted player line. */
@@ -512,7 +512,33 @@ export type NpcLine = {
   banner?: BannerSpec;
 };
 
-export type ExchangeEvent = PlayerLine | NpcLine;
+/**
+ * A scripted CONVERSATION SWITCH: the open channel changes to `channel`, and
+ * its unread ring clears, exactly as `read` does for a click.
+ *
+ * IT IS AN EXCHANGE EVENT, not a beat patch, and that is the whole point. The
+ * ad's rule is that a switch is REACTIVE — nothing changes the thread on screen
+ * until the reason to change it is already there — so the switch has to be able
+ * to sit AFTER the line that motivates it, on the same two-second metronome as
+ * everything else:
+ *
+ *   the beat lands (thread unchanged) -> the NPC line arrives in its own,
+ *   off-screen thread: banner + unread ring -> GAP_MS -> THIS: the channel
+ *   flips, the ring clears, and the message that was announced is revealed.
+ *
+ * On camera that reads as the player answering the notification. It also means
+ * the audience is never shown a thread before the thing that sent them there.
+ *
+ * The engine plays it as one instantaneous state update between two ordinary
+ * gaps, and the fold replays it in order, so a beat's completed state carries
+ * the switched channel exactly as stepping through it does.
+ */
+export type SwitchEvent = {
+  kind: "switch";
+  channel: ChannelId;
+};
+
+export type ExchangeEvent = PlayerLine | NpcLine | SwitchEvent;
 
 /** The sender identity every scripted player line carries. */
 export const PLAYER_AGENT_ID: AgentId = "player";
@@ -836,23 +862,31 @@ function say(
   };
 }
 
-/** The engine's entry point into `say`: lands one exchange line in its channel.
- * Pure, so it composes with an event's own `apply` inside one state update. */
-export function landLine(s: SceneState, line: ExchangeEvent): SceneState {
+/**
+ * The engine's (and the fold's) one entry point for an exchange event: lands a
+ * line in its channel, or performs a scripted channel switch.
+ *
+ * Pure, so it composes with an event's own `apply` inside one state update, and
+ * so the fold can replay the very same events with every delay treated as zero.
+ */
+export function applyExchangeEvent(s: SceneState, event: ExchangeEvent): SceneState {
+  // A switch moves the eye, not the thread: no message, just the channel and
+  // its unread ring — the same thing `read` does when the actor clicks a DM.
+  if (event.kind === "switch") return read(s, event.channel);
   const landed =
-    line.kind === "player"
-      ? say(s, line.channel, PLAYER_AGENT_ID, PLAYER_SENDER, line.time, line.text)
+    event.kind === "player"
+      ? say(s, event.channel, PLAYER_AGENT_ID, PLAYER_SENDER, event.time, event.text)
       : say(
           s,
-          line.channel,
-          line.agentId,
-          line.sender,
-          line.time,
-          line.text,
-          line.attachment,
-          line.officeChip ? { officeChip: true } : undefined,
+          event.channel,
+          event.agentId,
+          event.sender,
+          event.time,
+          event.text,
+          event.attachment,
+          event.officeChip ? { officeChip: true } : undefined,
         );
-  return line.apply ? line.apply(landed) : landed;
+  return event.apply ? event.apply(landed) : landed;
 }
 
 /**
@@ -1210,15 +1244,21 @@ export const SCRIPT: Step[] = [
     id: "whos-taking-this",
     label: "WHO IS TAKING THIS",
     // Chattr comes back to the front; Pulse stays open behind it, still
-    // showing the spike. The cut to Derek's DM carries his typing indicator
-    // with it — same cut-into-a-thread pair as RAJ ROOT CAUSE. A full three-line exchange in Derek's DM: he asks, the
+    // showing the spike. A full three-line exchange in Derek's DM: he asks, the
     // player answers on camera through the real composer, and he signs off. The
     // NEXT beat is the player making good on that answer — badly.
+    //
+    // REACTIVE SWITCH. The beat lands WITHOUT changing the thread on screen —
+    // the camera stays in #incidents, where the last beat left it — because at
+    // that moment there is nothing in Derek's DM to go and read. His question
+    // arrives first, as a banner and an unread ring on a background thread, and
+    // only THEN does the channel flip to reveal it (the `switch` event below).
+    // The player is answering a notification, not anticipating one. Everything
+    // after the switch plays in the now-visible thread with the ordinary gaps:
+    // the player types his reply on camera, and Derek's sign-off lands with a
+    // VISIBLE typing indicator, because by then his DM is the open channel.
     apply: (s) =>
-      read(
-        show({ ...s, day: 1, minutes: 605, chattrBadge: 0, unread: [] }, ["chattr", "pulse"], "chattr"),
-        "dm-derek",
-      ),
+      show({ ...s, day: 1, minutes: 605, chattrBadge: 0, unread: [] }, ["chattr", "pulse"], "chattr"),
     exchange: [
       {
         kind: "npc",
@@ -1227,12 +1267,18 @@ export const SCRIPT: Step[] = [
         sender: "Derek",
         time: "10:04 AM",
         text: "Can you let me know who is taking this?",
+        // A background thread now, so it takes the unread ring the real sidebar
+        // would give it — the ring the switch below then clears.
+        apply: (s) => markUnread(s, "dm-derek"),
         banner: {
           agentId: "derek",
           sender: "Derek",
           preview: "Can you let me know who is taking this?",
         },
       },
+      // The player answering the notification: the thread opens, the ring
+      // clears, and the question that was just announced is on screen.
+      { kind: "switch", channel: "dm-derek" },
       // Typed into the REAL composer, character by character, and sent through
       // the real Enter path — the same engine every other player line uses.
       {
@@ -1492,23 +1538,23 @@ export const SCRIPT: Step[] = [
     // is the setup the recovery beat needs: without it the numbers just fall
     // on their own, which reads as the incident fixing itself.
     //
-    // Chattr comes forward with Raj's DM open (opening it clears the unread
-    // ring the STACKING burst left on him, exactly like the real app), and
-    // Pulse is declared FIRST so it takes the earlier cascade step and sits
-    // staggered behind — still showing the spike Raj is about to explain, and
+    // Chattr comes forward — the player's inbox, still on #incidents where the
+    // correction landed — and Pulse is declared FIRST so it takes the other
+    // half of the split: still showing the spike Raj is about to explain, and
     // already in place for the payoff beat that follows.
     //
-    // The standard flat GAP_MS indicator, and — under the every-NPC-line policy
-    // — a banner too, even though this is the thread on screen and the audience
-    // is watching Raj compose it.
+    // REACTIVE SWITCH, and this is the beat that motivated the rule. It used to
+    // cut straight to Raj's DM and then wait there, so the shot stared at a
+    // nearly empty thread before anything arrived and the cut read as happening
+    // before the conversation existed. Now his report LANDS first, in a
+    // background thread, announced by its banner and an unread ring on his DM;
+    // one GAP_MS later the channel flips and reveals it. Nothing moves the eye
+    // to a thread before there is a reason to look at it.
     //
-    // RAJ IS ALREADY TYPING WHEN THE CUT LANDS. This beat cuts INTO his DM, and
-    // his thread is nearly empty, so paying the flat lead-in first left two
-    // seconds of blank thread on camera and the cut read as arriving before the
-    // conversation existed. It is a cut-into-a-thread pair (see
-    // stepExchangeLeadInMs): the channel switch and "Raj is typing…" are one
-    // motion, and his line still lands one GAP_MS after that.
-    apply: (s) => read(show({ ...s, day: 1, minutes: 835 }, ["pulse", "chattr"], "chattr"), "dm-raj"),
+    // His indicator is off camera throughout (his DM is not the open channel
+    // while he composes), so it starts with the beat's patch and the first
+    // thing the audience sees is the message itself, one GAP_MS in.
+    apply: (s) => show({ ...s, day: 1, minutes: 835 }, ["pulse", "chattr"], "chattr"),
     exchange: [
       {
         kind: "npc",
@@ -1517,14 +1563,20 @@ export const SCRIPT: Step[] = [
         sender: "Raj",
         time: "1:55 PM",
         text: "Confirmed. Apple Pay token validation is timing out on their end, not ours. We shipped a retry buffer to absorb it. Rate should settle in the next few minutes.",
+        // A background thread now, so it rings his DM in the sidebar.
+        apply: (s) => markUnread(s, "dm-raj"),
         // Banner, per the every-NPC-line policy. Previewed down to the finding
-        // itself: the fix, not the paragraph explaining it.
+        // itself: the fix, not the paragraph explaining it. It is also the
+        // reason the next event exists — the switch answers this notification.
         banner: {
           agentId: "raj",
           sender: "Raj",
           preview: "Confirmed. Apple Pay token validation is timing out on their end, not ours.",
         },
       },
+      // The reveal: Raj's DM opens, its ring clears, and the report the banner
+      // just announced is on screen to be read.
+      { kind: "switch", channel: "dm-raj" },
     ],
   },
 
@@ -1593,19 +1645,25 @@ export const SCRIPT: Step[] = [
     id: "derek-evals",
     label: "DEREK EVALS",
     // Day 2's ask, and the last thing the player is handed before the ad ends.
-    // Chattr alone, Derek's DM open — and, being another cut INTO a thread, his
-    // typing indicator lands with the cut rather than two seconds after it.
-    // The line then arrives with a REAL document
-    // chip under it — MessageListView's own attachment markup, the same button
-    // the live thread renders for a doc attachment. Clicking it raises the
-    // scripted Docs window; the next beat stages that window regardless, so the
-    // take never depends on the actor hitting the chip.
+    // Chattr alone, centered — and, like every other NPC-driven switch in the
+    // ad, REACTIVE: the beat lands on whatever thread Day 1 ended in (Raj's DM),
+    // Derek's message arrives in the background with its banner and an unread
+    // ring, and only then does the channel flip to reveal it. The workspace
+    // does not pre-empt the message that is about to arrive in it.
+    //
+    // The line arrives with a REAL document chip under it —
+    // MessageListView's own attachment markup, the same button the live thread
+    // renders for a doc attachment. The switch is what puts that chip on
+    // camera, which is what motivates the NEXT beat opening the document;
+    // clicking it raises the scripted Docs window, and the next beat stages
+    // that window regardless, so the take never depends on the actor hitting
+    // the chip.
     //
     // `overlay: "none"` is what DISMISSES the Day 2 transition card the
     // previous beat put up — this is the first beat of Day 2 proper, so it owns
     // clearing it (the beat that used to do that was the deleted Maya
     // follow-up).
-    apply: (s) => read(show({ ...s, minutes: 543, overlay: "none" }, ["chattr"]), "dm-derek"),
+    apply: (s) => show({ ...s, minutes: 543, overlay: "none" }, ["chattr"]),
     exchange: [
       {
         kind: "npc",
@@ -1615,12 +1673,17 @@ export const SCRIPT: Step[] = [
         time: "9:03 AM",
         text: "Hey, here are the evals",
         attachment: { key: EVAL_DOC_ID, label: EVAL_DOC_TITLE },
+        // Background thread on arrival, so it rings in the sidebar.
+        apply: (s) => markUnread(s, "dm-derek"),
         banner: {
           agentId: "derek",
           sender: "Derek",
           preview: "Hey, here are the evals",
         },
       },
+      // The reveal: Derek's DM opens on the message and its document chip —
+      // the frame the closing beat's Docs window comes out of.
+      { kind: "switch", channel: "dm-derek" },
     ],
   },
 
@@ -1666,7 +1729,7 @@ export const SCRIPT: Step[] = [
  * shorter thread, and nothing else in the take would look wrong. `completeStep`
  * runs on every ArrowLeft retake and on every fold, so this check sees every
  * beat's real end state; `say`'s own two guards (see above) cover the live
- * forward path, where a line lands through `landLine` instead.
+ * forward path, where a line lands through `applyExchangeEvent` instead.
  */
 export function assertThreadsGrow(
   before: SceneState,
@@ -1725,7 +1788,7 @@ function completeAssign(s: SceneState, step: Step, person: string): SceneState {
   const reaction = step.onAssign;
   if (!reaction || reaction.person !== person) return next;
   if (reaction.apply) next = reaction.apply(next);
-  for (const line of reaction.exchange ?? []) next = landLine(next, line);
+  for (const event of reaction.exchange ?? []) next = applyExchangeEvent(next, event);
   return next;
 }
 
@@ -1746,10 +1809,10 @@ function completeAssign(s: SceneState, step: Step, person: string): SceneState {
  */
 export function completeStep(state: SceneState, step: Step): SceneState {
   let s = step.apply(state);
-  for (const line of step.exchange ?? []) s = landLine(s, line);
+  for (const event of step.exchange ?? []) s = applyExchangeEvent(s, event);
   for (const auto of [...(step.autos ?? [])].sort((a, b) => a.delayMs - b.delayMs)) {
     if (auto.apply) s = auto.apply(s);
-    for (const line of auto.exchange ?? []) s = landLine(s, line);
+    for (const event of auto.exchange ?? []) s = applyExchangeEvent(s, event);
   }
   if (step.autoAssign) s = completeAssign(s, step, step.autoAssign.person);
   // A finished beat has an empty composer and no indicator on screen: the send

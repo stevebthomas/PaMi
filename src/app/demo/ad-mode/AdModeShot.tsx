@@ -137,7 +137,7 @@ import {
   clockLabel,
   completedTimeline,
   dayProgress,
-  landLine,
+  applyExchangeEvent,
   npcIndicatorMs,
   playerCharDelayMs,
   stepExchangeLeadInMs,
@@ -512,7 +512,7 @@ export default function AdModeShot() {
     // between beats): the real component's guards already ran, so just no-op.
     if (!pending) return;
     pendingSendRef.current = null;
-    setScene((s) => landLine({ ...s, composer: "" }, pending));
+    setScene((s) => applyExchangeEvent({ ...s, composer: "" }, pending));
     if (pending.banner) pushBanner(pending.banner);
   }, [pushBanner]);
 
@@ -578,7 +578,7 @@ export default function AdModeShot() {
       // indicator next to the message it announced) without stealing another
       // channel's.
       setScene((s) =>
-        landLine(
+        applyExchangeEvent(
           { ...s, typing: s.typing && s.typing.channel !== line.channel ? s.typing : null },
           line,
         ),
@@ -598,6 +598,11 @@ export default function AdModeShot() {
    * three-line exchange reads as start, land, pause, start, land, pause… all on
    * the same two-second metronome.
    *
+   * A `switch` event is a one-frame motion in that same sequence: the channel
+   * on screen changes to reveal a message that has ALREADY landed and rung. It
+   * is what makes a conversation switch REACTIVE — the ad never moves the eye
+   * to a thread before there is something in it to look at.
+   *
    * `leadInMs` is the gap from whatever caused the exchange to its first line
    * starting. A STEP-level exchange is caused by the beat's patch landing, so
    * it passes GAP_MS. An exchange owned by an `auto` or an assign reaction
@@ -614,9 +619,19 @@ export default function AdModeShot() {
           await sleep(session, gapMs);
           if (session.cancelled) return;
         }
-        if (event.kind === "player") await runPlayerLine(session, event);
-        else await runNpcLine(session, event);
-        // Every line after the first is one flat gap behind the one that just
+        if (event.kind === "switch") {
+          // THE REACTIVE SWITCH: one instantaneous state update — the channel
+          // flips and its unread ring clears — sitting between two ordinary
+          // gaps, so the reveal lands GAP_MS after the message that motivated
+          // it and whatever follows is GAP_MS after the reveal. Nothing to
+          // await: a switch has no duration of its own.
+          setScene((s) => applyExchangeEvent(s, event));
+        } else if (event.kind === "player") {
+          await runPlayerLine(session, event);
+        } else {
+          await runNpcLine(session, event);
+        }
+        // Every event after the first is one flat gap behind the one that just
         // landed.
         gapMs = GAP_MS;
       }
