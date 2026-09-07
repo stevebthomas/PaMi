@@ -140,6 +140,7 @@ import {
   landLine,
   npcIndicatorMs,
   playerCharDelayMs,
+  stepExchangeLeadInMs,
   type AssignReaction,
   type BannerSpec,
   type ChannelId,
@@ -883,10 +884,20 @@ export default function AdModeShot() {
      * not two seconds after a keypress they cannot.
      */
     const startBeatChains = () => {
-      // GAP_MS lead-in: the beat's picture has just landed, and its first
-      // scripted line is the next visible motion after it.
+      // The lead-in from the beat's picture to its first scripted line: GAP_MS
+      // normally, and ZERO on a beat that CUTS INTO the very thread that line
+      // lands in — there the indicator is what motivates the cut, so it rides
+      // with it in one composed motion. The rule lives with the script (see
+      // stepExchangeLeadInMs); the engine just asks.
+      //
+      // Zero here means the indicator's setScene lands in the SAME synchronous
+      // block as the patch's — runExchange runs to its first await inline — so
+      // React batches them into one frame rather than two.
       const exchange = step.exchange;
-      if (exchange) runChain(session, () => runExchange(session, exchange, GAP_MS));
+      if (exchange) {
+        const leadIn = stepExchangeLeadInMs(stepIndex);
+        runChain(session, () => runExchange(session, exchange, leadIn));
+      }
 
       // The scripted assignment: the beat makes the pick itself so the ad plays
       // without anyone touching the mouse, and Derek's reaction follows it. The

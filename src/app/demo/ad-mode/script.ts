@@ -237,6 +237,16 @@ export type StatePatch = (s: SceneState) => SceneState;
  *     · a message landing and its banner appearing (every banner in the ad);
  *     · a message landing and its own `apply` (an unread ring, a badge count);
  *     · an NPC's indicator clearing and the line it was announcing landing;
+ *     · A SCRIPTED CUT INTO A THREAD and the indicator that motivates it. When
+ *       a beat's patch switches the view to a channel and the first thing that
+ *       beat does is an NPC line landing THERE, the cut and the "X is typing…"
+ *       are one composed motion, not two: the reason the camera moved to that
+ *       thread IS the incoming activity. Paying the flat gap first left the
+ *       shot staring at a near-empty thread for two seconds, so the cut read as
+ *       happening before the conversation existed. Same rationale as a message
+ *       and its banner. The indicator -> message gap stays GAP_MS as normal.
+ *       See `stepExchangeLeadInMs`, which decides this from the script's own
+ *       data rather than per-beat by hand;
  *     · an `auto`'s own patch and the start of the exchange it owns — the
  *       STACKING burst's first ping climbs the Pulse numbers in the same frame
  *       Priya's indicator opens, which costs nothing because that indicator is
@@ -405,6 +415,45 @@ export const SCRIPTED_CHIP_PRESS: Record<string, FrontApp> = {
  * frame. Every new beat is paced correctly by construction. */
 export function entryHoldMs(step: Step): number {
   return INSTANT_ENTRY_STEP_IDS.has(step.id) ? 0 : GAP_MS;
+}
+
+/**
+ * THE STEP EXCHANGE'S LEAD-IN: the gap from a beat's picture landing to the
+ * first line of its exchange starting. GAP_MS like everything else — EXCEPT for
+ * the cut-into-a-thread pair documented in the GAP_MS block above, where it is
+ * ZERO and the indicator rides with the cut.
+ *
+ * THE CONDITION, all three parts required, so this stays a rule rather than a
+ * list of hand-picked beats:
+ *   1. the beat's patch CHANGES the channel on screen (an actual cut — a beat
+ *      that stays in the thread it was already in has nothing to motivate);
+ *   2. the first line of its exchange is an NPC line (incoming activity is what
+ *      motivates a cut; the player deciding to type is not — a person reads the
+ *      thread first, so those beats keep the full gap);
+ *   3. that line lands in the channel just cut to (a line landing elsewhere is
+ *      announced by its banner, and the cut is not about it).
+ *
+ * DERIVED FROM THE SCRIPT, not the live scene: it folds the beats before this
+ * one and asks what the patch does, so the answer is the same on every take,
+ * on a retake, and in the timing trace — and an actor browsing channels between
+ * beats cannot change the ad's pacing. Memoised, since it is a pure function of
+ * SCRIPT.
+ */
+let cutInLeadIns: number[] | null = null;
+
+export function stepExchangeLeadInMs(index: number): number {
+  if (!cutInLeadIns) {
+    const folded = completedTimeline(SCRIPT.length - 1);
+    cutInLeadIns = SCRIPT.map((step, i) => {
+      const first = step.exchange?.[0];
+      if (!first || first.kind !== "npc") return GAP_MS;
+      const before = i === 0 ? INITIAL_SCENE : folded[i - 1];
+      const after = step.apply(before);
+      const cut = after.activeChannel !== before.activeChannel;
+      return cut && after.activeChannel === first.channel ? 0 : GAP_MS;
+    });
+  }
+  return cutInLeadIns[index] ?? GAP_MS;
 }
 
 /** Delay before the next character of a scripted player line. */
@@ -1161,7 +1210,8 @@ export const SCRIPT: Step[] = [
     id: "whos-taking-this",
     label: "WHO IS TAKING THIS",
     // Chattr comes back to the front; Pulse stays open behind it, still
-    // showing the spike. A full three-line exchange in Derek's DM: he asks, the
+    // showing the spike. The cut to Derek's DM carries his typing indicator
+    // with it — same cut-into-a-thread pair as RAJ ROOT CAUSE. A full three-line exchange in Derek's DM: he asks, the
     // player answers on camera through the real composer, and he signs off. The
     // NEXT beat is the player making good on that answer — badly.
     apply: (s) =>
@@ -1451,6 +1501,13 @@ export const SCRIPT: Step[] = [
     // The standard flat GAP_MS indicator, and — under the every-NPC-line policy
     // — a banner too, even though this is the thread on screen and the audience
     // is watching Raj compose it.
+    //
+    // RAJ IS ALREADY TYPING WHEN THE CUT LANDS. This beat cuts INTO his DM, and
+    // his thread is nearly empty, so paying the flat lead-in first left two
+    // seconds of blank thread on camera and the cut read as arriving before the
+    // conversation existed. It is a cut-into-a-thread pair (see
+    // stepExchangeLeadInMs): the channel switch and "Raj is typing…" are one
+    // motion, and his line still lands one GAP_MS after that.
     apply: (s) => read(show({ ...s, day: 1, minutes: 835 }, ["pulse", "chattr"], "chattr"), "dm-raj"),
     exchange: [
       {
@@ -1536,7 +1593,9 @@ export const SCRIPT: Step[] = [
     id: "derek-evals",
     label: "DEREK EVALS",
     // Day 2's ask, and the last thing the player is handed before the ad ends.
-    // Chattr alone, Derek's DM open, and the line arrives with a REAL document
+    // Chattr alone, Derek's DM open — and, being another cut INTO a thread, his
+    // typing indicator lands with the cut rather than two seconds after it.
+    // The line then arrives with a REAL document
     // chip under it — MessageListView's own attachment markup, the same button
     // the live thread renders for a doc attachment. Clicking it raises the
     // scripted Docs window; the next beat stages that window regardless, so the
