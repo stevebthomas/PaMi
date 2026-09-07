@@ -88,9 +88,17 @@ import {
 } from "./windowLayout";
 import { EvalScreen, type Trace } from "../shared/EvalScreen";
 import { Banners, type BannerItem } from "./Banners";
-import { ScriptedChattr, ScriptedOffice, ScriptedPulse, ScriptedTaskflow } from "./ScriptedApps";
+import {
+  ScriptedChattr,
+  ScriptedDocs,
+  ScriptedOffice,
+  ScriptedPulse,
+  ScriptedTaskflow,
+} from "./ScriptedApps";
 import { Day2Transition, ScorecardReveal } from "./ScorecardReveal";
 import {
+  EVAL_BATCH_TOTAL,
+  EVAL_DOC_TITLE,
   INITIAL_SCENE,
   PLAYER_TYPING,
   SCRIPT,
@@ -111,9 +119,10 @@ import {
   type SceneState,
 } from "./script";
 
-/** The single eval trace the ad lands on. The counter still reads "trace 3 of
- * 20" because that string lives in the shared component. Hardcoded for
- * filming, no real eval behind it. */
+/** The single eval trace the ad lands on. The counter reads "trace 3 of 30",
+ * the same EVAL_BATCH_TOTAL the Day-2 document states, so the two surfaces
+ * agree on how big the batch is. Hardcoded for filming, no real eval behind
+ * it. */
 const AD_TRACES: Trace[] = [
   {
     no: 3,
@@ -129,14 +138,17 @@ const BANNER_EXIT_MS = 300;
 /** The dock tiles that actually open/raise a window on click. Every other
  * real app is still on the dock (TaskbarView renders the full shipping list in
  * the shipping order) but has no scripted body, so its tile no-ops. */
-const SCRIPTED_APPS = new Set<string>(["chattr", "pulse", "taskflow", "office"]);
+const SCRIPTED_APPS = new Set<string>(["chattr", "pulse", "taskflow", "office", "docs"]);
 
-/** Real Desktop titles each window bar with the app's name in caps. */
+/** Real Desktop titles each window bar with the app's name in caps — except a
+ * DOCUMENT window, which the real Desktop titles with the doc's own title (see
+ * its `isDocWindowId` branch), so the eval batch carries its title verbatim. */
 const WINDOW_TITLE: Record<FrontApp, string> = {
   chattr: "CHATTR",
   pulse: "PULSE",
   taskflow: "TASKFLOW",
   office: "OFFICE",
+  docs: EVAL_DOC_TITLE,
 };
 
 /* -------------------------------------------------------------- scheduler */
@@ -788,6 +800,14 @@ export default function AdModeShot() {
     }));
   }
 
+  /** Clicking a message's document chip, the actor path into the eval doc. The
+   * real chip opens the doc in its own window; here that is the same
+   * open-or-raise the dock does, so a click mid-beat lands exactly where the
+   * next beat would have staged it anyway. */
+  function handleOpenDoc() {
+    handleSelectApp("docs");
+  }
+
   function handleComposerChange(next: string) {
     setScene((prev) => ({ ...prev, composer: next }));
   }
@@ -823,6 +843,8 @@ export default function AdModeShot() {
         return <ScriptedOffice assignedTo={scene.assignedTo} onAssign={handleAssign} />;
       case "taskflow":
         return <ScriptedTaskflow />;
+      case "docs":
+        return <ScriptedDocs />;
       default:
         return (
           <ScriptedChattr
@@ -835,6 +857,7 @@ export default function AdModeShot() {
             onComposerSend={handleScriptedSend}
             composerRef={composerRef}
             onSelectChannel={handleSelectChannel}
+            onOpenDoc={handleOpenDoc}
           />
         );
     }
@@ -908,7 +931,7 @@ export default function AdModeShot() {
       {scene.overlay === "day2" && <Day2Transition key={`day2-${runKey}`} />}
       {scene.overlay === "eval" && (
         <div key={`eval-${runKey}`} className="fixed inset-0 z-40 overflow-y-auto bg-canvas">
-          <EvalScreen traces={AD_TRACES} />
+          <EvalScreen traces={AD_TRACES} total={EVAL_BATCH_TOTAL} />
         </div>
       )}
 

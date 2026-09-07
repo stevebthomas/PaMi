@@ -51,7 +51,7 @@ import type { AgentId } from "@/lib/sim/types";
 
 /** The four apps with scripted content. Every other dock tile is present (the
  * real dock is rendered in full) but inert during a take. */
-export type FrontApp = "chattr" | "pulse" | "taskflow" | "office";
+export type FrontApp = "chattr" | "pulse" | "taskflow" | "office" | "docs";
 export type Overlay = "none" | "scorecard" | "day2" | "eval";
 
 export type ChannelId =
@@ -67,6 +67,11 @@ export type ChannelId =
   // away-reply the WRONG PICK beat triggers (see that step).
   | "dm-theo";
 
+/** A document chip under a message, rendered through MessageListView's own
+ * attachment markup. `key` is the chip's React key; clicking it raises the
+ * scripted Docs window, the same shape the real chip's onOpen has. */
+export type MessageAttachment = { key: string; label: string };
+
 export type ChattrMessage = {
   id: string;
   /** Resolves the real PixelAvatar sprite for this line. */
@@ -74,6 +79,8 @@ export type ChattrMessage = {
   sender: string;
   time: string;
   text: string;
+  /** Document chip(s) rendered under the body, exactly like the live thread. */
+  attachment?: MessageAttachment;
   /** Thread history: this line was already on screen before the take started,
    * so it renders instantly and never runs through the typing engine. Only
    * INITIAL_SCENE seeds carry it. */
@@ -229,6 +236,23 @@ export const SCORECARD_HOLD_MS = 2200;
  * scripted value; it just stops the digits from teleporting.
  */
 export const PULSE_COUNT_UP_MS = 500;
+/**
+ * The STACKING burst's banner cadence. Notifications piling on top of each
+ * other in the same half-second read as one event, not three people; these two
+ * knobs space them so each banner gets its own moment and the stack visibly
+ * PUSHES down (see Banners.tsx) between arrivals.
+ *
+ * Each ping's banner lands at `delayMs + indicatorMs`, so all three lines pin
+ * the SAME `BURST_INDICATOR_MS` and their autos sit one `BURST_GAP_MS` apart:
+ * the gap between banners is then exactly BURST_GAP_MS, with no dependence on
+ * the length-scaled formula and therefore no take-to-take variation.
+ *
+ * With the values below the three banners land at 2.5s, 4.4s and 6.3s after
+ * beat entry.
+ */
+export const BURST_FIRST_MS = 1700;
+export const BURST_GAP_MS = 1900;
+export const BURST_INDICATOR_MS = 800;
 
 /** Delay before the next character of a scripted player line. */
 export function playerCharDelayMs(char: string, cfg: PlayerTypingConfig = PLAYER_TYPING): number {
@@ -271,6 +295,8 @@ export type NpcLine = {
   sender: string;
   time: string;
   text: string;
+  /** Document chip rendered under this line when it lands. */
+  attachment?: MessageAttachment;
   /** Hard override of the computed indicator hold, in ms. Skips the formula. */
   indicatorMs?: number;
   /** Extra patch folded into the SAME update the message lands in (unread
@@ -583,6 +609,7 @@ function say(
   sender: string,
   time: string,
   text: string,
+  attachment?: MessageAttachment,
 ): SceneState {
   const existing = s.messages[channel];
   if (!existing) {
@@ -596,7 +623,7 @@ function say(
     ...s,
     messages: {
       ...s.messages,
-      [channel]: [...existing, { id, agentId, sender, time, text }],
+      [channel]: [...existing, { id, agentId, sender, time, text, attachment }],
     },
   };
 }
@@ -607,7 +634,7 @@ export function landLine(s: SceneState, line: ExchangeEvent): SceneState {
   const landed =
     line.kind === "player"
       ? say(s, line.channel, PLAYER_AGENT_ID, PLAYER_SENDER, line.time, line.text)
-      : say(s, line.channel, line.agentId, line.sender, line.time, line.text);
+      : say(s, line.channel, line.agentId, line.sender, line.time, line.text, line.attachment);
   return line.apply ? line.apply(landed) : landed;
 }
 
@@ -658,6 +685,58 @@ function setPulse(
   };
 }
 
+/* --------------------------------------------------------- the eval batch */
+
+/**
+ * The Day-2 document, in one place: the chip Derek attaches, the title on the
+ * Docs window and the body ScriptedDocs renders all read from here, so the ad
+ * cannot show a chip labelled one thing and a window titled another.
+ *
+ * EVAL_BATCH_TOTAL is the number the whole back half of the ad is built to
+ * make legible: it is the count line on the doc, the length of the numbered
+ * list, and the denominator in the eval overlay's "Reviewing trace 3 of 30".
+ * Change it here and all three follow.
+ */
+export const EVAL_DOC_ID = "ai-eval-batch-listing-assistant";
+export const EVAL_DOC_TITLE = "AI Eval Batch — Listing Assistant";
+export const EVAL_BATCH_TOTAL = 30;
+
+/** The batch's trace list, one row per eval. Thirty short, scannable rows: the
+ * point on camera is that the list VISIBLY runs 1..30, so the rows are terse
+ * and the numbering does the talking. Hardcoded for filming. */
+export const EVAL_BATCH_ROWS: string[] = [
+  "retro chrome toaster · seller pilot",
+  "mid-century walnut side table",
+  "road bike, 54cm frame",
+  "film camera, untested",
+  "wool overcoat, size M",
+  "cast iron skillet, seasoned",
+  "record player + 2 speakers",
+  "kids' bunk bed, flat-pack",
+  "espresso machine, descaled",
+  "leather satchel, worn corners",
+  "desk lamp, brass finish",
+  "mountain bike, needs tune-up",
+  "sewing machine, 1970s",
+  "dining chairs, set of 4",
+  "acoustic guitar, small ding",
+  "patio umbrella, faded",
+  "bookshelf speakers, pair",
+  "vintage typewriter, sticky keys",
+  "stand mixer, all attachments",
+  "snowboard + bindings",
+  "wingback armchair, reupholstered",
+  "telescope, tripod included",
+  "rice cooker, barely used",
+  "denim jacket, distressed",
+  "coffee table, glass top",
+  "electric kettle, no box",
+  "camping tent, 2-person",
+  "turntable cartridge, spare",
+  "office chair, adjustable",
+  "ceramic planter, hairline crack",
+];
+
 /* ------------------------------------------------------------ beat 0 state */
 
 export const INITIAL_SCENE: SceneState = {
@@ -703,20 +782,12 @@ export const INITIAL_SCENE: SceneState = {
         history: true,
       },
     ],
-    // Kept as seeded history even though #design-review is not on camera at
-    // beat 0: the Day-2 "maya-follow-up" beat appends to this same thread, and
-    // needs the 8:58 AM line already in it for that follow-up to read as a
-    // follow-up.
-    "design-review": [
-      {
-        id: "design-review-0",
-        agentId: "maya",
-        sender: "Maya",
-        time: "8:58 AM",
-        text: "pushed the new empty-state illustration, lmk what you think 👀",
-        history: true,
-      },
-    ],
+    // Empty. #design-review carries no scripted content at all: the Day-2 half
+    // of the ad is the eval batch now, not a design decision, so there is no
+    // beat that reads or appends to this thread. The channel stays in the
+    // sidebar because the real app has it; the thread stays seeded (as an empty
+    // array) because `say` refuses to write to an unseeded channel.
+    "design-review": [],
     random: [
       {
         id: "random-0",
@@ -824,17 +895,21 @@ export const SCRIPT: Step[] = [
     //
     // Every one of the three is a REAL thread line, so each banner is tied to
     // the message it previews and each unread ring points at something that
-    // exists. Priya's and Raj's indicator holds are PINNED (`indicatorMs`)
-    // rather than length-scaled, purely to make the on-camera order of the
-    // three banners deterministic: pinned, they land at ~2.5s and ~3.4s, both
-    // strictly before the earliest Derek's un-pinned formula can produce
-    // (~4.4s), so a take can never show the pile-up out of order. The holds
-    // are invisible anyway — Pulse is front, and #incidents is the open
-    // channel — but they are still real, so clicking Chattr mid-hold shows the
-    // indicator exactly like the live app.
+    // exists.
+    //
+    // ONE BANNER AT A TIME. All three holds are PINNED to the same
+    // BURST_INDICATOR_MS and the autos sit BURST_GAP_MS apart, so the banners
+    // land BURST_GAP_MS apart too — far enough that each one arrives, is read,
+    // and visibly PUSHES the previous one down the stack before the next
+    // appears (see Banners.tsx), instead of three notifications materialising
+    // as one block. Pinning also makes the Priya -> Raj -> Derek order exact:
+    // nothing here depends on the length-scaled formula's random jitter, so no
+    // take can show the pile-up out of order. The holds are invisible anyway —
+    // Pulse is front and #incidents is the open channel — but they are still
+    // real, so clicking Chattr mid-hold shows the indicator like the live app.
     autos: [
       {
-        delayMs: 1700,
+        delayMs: BURST_FIRST_MS,
         apply: (s) => markUnread(setPulse({ ...s, chattrBadge: 7 }, 600, 17, 361), "incidents"),
         exchange: [
           {
@@ -844,7 +919,7 @@ export const SCRIPT: Step[] = [
             sender: "Priya",
             time: "9:42 AM",
             text: "support queue is filling up with checkout complaints",
-            indicatorMs: 800,
+            indicatorMs: BURST_INDICATOR_MS,
             apply: (s) => markUnread(s, "dm-priya"),
             banner: {
               agentId: "priya",
@@ -855,7 +930,7 @@ export const SCRIPT: Step[] = [
         ],
       },
       {
-        delayMs: 2600,
+        delayMs: BURST_FIRST_MS + BURST_GAP_MS,
         // The engineering side hearing about it independently: Raj is already
         // in the logs before anyone has asked him to be.
         exchange: [
@@ -866,7 +941,7 @@ export const SCRIPT: Step[] = [
             sender: "Raj",
             time: "9:43 AM",
             text: "Saw the Pulse spike. Pulling logs now. Give me a few.",
-            indicatorMs: 800,
+            indicatorMs: BURST_INDICATOR_MS,
             apply: (s) => markUnread(s, "dm-raj"),
             banner: {
               agentId: "raj",
@@ -877,7 +952,7 @@ export const SCRIPT: Step[] = [
         ],
       },
       {
-        delayMs: 3400,
+        delayMs: BURST_FIRST_MS + BURST_GAP_MS * 2,
         // Derek's DM goes through the same engine as every other NPC line even
         // though Pulse is front and the indicator is therefore invisible: if
         // the actor clicks Chattr mid-hold, the indicator is there, exactly
@@ -890,6 +965,7 @@ export const SCRIPT: Step[] = [
             sender: "Derek",
             time: "9:41 AM",
             text: "Just saw the alert. What's the plan?",
+            indicatorMs: BURST_INDICATOR_MS,
             apply: (s) => markUnread({ ...s, chattrBadge: 12 }, "dm-derek"),
             banner: {
               agentId: "derek",
@@ -947,7 +1023,7 @@ export const SCRIPT: Step[] = [
         agentId: "derek",
         sender: "Derek",
         time: "10:06 AM",
-        text: "Sounds good, just keep me posted.",
+        text: "Do it. I want an update before this hits #general.",
       },
     ],
   },
@@ -1005,6 +1081,45 @@ export const SCRIPT: Step[] = [
 
   /* 4 */
   {
+    id: "course-correct",
+    label: "COURSE CORRECT",
+    // The fix, IMMEDIATELY. Theo's away-reply has just bounced the assignment
+    // back, so the retry happens in the same breath rather than four hours
+    // later: Office is still the front window, `assignedTo: null` clears Theo's
+    // flipped card so the roster is live again, and the right pick follows on
+    // the same desk the wrong one was made on.
+    //
+    // Chattr is behind Office on Derek's DM (still the open channel from the
+    // WHO IS TAKING THIS exchange), so Derek's confirmation lands in a thread
+    // the camera can already see — and it answers the promise the player made
+    // him two minutes earlier.
+    //
+    // Symmetrical with WRONG PICK: the script assigns Raj itself 1.5s in and
+    // Derek's confirmation follows 1.5s after that, unless the actor clicks an
+    // Assign button first — in which case that click claims the beat's one
+    // assignment, the auto is cancelled, and clicking Raj plays this same
+    // reaction.
+    apply: (s) => show({ ...s, day: 1, minutes: 610, assignedTo: null }, ["chattr", "office"]),
+    autoAssign: { person: "Raj", delayMs: 1500 },
+    onAssign: {
+      person: "Raj",
+      delayMs: 1500,
+      exchange: [
+        {
+          kind: "npc",
+          channel: "dm-derek",
+          agentId: "derek",
+          sender: "Derek",
+          time: "10:10 AM",
+          text: "Raj is on it. Good.",
+          banner: { agentId: "derek", sender: "Derek", preview: "Raj is on it. Good." },
+        },
+      ],
+    },
+  },
+
+  /* 5 */
+  {
     id: "misread-1",
     label: "MISREAD 1 of 5",
     // 3.1% next to 407 attempts: the two confusable numbers, side by side.
@@ -1013,7 +1128,7 @@ export const SCRIPT: Step[] = [
       setPulse(show({ ...s, day: 1, minutes: 680 }, ["chattr", "pulse"]), 680, 3.1, 407, false),
   },
 
-  /* 5 */
+  /* 6 */
   {
     id: "misread-2",
     label: "MISREAD 2 of 5",
@@ -1033,7 +1148,7 @@ export const SCRIPT: Step[] = [
     ],
   },
 
-  /* 6 */
+  /* 7 */
   {
     id: "misread-3",
     label: "MISREAD 3 of 5",
@@ -1061,7 +1176,7 @@ export const SCRIPT: Step[] = [
     ],
   },
 
-  /* 7 */
+  /* 8 */
   {
     id: "misread-4",
     label: "MISREAD 4 of 5",
@@ -1082,7 +1197,7 @@ export const SCRIPT: Step[] = [
     ],
   },
 
-  /* 8 */
+  /* 9 */
   {
     id: "misread-5",
     label: "MISREAD 5 of 5",
@@ -1106,41 +1221,6 @@ export const SCRIPT: Step[] = [
         text: "That's not the right metric. 400 is the total attempts, not failures. Actual failure rate is closer to 3%. I'll update Derek with that.",
       },
     ],
-  },
-
-  /* 9 */
-  {
-    id: "course-correct",
-    label: "COURSE CORRECT",
-    // Office in front, Chattr behind it. Clears the earlier assignment so the
-    // roster is live again for the right pick.
-    //
-    // Chattr is still showing #incidents from the misread beats, so Derek's
-    // confirmation lands in a thread that is NOT on screen and its banner is
-    // what carries it — the same rule every other off-screen line follows.
-    //
-    // Symmetrical with WRONG PICK: the script assigns Raj itself 1.5s in and
-    // Derek's confirmation follows 1.5s after that, unless the actor clicks an
-    // Assign button first — in which case that click claims the beat's one
-    // assignment, the auto is cancelled, and clicking Raj plays this same
-    // reaction.
-    apply: (s) => show({ ...s, day: 1, minutes: 825, assignedTo: null }, ["chattr", "office"]),
-    autoAssign: { person: "Raj", delayMs: 1500 },
-    onAssign: {
-      person: "Raj",
-      delayMs: 1500,
-      exchange: [
-        {
-          kind: "npc",
-          channel: "dm-derek",
-          agentId: "derek",
-          sender: "Derek",
-          time: "1:47 PM",
-          text: "Raj is on it. Good.",
-          banner: { agentId: "derek", sender: "Derek", preview: "Raj is on it. Good." },
-        },
-      ],
-    },
   },
 
   /* 10 */
@@ -1230,31 +1310,20 @@ export const SCRIPT: Step[] = [
 
   /* 14 */
   {
-    id: "maya-follow-up",
-    label: "MAYA FOLLOW UP",
-    apply: (s) => read(show({ ...s, overlay: "none" }, ["chattr"]), "design-review"),
-    exchange: [
-      {
-        kind: "npc",
-        channel: "design-review",
-        agentId: "maya",
-        sender: "Maya",
-        time: "9:01 AM",
-        text: "hey, did you get a chance to look at the empty-state illustration? kinda need a decision before I move forward 👀",
-        banner: {
-          agentId: "maya",
-          sender: "Maya",
-          preview: "did you get a chance to look at the empty-state illustration?",
-        },
-      },
-    ],
-  },
-
-  /* 15 */
-  {
-    id: "derek-assignment",
-    label: "DEREK ASSIGNMENT",
-    apply: (s) => read(show(s, ["chattr"]), "dm-derek"),
+    id: "derek-evals",
+    label: "DEREK EVALS",
+    // Day 2's ask, and the last thing the player is handed before the ad ends.
+    // Chattr alone, Derek's DM open, and the line arrives with a REAL document
+    // chip under it — MessageListView's own attachment markup, the same button
+    // the live thread renders for a doc attachment. Clicking it raises the
+    // scripted Docs window; the next beat stages that window regardless, so the
+    // take never depends on the actor hitting the chip.
+    //
+    // `overlay: "none"` is what DISMISSES the Day 2 transition card the
+    // previous beat put up — this is the first beat of Day 2 proper, so it owns
+    // clearing it (the beat that used to do that was the deleted Maya
+    // follow-up).
+    apply: (s) => read(show({ ...s, minutes: 543, overlay: "none" }, ["chattr"]), "dm-derek"),
     exchange: [
       {
         kind: "npc",
@@ -1262,14 +1331,31 @@ export const SCRIPT: Step[] = [
         agentId: "derek",
         sender: "Derek",
         time: "9:03 AM",
-        text: "Assigned you the AI Listing Assistant eval batch. Need your read before we scope the rollout.",
+        text: "Hey, here are the evals",
+        attachment: { key: EVAL_DOC_ID, label: EVAL_DOC_TITLE },
         banner: {
           agentId: "derek",
           sender: "Derek",
-          preview: "Assigned you the AI Listing Assistant eval batch",
+          preview: "Hey, here are the evals",
         },
       },
     ],
+  },
+
+  /* 15 */
+  {
+    id: "evals-doc",
+    label: "EVALS DOC",
+    // The document itself, in its own window, in front of the thread that sent
+    // it — the real product's shape for an opened attachment (Desktop gives a
+    // doc its OWN DesktopWindow, titled with the doc's title and carrying the
+    // Docs FileText icon, rather than pushing it into the Docs app shell).
+    //
+    // The whole point of the frame is the NUMBER: the count line and the
+    // numbered list have to make "30" unmistakable in one glance, because the
+    // eval overlay two beats later says "trace 3 of 30" and the two have to
+    // agree.
+    apply: (s) => show({ ...s, minutes: 545 }, ["chattr", "docs"], "docs"),
   },
 
   /* 16 */
@@ -1278,6 +1364,7 @@ export const SCRIPT: Step[] = [
     label: "EVAL (final)",
     apply: (s) => ({ ...s, overlay: "eval" }),
   },
+
 ];
 
 /* ------------------------------------------------- folding a finished beat */

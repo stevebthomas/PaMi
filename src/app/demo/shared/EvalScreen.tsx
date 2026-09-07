@@ -4,9 +4,11 @@
  *
  * Extracted verbatim from src/app/demo/day2/Day2DemoShot.tsx so /demo/day2 and
  * /demo/ad-mode can film the SAME eval surface without duplicating it. The only
- * change is parameterization: the trace list and the starting index are props
- * instead of a module-level constant. Behavior is otherwise byte-identical to
- * the original (loads fully unanswered, prev/next reset every field, same copy).
+ * change is parameterization: the trace list, the starting index and the trace
+ * COUNT are props instead of module-level constants. Every one of them defaults
+ * to the original value, so /demo/day2 (which passes only `traces`) renders
+ * byte-identically to before: loads fully unanswered, prev/next reset every
+ * field, same copy, same "of 20".
  *
  * Everything below is filming scaffolding: no store, no scoring, no submission.
  */
@@ -44,9 +46,15 @@ const EMPTY_RULE_VERDICTS: Record<RuleKey, RuleVerdict | null> = {
 export function EvalScreen({
   traces,
   initialIndex = 0,
+  total = 20,
 }: {
   traces: Trace[];
   initialIndex?: number;
+  /** Denominator in the two trace counters ("Reviewing trace 3 of {total}" and
+   * the footer's "trace 3/{total}"). Defaults to the original hardcoded 20, so
+   * /demo/day2 renders exactly as it did before this became a prop; the ad-mode
+   * route passes its own batch size. */
+  total?: number;
 }) {
   const [visible, setVisible] = useState(false);
   const [traceIndex, setTraceIndex] = useState(initialIndex);
@@ -94,7 +102,7 @@ export function EvalScreen({
         <div className="bg-canvas p-6">
           <div className="flex items-center justify-between">
             <span className="font-pixel text-label tabular-nums text-text-secondary">
-              Reviewing trace <span className="text-text-primary">{trace.no}</span> of 20
+              Reviewing trace <span className="text-text-primary">{trace.no}</span> of {total}
             </span>
             <div className="flex items-center gap-1.5">
               <button
@@ -239,7 +247,7 @@ export function EvalScreen({
 
           <div className="mt-6 flex items-center justify-between">
             <p className="font-pixel text-caption text-text-secondary tabular-nums">
-              EVAL-0042 · model: listing-assistant-v0.3 · trace {trace.no}/20
+              EVAL-0042 · model: listing-assistant-v0.3 · trace {trace.no}/{total}
             </p>
             <button
               type="button"

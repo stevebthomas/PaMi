@@ -51,6 +51,9 @@ import {
   DAY_START_MINUTE,
   DEMO_BASELINE_SUCCESS_PCT,
   DIRECT_MESSAGES,
+  EVAL_BATCH_ROWS,
+  EVAL_BATCH_TOTAL,
+  EVAL_DOC_TITLE,
   PULSE_COUNT_UP_MS,
   composerPlaceholder,
   derivePulse,
@@ -92,6 +95,7 @@ export function ScriptedChattr({
   onComposerSend,
   composerRef,
   onSelectChannel,
+  onOpenDoc,
 }: {
   activeChannel: ChannelId;
   unread: ChannelId[];
@@ -102,6 +106,9 @@ export function ScriptedChattr({
   onComposerSend: () => void;
   composerRef: Ref<HTMLTextAreaElement>;
   onSelectChannel: (id: ChannelId) => void;
+  /** Clicking a message's document chip. Raises the scripted Docs window, the
+   * same thing the real chip's onOpen does (minus the store write). */
+  onOpenDoc: () => void;
 }) {
   const unreadIds = useMemo(() => new Set<string>(unread), [unread]);
   const items: MessageListItem[] = messages.map((m) => ({
@@ -110,6 +117,11 @@ export function ScriptedChattr({
     name: m.sender,
     timeLabel: m.time,
     body: m.text,
+    // The REAL attachment chip: same markup, same FileText icon, same hover
+    // treatment the live thread gives a document.
+    attachments: m.attachment
+      ? [{ key: m.attachment.key, label: m.attachment.label, onOpen: onOpenDoc }]
+      : undefined,
   }));
 
   return (
@@ -592,6 +604,71 @@ export function ScriptedOffice({
   );
 }
 
+/* -------------------------------------------------------------------- Docs */
+
+/**
+ * The eval batch document, in its own window.
+ *
+ * APPROXIMATION of DocWindow, for the same reason Office and Taskflow are: the
+ * real component renders a SimDoc through the sim's own tiny markdown subset
+ * (`# `, `## `, `- ` bullets, `---`, `{{demo}}`), and that subset has no
+ * ordered list — which is the one thing this document is entirely about. So the
+ * SHELL and the prose classes are DocWindow's, token for token (the scrolling
+ * `bg-surface px-5 py-4 text-body leading-relaxed` body, the `mx-auto
+ * max-w-[65ch]` measure, its `text-subheading font-semibold` h1, its
+ * `border-border-hairline` rule), and only the numbered list is the shoot's.
+ *
+ * WHAT THE FRAME HAS TO SELL IS THE NUMBER. The count line states it outright
+ * at hero size, the list is numbered so the rows literally read 1, 2, 3…, and
+ * the footer restates it — three independent ways for "30" to land in a shot
+ * that may only be on screen for two seconds. It is also the same number the
+ * eval overlay's "Reviewing trace 3 of 30" uses: both read EVAL_BATCH_TOTAL.
+ */
+export function ScriptedDocs() {
+  return (
+    <div className="h-full min-h-0 w-full overflow-y-auto bg-surface px-5 py-4 text-body leading-relaxed text-text-primary">
+      <div className="mx-auto max-w-[65ch]">
+        <h1 className="mb-1 text-subheading font-semibold text-text-primary">{EVAL_DOC_TITLE}</h1>
+        <p className="mb-3 font-mono text-caption text-text-secondary">
+          seller pilot · model listing-assistant-v0.3 · EVAL-0042
+        </p>
+
+        {/* The count, at hero scale. This is the shot. */}
+        <div className="mb-4 flex items-baseline gap-2 rounded-[var(--radius-card)] border border-border-hairline bg-canvas px-4 py-3">
+          <span className="text-4xl font-semibold leading-none tabular-nums text-text-primary">
+            {EVAL_BATCH_TOTAL}
+          </span>
+          <span className="text-body text-text-secondary">
+            evals · assigned to you · due before rollout scoping
+          </span>
+        </div>
+
+        <hr className="my-4 border-t border-border-hairline" />
+
+        <h2 className="mb-2 mt-4 text-body font-semibold text-text-primary">
+          Traces in this batch
+        </h2>
+        <ol className="mb-3 list-decimal space-y-1 pl-6 tabular-nums marker:font-mono marker:text-text-secondary">
+          {EVAL_BATCH_ROWS.map((row) => (
+            <li key={row} className="text-label leading-snug text-text-primary">
+              {row}
+            </li>
+          ))}
+        </ol>
+
+        <hr className="my-4 border-t border-border-hairline" />
+
+        <p className="mb-3 text-label text-text-secondary">
+          <span className="font-semibold tabular-nums text-text-primary">
+            0 of {EVAL_BATCH_TOTAL}
+          </span>{" "}
+          reviewed. Score every trace against the four listing rules, then send Derek your read.
+        </p>
+      </div>
+    </div>
+  );
+}
+
 /* ---------------------------------------------------------------- Taskflow */
 
 type ScriptedTicket = {
@@ -619,13 +696,16 @@ const BOARD: { label: string; tickets: ScriptedTicket[] }[] = [
         time: "8:40 AM",
         assignee: null,
       },
+      // The tail of the incident, not a design decision: Raj's retry buffer
+      // (see his 1:55 PM DM) still has to be watched over a full day of
+      // traffic. Unassigned, because nobody has picked it up yet.
       {
         displayId: "TF-5",
-        title: "Empty-state illustration review",
-        description: "Sign off on Maya's new empty state.",
-        reporter: "Maya",
-        time: "8:58 AM",
-        assignee: "Maya",
+        title: "Apple Pay webhook retry buffer follow-up",
+        description: "Confirm the retry buffer holds over a full day of traffic.",
+        reporter: "Raj",
+        time: "1:55 PM",
+        assignee: null,
       },
     ],
   },
