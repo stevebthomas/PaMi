@@ -4,28 +4,46 @@
  *
  * The ad-mode engine and desktop layout.
  *
+ * ADVANCEMENT IS FULLY MANUAL. Nothing on this route moves the beat index on a
+ * timer: a beat's own animations (typing, indicators, the auto-assign, banner
+ * auto-dismiss) play on their own clocks, and when they are done the take HOLDS
+ * on that beat indefinitely until the operator presses a key. The only two
+ * callers of `advance` are the ArrowRight branches below.
+ *
  * Hotkeys (global, route level):
- *   ArrowLeft  idle:   advance one scripted beat (clamps at the last one)
- *              typing: FAST-FORWARD the running timeline — the player's line is
- *                      typed out and sent instantly, every indicator is skipped,
- *                      every message and banner of the beat lands at once. The
- *                      beat does NOT advance; the next press does.
+ *   ArrowRight NEXT BEAT, always, in ONE press. If the beat is mid-playback the
+ *              press first fast-forwards it — the player's line is typed out and
+ *              sent instantly, every indicator is skipped, every message and
+ *              banner of the beat lands at once — and then advances off the same
+ *              press. Animations never block or delay the advance. Clamps at the
+ *              last beat.
+ *   ArrowLeft  BACK ONE BEAT, for retakes. Cancels whatever is playing, rebuilds
+ *              the scene by FOLDING the completed state of beats 0..n-2 (see
+ *              script.ts's completeStep/completedTimeline: every delay treated
+ *              as zero, no banners, no timers) plus a from-scratch replay of the
+ *              real window cascade, then enters beat n-1 normally so its
+ *              animations play again from the top. Mid-playback it is the same
+ *              action — cancel and re-enter the previous beat — because the fold
+ *              is authoritative, so a half-played beat has nothing worth
+ *              salvaging. No-op at beat 0.
  *   r / R      cancel every timer and animation, reset to beat 0
  *
- * ONE capture-phase listener implements both, deliberately:
+ * ONE capture-phase listener implements all three, deliberately:
  *   - CAPTURE, because during a player line the real composer has focus (so the
  *     native caret blinks at the end of the text) and a bubble listener would be
- *     opted out by the text-field guard.
+ *     opted out by the text-field guard. Both arrows are consumed there
+ *     (preventDefault + stopPropagation) so the focused composer never eats
+ *     them.
  *   - ONE listener, because a press must resolve to exactly one action. It reads
  *     the "is a timeline running" flag once, up front, before anything mutates,
  *     and branches on that snapshot. Splitting this across a capture and a
  *     bubble listener does NOT work: the browser drains microtasks between
- *     listener invocations, so the fast-forward done in capture let the
- *     timeline's chains settle and go idle before the bubble handler read the
- *     flag, which then advanced the beat off the very same keypress.
+ *     listener invocations, so a fast-forward done in capture let the timeline's
+ *     chains settle and go idle before the bubble handler read the flag, and
+ *     that handler then took the idle branch off the very same keypress.
  *   - the text-field guard still applies whenever no timeline is running, so
  *     typing in the eval screen's Reason / Good response inputs, or in the
- *     composer between beats, can never advance or reset a take.
+ *     composer between beats, can never drive or reset a take.
  *
  * The CHROME here is the real app's: the real StatusBar (difficulty pill, +15m,
  * battery meter, clock), the real Wallpaper and ambient time-of-day tint, the
@@ -77,10 +95,12 @@ import {
   PLAYER_TYPING,
   SCRIPT,
   clockLabel,
+  completedTimeline,
   dayProgress,
   landLine,
   npcIndicatorMs,
   playerCharDelayMs,
+  type AssignReaction,
   type BannerSpec,
   type ChannelId,
   type ExchangeEvent,
@@ -134,13 +154,15 @@ const WINDOW_TITLE: Record<FrontApp, string> = {
  *   beat.
  *
  *   fast-forward flips `fast` and releases every pending sleep, so every
- *   remaining step of the beat runs back-to-back in the same tick: subsequent
- *   sleeps resolve instantly and the typing loop jumps straight to the full
- *   string.
+ *   remaining step of the beat runs back-to-back: subsequent sleeps resolve
+ *   instantly (no timer is created at all) and the typing loop jumps straight to
+ *   the full string. `settleSession` then awaits the chains, which is what lets
+ *   ONE ArrowRight land the whole beat and advance off the same press — the
+ *   advance is sequenced after the last chain, never after a timer.
  *
  * A session is created per beat and shared by every chain in it (the beat's
- * exchange, each `auto`, and any assign reaction fired during the beat), so one
- * ArrowLeft flushes all of them at once.
+ * exchange, each `auto`, the scripted auto-assign and any assign reaction fired
+ * during the beat), so one ArrowRight flushes all of them at once.
  */
 type Session = {
   /** Which beat/run this session belongs to, so a chain finishing can only
@@ -155,10 +177,22 @@ type Session = {
   timers: Set<number>;
   /** Chains still running under this session. */
   running: number;
+  /** Every chain started under this session, so a fast-forward can await them
+   * all before advancing. Drained by `settleSession`. */
+  chains: Promise<unknown>[];
 };
 
 function createSession(beat: number, run: number): Session {
-  return { beat, run, cancelled: false, fast: false, wakes: new Set(), timers: new Set(), running: 0 };
+  return {
+    beat,
+    run,
+    cancelled: false,
+    fast: false,
+    wakes: new Set(),
+    timers: new Set(),
+    running: 0,
+    chains: [],
+  };
 }
 
 function sleep(session: Session, ms: number): Promise<void> {
@@ -190,6 +224,22 @@ function releaseAll(session: Session) {
   wakes.forEach((wake) => wake());
 }
 
+/**
+ * Resolves once every chain of a session has run out. Called only after `fast`
+ * is set, where each remaining sleep resolves immediately and no new timer can
+ * be created, so this settles within a few microtasks — before the browser
+ * paints, and without a single timer in the path to the advance.
+ *
+ * The loop re-drains because a chain can start another one while it unwinds
+ * (an `auto` that owns an exchange, the auto-assign that owns its reaction).
+ */
+async function settleSession(session: Session): Promise<void> {
+  while (session.chains.length > 0) {
+    const pending = session.chains.splice(0, session.chains.length);
+    await Promise.allSettled(pending);
+  }
+}
+
 export default function AdModeShot() {
   const [scene, setScene] = useState<SceneState>(INITIAL_SCENE);
   const [stepIndex, setStepIndex] = useState(0);
@@ -202,7 +252,7 @@ export default function AdModeShot() {
   /** Bumped on reset so keyed overlays remount and replay their animations. */
   const [runKey, setRunKey] = useState(0);
   /**
-   * Operator-HUD "typing…" state, and the thing ArrowLeft branches on. Derived
+   * Operator-HUD "typing…" state, and the thing ArrowRight branches on. Derived
    * rather than stored: a beat that declares an exchange or autos IS running a
    * timeline from the moment it is entered, and only the two events that can
    * change that — the last chain of a beat finishing, and an assign reaction
@@ -227,8 +277,14 @@ export default function AdModeShot() {
   /** Banner dismiss timers. Cleared on reset only: clearing them on a step
    * change would strand a banner on screen forever. */
   const bannerTimers = useRef<number[]>([]);
-  /** One scripted assign reaction per step, at most. */
-  const assignFired = useRef(false);
+  /**
+   * ONE assignment per beat entry. Whichever gets there first — the actor
+   * clicking an Assign button on camera, or the beat's scripted `autoAssign`
+   * timer — sets this and the other becomes a no-op, so the card can never be
+   * assigned twice and the reaction can never double-fire. Cleared when a beat
+   * is entered (including on a retake).
+   */
+  const assignClaimed = useRef(false);
   const bannerId = useRef(0);
   /** The real composer's textarea, for focus/caret/synthetic-Enter. */
   const composerRef = useRef<HTMLTextAreaElement | null>(null);
@@ -257,7 +313,7 @@ export default function AdModeShot() {
   const runChain = useCallback((session: Session, body: () => Promise<void>) => {
     session.running += 1;
     timelineActiveRef.current = true;
-    void body().finally(() => {
+    const chain = body().finally(() => {
       session.running -= 1;
       // Only the CURRENT session may clear the HUD flag: a cancelled session's
       // chains unwinding must not stomp a freshly-started beat.
@@ -266,6 +322,10 @@ export default function AdModeShot() {
         setActiveOverride({ beat: session.beat, run: session.run, active: false });
       }
     });
+    // Tracked so a fast-forward can await the whole beat (see settleSession).
+    // allSettled is what consumes the rejection, so a throwing chain surfaces
+    // as a failed take rather than an unhandled rejection storm.
+    session.chains.push(chain);
   }, []);
 
   /**
@@ -303,7 +363,7 @@ export default function AdModeShot() {
       pendingSendRef.current = line;
       // Focus the REAL textarea so the native caret blinks at the end of the
       // text while the characters land. The capture-phase hotkey listener is
-      // what keeps ArrowLeft/R working while it holds focus.
+      // what keeps the operator's hotkeys working while it holds focus.
       composerRef.current?.focus();
 
       for (let i = 0; i < line.text.length; i += 1) {
@@ -362,34 +422,110 @@ export default function AdModeShot() {
     releaseAll(session);
   }, []);
 
-  /** ArrowLeft while a timeline is running: land everything now, stay on the
-   * beat. */
-  const fastForward = useCallback(() => {
-    const session = sessionRef.current;
-    if (!session || session.cancelled) return;
-    session.fast = true;
-    releaseAll(session);
-  }, []);
+  /**
+   * Puts a beat on screen: the index, the scene it starts from and its
+   * beat-entry banner. The single entry point, so arriving by ArrowRight and
+   * arriving by ArrowLeft are the same event as far as the beat's own timeline
+   * effect is concerned — it re-runs on the index change either way and plays
+   * the beat from the top.
+   *
+   * `from` is the state to patch (the retake's rebuilt fold); without it the
+   * step patches whatever is on screen, which is the forward case.
+   */
+  const enterStep = useCallback(
+    (index: number, from?: SceneState) => {
+      const step = SCRIPT[index];
+      stepRef.current = index;
+      // A beat being re-entered may still carry the previous visit's HUD verdict
+      // under the same beat/run key, which would read as "already finished".
+      setActiveOverride(null);
+      setStepIndex(index);
+      setScene(from ? step.apply(from) : step.apply);
+      // Step-level banners are the ones NOT tied to a scripted message, so they
+      // still fire at beat entry. Message-tied banners fire when their line
+      // lands.
+      if (step.banner) pushBanner(step.banner);
+    },
+    [pushBanner],
+  );
 
   const advance = useCallback(() => {
     const next = stepRef.current + 1;
     if (next >= SCRIPT.length) return;
-    stepRef.current = next;
-    setStepIndex(next);
-    const step = SCRIPT[next];
-    setScene(step.apply);
-    // Step-level banners are the ones NOT tied to a scripted message, so they
-    // still fire at beat entry. Message-tied banners fire when their line lands.
-    if (step.banner) pushBanner(step.banner);
-  }, [pushBanner]);
+    enterStep(next);
+  }, [enterStep]);
+
+  /**
+   * ArrowRight while a timeline is running: land the whole beat AND advance, off
+   * the one press. `fast` + releaseAll makes every remaining sleep resolve
+   * without a timer, `settleSession` waits for the chains that are unwinding
+   * (microtasks only, so nothing paints in between), and the advance goes last
+   * so the beat's final state is on screen underneath the next beat's patch.
+   *
+   * Sequencing the advance after the chains — rather than firing it in the same
+   * synchronous breath — is what keeps this exact: advancing first would change
+   * `stepIndex`, and the timeline effect's cleanup would cancel the very chains
+   * that were mid-flush, dropping the tail of the beat.
+   */
+  const skipAndAdvance = useCallback(() => {
+    const session = sessionRef.current;
+    if (!session || session.cancelled) {
+      advance();
+      return;
+    }
+    session.fast = true;
+    releaseAll(session);
+    void settleSession(session).then(() => {
+      // A reset (or a back-step) between the press and the flush retires this
+      // session; that press has already been superseded.
+      if (sessionRef.current === session) advance();
+    });
+  }, [advance]);
+
+  /**
+   * ArrowLeft: back one beat, for a retake.
+   *
+   * Deterministic by construction. Nothing about the beat being left is reused:
+   * the session is cancelled, the scene is rebuilt from the pure fold of beats
+   * 0..n-2 (every message landed, every patch applied, the right clock, no
+   * banner and no timer), the window layer is re-placed from an empty layout by
+   * replaying the real cascade over each of those beats' declared window sets,
+   * and beat n-1 is then entered normally so its animations play from the top.
+   * The fold reads the script's own step/auto/exchange/assign data, so there is
+   * no second table of per-beat end states to keep in sync.
+   */
+  const goBack = useCallback(() => {
+    const target = stepRef.current - 1;
+    if (target < 0) return;
+    cancelSession();
+    // A retake starts on a clear desk: banners from the abandoned beat would
+    // otherwise hang around over the rebuilt one.
+    bannerTimers.current.forEach(clearTimeout);
+    bannerTimers.current = [];
+    setBanners([]);
+
+    const prior = completedTimeline(target - 1);
+    const base = prior.length > 0 ? prior[prior.length - 1] : INITIAL_SCENE;
+    if (desk) {
+      // Beat n-1's ENTRY scene is folded in too, so the layout the effect below
+      // computes for it is already the current one and its pass is a no-op.
+      const placed = [...prior, SCRIPT[target].apply(base)].reduce(
+        (acc, s) => syncLayout(acc, s.windows, s.frontApp, desk),
+        EMPTY_LAYOUT,
+      );
+      setLayout(placed);
+    }
+    enterStep(target, base);
+  }, [cancelSession, desk, enterStep]);
 
   const reset = useCallback(() => {
     cancelSession();
     bannerTimers.current.forEach(clearTimeout);
     bannerTimers.current = [];
-    assignFired.current = false;
+    assignClaimed.current = false;
     pendingSendRef.current = null;
     stepRef.current = 0;
+    setActiveOverride(null);
     setStepIndex(0);
     setScene(INITIAL_SCENE);
     setBanners([]);
@@ -438,7 +574,7 @@ export default function AdModeShot() {
 
   useEffect(() => {
     /**
-     * ONE listener, capture phase, for both hotkeys. It has to be capture
+     * ONE listener, capture phase, for all three hotkeys. It has to be capture
      * because during a player line the real composer holds focus, and it has to
      * be a SINGLE listener because a press must resolve to exactly one action.
      *
@@ -447,16 +583,17 @@ export default function AdModeShot() {
      * fast-forwarding in the capture handler let the timeline's chains settle
      * (releaseAll -> the sleeps resolve -> the last chain's `finally` flips
      * timelineActiveRef to false) before the bubble handler read the flag, and
-     * that handler then saw an idle take and advanced the beat off the same
-     * keypress. Reading `active` once, up front, before anything mutates, is
-     * what makes "fast-forward now, advance on the NEXT press" exact.
+     * that handler then took the idle branch off the same keypress. Reading
+     * `active` once, up front, before anything mutates, is what keeps the two
+     * ArrowRight branches from ever both running.
      */
     function handleKeyDown(event: KeyboardEvent) {
       if (event.metaKey || event.ctrlKey || event.altKey) return;
 
-      const isAdvance = event.key === "ArrowLeft";
+      const isNext = event.key === "ArrowRight";
+      const isBack = event.key === "ArrowLeft";
       const isReset = event.code === "KeyR" || event.key === "r" || event.key === "R";
-      if (!isAdvance && !isReset) return;
+      if (!isNext && !isBack && !isReset) return;
 
       // Snapshot BEFORE any state mutation. Everything below branches on this
       // one value, so a press can never both skip and advance.
@@ -465,7 +602,7 @@ export default function AdModeShot() {
       // Idle: the original text-field guard applies, so typing in the eval
       // screen's Reason / Good response inputs (or in the composer between
       // beats) can never drive the take. While a timeline IS running, the
-      // operator keeps both hotkeys even though the composer has focus — that
+      // operator keeps every hotkey even though the composer has focus — that
       // is the whole reason this listener is on the capture phase.
       if (!active) {
         const target = event.target;
@@ -482,12 +619,21 @@ export default function AdModeShot() {
         }
       }
 
+      // Consumed here, in capture, so the focused composer (or anything else on
+      // the desk) never sees an arrow key that belongs to the operator.
       event.preventDefault();
       event.stopPropagation();
 
-      if (isAdvance) {
-        if (active) fastForward();
+      if (isNext) {
+        // One press, one beat forward, whatever is playing.
+        if (active) skipAndAdvance();
         else advance();
+        return;
+      }
+      if (isBack) {
+        // Same action either way: the rebuild is authoritative, so a
+        // half-played beat has nothing to salvage first.
+        goBack();
         return;
       }
       reset();
@@ -495,18 +641,53 @@ export default function AdModeShot() {
 
     window.addEventListener("keydown", handleKeyDown, true);
     return () => window.removeEventListener("keydown", handleKeyDown, true);
-  }, [advance, reset, fastForward]);
+  }, [advance, goBack, reset, skipAndAdvance]);
 
   /* --------------------------------------------------- the beat's timeline */
 
+  /**
+   * The tail of an assignment: the same reaction chain whether the assignment
+   * came from the actor's click or the beat's own `autoAssign`, so the two
+   * paths cannot drift.
+   */
+  const playAssignReaction = useCallback(
+    async (session: Session, reaction: AssignReaction) => {
+      await sleep(session, reaction.delayMs);
+      if (session.cancelled) return;
+      if (reaction.apply) setScene(reaction.apply);
+      if (reaction.banner) pushBanner(reaction.banner);
+      if (reaction.exchange) await runExchange(session, reaction.exchange);
+    },
+    [pushBanner, runExchange],
+  );
+
   useEffect(() => {
-    assignFired.current = false;
+    assignClaimed.current = false;
     const step = SCRIPT[stepIndex];
     const session = createSession(stepIndex, runKey);
     sessionRef.current = session;
 
     const exchange = step.exchange;
     if (exchange) runChain(session, () => runExchange(session, exchange));
+
+    // The scripted assignment: the beat makes the pick itself so the ad plays
+    // without anyone touching the mouse, and Derek's reaction follows it. The
+    // claim check is what makes it lose gracefully to a manual click — the
+    // actor's Assign already took the beat's one assignment, and its reaction
+    // is already running, so this chain just retires.
+    const autoAssign = step.autoAssign;
+    if (autoAssign) {
+      runChain(session, async () => {
+        await sleep(session, autoAssign.delayMs);
+        if (session.cancelled || assignClaimed.current) return;
+        assignClaimed.current = true;
+        setScene((s) => (s.assignedTo ? s : { ...s, assignedTo: autoAssign.person }));
+        const reaction = step.onAssign;
+        if (reaction && reaction.person === autoAssign.person) {
+          await playAssignReaction(session, reaction);
+        }
+      });
+    }
 
     for (const auto of step.autos ?? []) {
       runChain(session, async () => {
@@ -520,10 +701,11 @@ export default function AdModeShot() {
       });
     }
 
-    // Covers the step change, the reset (runKey) and unmount, and also kills any
-    // assign-reaction chain started against this same session during the step.
+    // Covers the step change (forward OR back), the reset (runKey) and unmount,
+    // and also kills any assign-reaction chain started against this same session
+    // during the step.
     return () => cancelSession();
-  }, [stepIndex, runKey, pushBanner, runChain, runExchange, cancelSession]);
+  }, [stepIndex, runKey, pushBanner, runChain, runExchange, cancelSession, playAssignReaction]);
 
   /* -------------------------------------------------------- composer caret */
 
@@ -539,25 +721,25 @@ export default function AdModeShot() {
 
   /* ------------------------------------------------------- office assigning */
 
+  /**
+   * The actor assigning by hand, on camera. Claiming the beat's one assignment
+   * here is what cancels a pending `autoAssign`: the auto's chain wakes later,
+   * sees the claim and retires without touching anything, so the same beat can
+   * never be assigned twice or fire its reaction twice.
+   */
   function handleAssign(name: string) {
-    if (scene.assignedTo) return;
+    if (assignClaimed.current || scene.assignedTo) return;
+    assignClaimed.current = true;
     setScene((prev) => (prev.assignedTo ? prev : { ...prev, assignedTo: name }));
 
     const reaction = SCRIPT[stepRef.current].onAssign;
-    if (!reaction || reaction.person !== name || assignFired.current) return;
+    if (!reaction || reaction.person !== name) return;
     const session = sessionRef.current;
     if (!session || session.cancelled) return;
-    assignFired.current = true;
     // The beat's own chains may already have finished, so the reaction is what
     // makes the timeline active again.
     setActiveOverride({ beat: session.beat, run: session.run, active: true });
-    runChain(session, async () => {
-      await sleep(session, reaction.delayMs);
-      if (session.cancelled) return;
-      if (reaction.apply) setScene(reaction.apply);
-      if (reaction.banner) pushBanner(reaction.banner);
-      if (reaction.exchange) await runExchange(session, reaction.exchange);
-    });
+    runChain(session, () => playAssignReaction(session, reaction));
   }
 
   /* ------------------------------------------------------------ dock/chrome */
@@ -616,10 +798,12 @@ export default function AdModeShot() {
   const progress = dayProgress(scene);
   const ambientTint = getAmbientTint(progress);
 
-  // Entering a beat that declares an exchange or autos starts its timeline, so
-  // that is the default; the override only speaks for the beat it was written
-  // in (see activeOverride).
-  const beatHasTimeline = Boolean(step.exchange?.length || step.autos?.length);
+  // Entering a beat that declares an exchange, autos or a scripted assignment
+  // starts its timeline, so that is the default; the override only speaks for
+  // the beat it was written in (see activeOverride).
+  const beatHasTimeline = Boolean(
+    step.exchange?.length || step.autos?.length || step.autoAssign,
+  );
   const timelineActive =
     activeOverride && activeOverride.beat === stepIndex && activeOverride.run === runKey
       ? activeOverride.active
@@ -708,7 +892,9 @@ export default function AdModeShot() {
       {/* The REAL dock, full shipping app list and order, with an open dot on
           every window currently on the desk. The four apps with scripted bodies
           open (or raise) their window on click, cascading onto the desk exactly
-          like the live app — the actor clicks Office on camera; the rest no-op.
+          like the live app. Office also opens on its own at the WRONG PICK beat,
+          and the actor can still raise or open any of the four by hand; the rest
+          no-op.
           The badge count is scripted, never derived from the messages. */}
       <TaskbarView
         openApps={openApps}
@@ -729,11 +915,14 @@ export default function AdModeShot() {
       <Banners items={banners} />
 
       {/* Operator HUD. Deliberately tiny and dim; crop it out or ignore it. The
-          "typing…" state is the cue that a fast-forward press is available. */}
+          "typing…" state is the cue that the beat is still playing, so the next
+          ArrowRight will land it AND step forward off the one press. */}
       <div className="pointer-events-none fixed bottom-1 right-2 z-50 font-mono text-caption tabular-nums text-text-secondary opacity-40">
         {`${stepIndex}/${SCRIPT.length - 1} ${step.label}${
           timelineActive ? " · typing…" : ""
-        } · left arrow ${timelineActive ? "skip" : "next"} · r reset`}
+        } · right arrow ${
+          timelineActive ? "skip+next" : "next"
+        } · left arrow back · r reset`}
       </div>
     </div>
   );

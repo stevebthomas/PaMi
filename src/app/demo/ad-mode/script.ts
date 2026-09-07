@@ -9,12 +9,14 @@
  * only ever feeds them props from this file: it never writes to a store and
  * never calls an API, so it can be deleted wholesale after the shoot.
  *
- * The engine (AdModeShot.tsx) walks SCRIPT one step at a time on ArrowLeft.
- * Each step gets a pure `apply` patch over SceneState, an optional notification
- * banner, an optional `exchange` (the sequenced typing timeline — see below),
- * optional `autos` (scripted sub-events fired on a timer once the step becomes
- * active) and an optional `onAssign` reaction for the Office beat the actor
- * drives by hand on camera.
+ * The engine (AdModeShot.tsx) walks SCRIPT one step at a time on ArrowRight,
+ * and one step BACK on ArrowLeft. Each step gets a pure `apply` patch over
+ * SceneState, an optional notification banner, an optional `exchange` (the
+ * sequenced typing timeline — see below), optional `autos` (scripted sub-events
+ * fired on a timer once the step becomes active), an optional `autoAssign` (the
+ * Office assignment the script makes on its own if the actor doesn't) and an
+ * optional `onAssign` reaction that answers whichever of the two got there
+ * first.
  *
  * EXCHANGES. A beat that puts words on screen does NOT append them in its
  * `apply` patch. It declares them as an ordered `exchange`, and the engine
@@ -34,6 +36,13 @@
  * Pacing is data, not code: PLAYER_TYPING and NPC_TYPING below are the global
  * knobs, and any single line can override them (`typing` on a player line,
  * `indicatorMs` on an NPC line) without touching the engine.
+ *
+ * FOLDING. `completeStep` / `completedTimeline` at the bottom of this file
+ * replay the very same step/auto/exchange/assign data as a pure reduction, with
+ * every delay treated as zero: they are the one definition of "what this beat
+ * looks like once it has finished playing". ArrowLeft (retake: rebuild beats
+ * 0..n-2, then re-enter n-1) is built on them, so there is no second, hand-
+ * written table of per-beat end states to drift out of sync with the script.
  */
 
 /* ------------------------------------------------------------------ types */
@@ -262,6 +271,22 @@ export type AssignReaction = {
   exchange?: ExchangeEvent[];
 };
 
+/**
+ * The assignment the SCRIPT makes on its own, so the beat plays without anyone
+ * touching the mouse: `delayMs` after beat entry the named engineer's card
+ * flips to "Assigned ✓", exactly as a click would leave it, and the step's
+ * `onAssign` reaction then answers it on its own delay.
+ *
+ * A beat entry has room for exactly ONE assignment. Whichever comes first — the
+ * actor clicking any Assign button, or this timer — claims it and the other
+ * becomes a no-op, so a manual take on camera cannot double-assign or double-
+ * fire the reaction.
+ */
+export type AutoAssign = {
+  person: string;
+  delayMs: number;
+};
+
 export type Step = {
   id: string;
   /** Operator-facing label in the tiny filming HUD. Never part of the ad. */
@@ -272,6 +297,7 @@ export type Step = {
   banner?: BannerSpec;
   exchange?: ExchangeEvent[];
   autos?: AutoEvent[];
+  autoAssign?: AutoAssign;
   onAssign?: AssignReaction;
 };
 
@@ -722,8 +748,8 @@ export const SCRIPT: Step[] = [
     id: "whos-taking-this",
     label: "WHO IS TAKING THIS",
     // Chattr comes back to the front; Pulse stays open behind it, still
-    // showing the spike. The actor clicks Office in the dock during this beat,
-    // which opens a third window live on camera.
+    // showing the spike. Derek asks the question here and the NEXT beat answers
+    // it — badly.
     apply: (s) =>
       read(
         show({ ...s, day: 1, minutes: 605, chattrBadge: 0, unread: [] }, ["chattr", "pulse"], "chattr"),
@@ -744,8 +770,28 @@ export const SCRIPT: Step[] = [
         },
       },
     ],
-    // The actor clicks Office in the dock on camera and assigns Theo. Only Theo
-    // gets a reaction; the roster shows he is out today, which is the joke.
+  },
+
+  /* 4 */
+  {
+    id: "wrong-pick",
+    label: "WRONG PICK",
+    // The answer to Derek's question, and it is the wrong one. Office opens in
+    // front of Chattr (Pulse steps off the desk for this beat) with Derek's DM
+    // still on screen behind it, so his reply lands in a thread the camera can
+    // already see.
+    //
+    // The beat plays ITSELF: `autoAssign` flips Theo's card to "Assigned ✓"
+    // 1.2s in — the same UI a click leaves behind — and `onAssign` then lands
+    // the pushback 2s after that, through the normal NPC engine (indicator in
+    // dm-derek, banner as the line lands). Only Theo gets a reaction; the
+    // roster shows he is out today, which is the joke.
+    //
+    // The actor can still beat the script to it: clicking any Assign button
+    // first claims the beat's one assignment and cancels the auto, and clicking
+    // Theo runs this exact same reaction (see AdModeShot's assignClaimed).
+    apply: (s) => show({ ...s, day: 1, minutes: 607 }, ["chattr", "office"], "office"),
+    autoAssign: { person: "Theo", delayMs: 1200 },
     onAssign: {
       person: "Theo",
       delayMs: 2000,
@@ -767,7 +813,7 @@ export const SCRIPT: Step[] = [
     },
   },
 
-  /* 4 */
+  /* 5 */
   {
     id: "misread-1",
     label: "MISREAD 1 of 5",
@@ -777,7 +823,7 @@ export const SCRIPT: Step[] = [
       setPulse(show({ ...s, day: 1, minutes: 680 }, ["chattr", "pulse"]), 680, 3.1, 407, false),
   },
 
-  /* 5 */
+  /* 6 */
   {
     id: "misread-2",
     label: "MISREAD 2 of 5",
@@ -797,7 +843,7 @@ export const SCRIPT: Step[] = [
     ],
   },
 
-  /* 6 */
+  /* 7 */
   {
     id: "misread-3",
     label: "MISREAD 3 of 5",
@@ -825,7 +871,7 @@ export const SCRIPT: Step[] = [
     ],
   },
 
-  /* 7 */
+  /* 8 */
   {
     id: "misread-4",
     label: "MISREAD 4 of 5",
@@ -841,7 +887,7 @@ export const SCRIPT: Step[] = [
     ],
   },
 
-  /* 8 */
+  /* 9 */
   {
     id: "misread-5",
     label: "MISREAD 5 of 5",
@@ -863,14 +909,21 @@ export const SCRIPT: Step[] = [
     ],
   },
 
-  /* 9 */
+  /* 10 */
   {
     id: "course-correct",
     label: "COURSE CORRECT",
     // Office in front, Chattr behind it so Derek's thread is still on the desk
     // when he reacts. Clears the earlier assignment so the roster is live again
-    // for take two.
+    // for the right pick.
+    //
+    // Symmetrical with WRONG PICK: the script assigns Raj itself 1.5s in and
+    // Derek's confirmation follows 1.5s after that, unless the actor clicks an
+    // Assign button first — in which case that click claims the beat's one
+    // assignment, the auto is cancelled, and clicking Raj plays this same
+    // reaction.
     apply: (s) => show({ ...s, day: 1, minutes: 825, assignedTo: null }, ["chattr", "office"]),
+    autoAssign: { person: "Raj", delayMs: 1500 },
     onAssign: {
       person: "Raj",
       delayMs: 1500,
@@ -888,7 +941,7 @@ export const SCRIPT: Step[] = [
     },
   },
 
-  /* 10 */
+  /* 11 */
   {
     id: "pulse-payoff",
     label: "PULSE PAYOFF",
@@ -906,14 +959,14 @@ export const SCRIPT: Step[] = [
     ],
   },
 
-  /* 11 */
+  /* 12 */
   {
     id: "reckoning",
     label: "RECKONING",
     apply: (s) => ({ ...s, day: 1, minutes: 1005, overlay: "scorecard" }),
   },
 
-  /* 12 */
+  /* 13 */
   {
     id: "closer-transition",
     label: "CLOSER, DAY 2",
@@ -922,7 +975,7 @@ export const SCRIPT: Step[] = [
     apply: (s) => show({ ...s, day: 2, minutes: 540, overlay: "day2" }, ["chattr"]),
   },
 
-  /* 13 */
+  /* 14 */
   {
     id: "maya-follow-up",
     label: "MAYA FOLLOW UP",
@@ -944,7 +997,7 @@ export const SCRIPT: Step[] = [
     ],
   },
 
-  /* 14 */
+  /* 15 */
   {
     id: "derek-assignment",
     label: "DEREK ASSIGNMENT",
@@ -966,10 +1019,70 @@ export const SCRIPT: Step[] = [
     ],
   },
 
-  /* 15 */
+  /* 16 */
   {
     id: "eval",
     label: "EVAL (final)",
     apply: (s) => ({ ...s, overlay: "eval" }),
   },
 ];
+
+/* ------------------------------------------------- folding a finished beat */
+
+/**
+ * The assignment half of a completed beat: the card is flipped, and the step's
+ * reaction (if this is the person it answers) has fully landed.
+ */
+function completeAssign(s: SceneState, step: Step, person: string): SceneState {
+  let next: SceneState = { ...s, assignedTo: person };
+  const reaction = step.onAssign;
+  if (!reaction || reaction.person !== person) return next;
+  if (reaction.apply) next = reaction.apply(next);
+  for (const line of reaction.exchange ?? []) next = landLine(next, line);
+  return next;
+}
+
+/**
+ * One beat, played to its END, instantly and purely.
+ *
+ * This is the fast-forward semantics as a reduction: the step's patch, then
+ * every scripted line landed, every auto applied and the beat's own assignment
+ * made — no timers, no indicators, no banners, no composer text. It reads the
+ * SAME step/auto/exchange/assign data the engine plays, so a beat can never
+ * have two different definitions of "finished".
+ *
+ * ORDERING. A beat's exchange and its autos run as parallel chains live, so the
+ * fold needs one deterministic rule: the step exchange first, then the autos in
+ * ascending `delayMs`, then the assignment. No beat in SCRIPT mixes an exchange
+ * with autos or an assignment, so this rule is exact for the shoot as written,
+ * and it stays the obvious reading if one ever does.
+ */
+export function completeStep(state: SceneState, step: Step): SceneState {
+  let s = step.apply(state);
+  for (const line of step.exchange ?? []) s = landLine(s, line);
+  for (const auto of [...(step.autos ?? [])].sort((a, b) => a.delayMs - b.delayMs)) {
+    if (auto.apply) s = auto.apply(s);
+    for (const line of auto.exchange ?? []) s = landLine(s, line);
+  }
+  if (step.autoAssign) s = completeAssign(s, step, step.autoAssign.person);
+  // A finished beat has an empty composer and no indicator on screen: the send
+  // path clears one and the landing line clears the other.
+  return { ...s, composer: "", typing: null };
+}
+
+/**
+ * The completed state of beats 0..upTo, in order (empty when `upTo` < 0).
+ *
+ * The array, not just the last entry, is what the retake needs: the window
+ * layer replays the real cascade over each beat's declared window set, so a
+ * rebuilt desk is placed exactly as stepping forward would have placed it.
+ */
+export function completedTimeline(upTo: number, from: SceneState = INITIAL_SCENE): SceneState[] {
+  const states: SceneState[] = [];
+  let s = from;
+  for (let i = 0; i <= upTo && i < SCRIPT.length; i += 1) {
+    s = completeStep(s, SCRIPT[i]);
+    states.push(s);
+  }
+  return states;
+}

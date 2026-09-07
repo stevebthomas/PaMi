@@ -105,7 +105,7 @@ export function ScorecardReveal() {
 
 /**
  * Day 2 card. Same visual pattern as the day2 shot's TransitionScreen, but
- * static: it never auto-advances, the operator steps past it on ArrowLeft.
+ * static: it never auto-advances, the operator steps past it on ArrowRight.
  */
 export function Day2Transition() {
   const [filled, setFilled] = useState(false);
