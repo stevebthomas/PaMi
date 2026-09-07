@@ -594,13 +594,17 @@ function setPulse(
 
 export const INITIAL_SCENE: SceneState = {
   day: 1,
-  minutes: 540, // 9:00 AM
-  // The calm open: Chattr alone, centered, exactly like the real desktop's
-  // first window at login.
+  minutes: 555, // 9:15 AM — the incident's opening frame (see INCIDENT_MINUTE).
+  // The take now OPENS already inside the incident: Chattr alone, centered,
+  // exactly like the real desktop's first window at login, but on #incidents
+  // rather than an empty inbox — this is the folded, already-landed state of
+  // what used to be a quiet opener followed by Priya's line typed in live. See
+  // the (inert) "first-fire" step below for why that beat still exists in
+  // SCRIPT.
   windows: ["chattr"],
   frontApp: "chattr",
   overlay: "none",
-  activeChannel: "design-review",
+  activeChannel: "incidents",
   unread: [],
   chattrBadge: 0,
   composer: "",
@@ -619,7 +623,22 @@ export const INITIAL_SCENE: SceneState = {
         history: true,
       },
     ],
-    incidents: [],
+    // Priya's opening line: the take's very first frame, already landed. No
+    // typing indicator plays for it — see the "first-fire" step's comment.
+    incidents: [
+      {
+        id: "incidents-0",
+        agentId: "priya",
+        sender: "Priya",
+        time: "9:14 AM",
+        text: "Heads up. Seeing a spike in failed checkouts on Apple Pay. Volume's climbing fast. Can someone take a look?",
+        history: true,
+      },
+    ],
+    // Kept as seeded history even though #design-review is not on camera at
+    // beat 0: the Day-2 "maya-follow-up" beat appends to this same thread, and
+    // needs the 8:58 AM line already in it for that follow-up to read as a
+    // follow-up.
     "design-review": [
       {
         id: "design-review-0",
@@ -664,34 +683,20 @@ export const INITIAL_SCENE: SceneState = {
 export const SCRIPT: Step[] = [
   /* 0 */
   {
-    id: "calm",
-    label: "CALM",
-    // Step 0 is the initial scene, so its patch is the identity: pressing R
-    // rebuilds INITIAL_SCENE and re-enters this step. Its thread content is
-    // history (see INITIAL_SCENE) and paints instantly.
+    id: "first-fire",
+    label: "FIRST FIRE",
+    // The incident has already landed by the time the take starts: INITIAL_SCENE
+    // carries #incidents active with Priya's line seeded as history at 9:15 AM
+    // (see INITIAL_SCENE). This step's patch is therefore the identity, so
+    // mount, R and an ArrowLeft back to beat 0 all land on exactly the same
+    // frame, with nothing left to type or fold. The step stays in SCRIPT
+    // (rather than being deleted along with the beat that used to precede it)
+    // purely to hold this beat's place for the operator HUD and the ArrowLeft
+    // fold; it has no work left to do.
     apply: (s) => s,
   },
 
   /* 1 */
-  {
-    id: "first-fire",
-    label: "FIRST FIRE",
-    // Opens #incidents empty, then Priya types into it on camera. Still Chattr
-    // alone: the desk is calm right up to the moment it isn't.
-    apply: (s) => read(show({ ...s, day: 1, minutes: 555 }, ["chattr"]), "incidents"),
-    exchange: [
-      {
-        kind: "npc",
-        channel: "incidents",
-        agentId: "priya",
-        sender: "Priya",
-        time: "9:14 AM",
-        text: "Heads up. Seeing a spike in failed checkouts on Apple Pay. Volume's climbing fast. Can someone take a look?",
-      },
-    ],
-  },
-
-  /* 2 */
   {
     id: "stacking",
     label: "STACKING",
@@ -743,7 +748,7 @@ export const SCRIPT: Step[] = [
     ],
   },
 
-  /* 3 */
+  /* 2 */
   {
     id: "whos-taking-this",
     label: "WHO IS TAKING THIS",
@@ -772,7 +777,7 @@ export const SCRIPT: Step[] = [
     ],
   },
 
-  /* 4 */
+  /* 3 */
   {
     id: "wrong-pick",
     label: "WRONG PICK",
@@ -813,7 +818,7 @@ export const SCRIPT: Step[] = [
     },
   },
 
-  /* 5 */
+  /* 4 */
   {
     id: "misread-1",
     label: "MISREAD 1 of 5",
@@ -823,7 +828,7 @@ export const SCRIPT: Step[] = [
       setPulse(show({ ...s, day: 1, minutes: 680 }, ["chattr", "pulse"]), 680, 3.1, 407, false),
   },
 
-  /* 6 */
+  /* 5 */
   {
     id: "misread-2",
     label: "MISREAD 2 of 5",
@@ -843,7 +848,7 @@ export const SCRIPT: Step[] = [
     ],
   },
 
-  /* 7 */
+  /* 6 */
   {
     id: "misread-3",
     label: "MISREAD 3 of 5",
@@ -871,7 +876,7 @@ export const SCRIPT: Step[] = [
     ],
   },
 
-  /* 8 */
+  /* 7 */
   {
     id: "misread-4",
     label: "MISREAD 4 of 5",
@@ -887,7 +892,7 @@ export const SCRIPT: Step[] = [
     ],
   },
 
-  /* 9 */
+  /* 8 */
   {
     id: "misread-5",
     label: "MISREAD 5 of 5",
@@ -909,7 +914,7 @@ export const SCRIPT: Step[] = [
     ],
   },
 
-  /* 10 */
+  /* 9 */
   {
     id: "course-correct",
     label: "COURSE CORRECT",
@@ -941,7 +946,7 @@ export const SCRIPT: Step[] = [
     },
   },
 
-  /* 11 */
+  /* 10 */
   {
     id: "pulse-payoff",
     label: "PULSE PAYOFF",
@@ -959,14 +964,14 @@ export const SCRIPT: Step[] = [
     ],
   },
 
-  /* 12 */
+  /* 11 */
   {
     id: "reckoning",
     label: "RECKONING",
     apply: (s) => ({ ...s, day: 1, minutes: 1005, overlay: "scorecard" }),
   },
 
-  /* 13 */
+  /* 12 */
   {
     id: "closer-transition",
     label: "CLOSER, DAY 2",
@@ -975,7 +980,7 @@ export const SCRIPT: Step[] = [
     apply: (s) => show({ ...s, day: 2, minutes: 540, overlay: "day2" }, ["chattr"]),
   },
 
-  /* 14 */
+  /* 13 */
   {
     id: "maya-follow-up",
     label: "MAYA FOLLOW UP",
@@ -997,7 +1002,7 @@ export const SCRIPT: Step[] = [
     ],
   },
 
-  /* 15 */
+  /* 14 */
   {
     id: "derek-assignment",
     label: "DEREK ASSIGNMENT",
@@ -1019,7 +1024,7 @@ export const SCRIPT: Step[] = [
     ],
   },
 
-  /* 16 */
+  /* 15 */
   {
     id: "eval",
     label: "EVAL (final)",
