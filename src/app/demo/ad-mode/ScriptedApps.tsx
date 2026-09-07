@@ -23,7 +23,7 @@
  * Nothing in this file calls a store action or an API.
  */
 
-import { useMemo, type Ref } from "react";
+import { useEffect, useMemo, useRef, useState, type Ref } from "react";
 import { Activity, BarChart3, CreditCard, GitBranch } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { RateSparkline } from "@/components/charts/RateSparkline";
@@ -51,6 +51,7 @@ import {
   DAY_START_MINUTE,
   DEMO_BASELINE_SUCCESS_PCT,
   DIRECT_MESSAGES,
+  PULSE_COUNT_UP_MS,
   composerPlaceholder,
   derivePulse,
   formatClock,
@@ -160,9 +161,74 @@ export function ScriptedChattr({
  * live dashboard doesn't have is the attempts/failure-rate pair directly under
  * the hero: the ad's misread beat needs "407 attempts" and "3.1%" adjacent and
  * legible in one frame.
+ *
+ * The one BEHAVIOUR that is the shoot's rather than the product's is the
+ * count-up on those two headline figures (see `useCountUp`): a filmed recovery
+ * has to read as a climb, not as four value swaps. It is a render decoration
+ * only — no scene state, no recorded sample and no shipping component is
+ * touched by it.
  */
+/**
+ * DEMO-ONLY numeric count-up. Returns a value that EASES from wherever it
+ * currently sits to `target` over `durationMs`, instead of jumping.
+ *
+ * Why it exists: the recovery beat walks the failure rate 17 -> 12 -> 6 -> 3 on
+ * a timer, and swapping four digits in place made a 60-second ad's one moment
+ * of relief read as four hard cuts. Easing the digits (and only the digits)
+ * turns it into a climb the eye can follow.
+ *
+ * What it deliberately does NOT do:
+ *  - it never touches scene state, so the SCRIPTED value is still the one and
+ *    only truth: each step lands as a discrete recorded sparkline sample, and
+ *    the tone/badge/edge colours flip off the real `pulse` prop the instant the
+ *    step fires, not off the eased digits;
+ *  - it lives here, in the demo's own dashboard, and changes nothing in the
+ *    shipping PulseMock;
+ *  - it seeds itself with the FIRST value it is given, so a freshly mounted
+ *    window paints the true number immediately rather than counting up from
+ *    zero — which is what keeps the STACKING beat's first frame at 91.0%.
+ *
+ * Interrupting is safe: a new target mid-flight eases on from the value on
+ * screen (`shownRef`), and the frame loop is cancelled on unmount, so a
+ * fast-forward or an ArrowLeft mid-recovery cannot strand a running tween.
+ */
+function useCountUp(target: number, durationMs = PULSE_COUNT_UP_MS): number {
+  const [shown, setShown] = useState(target);
+  /** The value actually on screen, readable synchronously by the next tween. */
+  const shownRef = useRef(target);
+  const frameRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    const from = shownRef.current;
+    if (from === target) return;
+    const startedAt = performance.now();
+    const tick = (now: number) => {
+      const t = Math.min(1, (now - startedAt) / durationMs);
+      // easeOutCubic: quick off the mark, settles gently onto the final digit.
+      const eased = 1 - (1 - t) ** 3;
+      const value = t < 1 ? from + (target - from) * eased : target;
+      shownRef.current = value;
+      setShown(value);
+      frameRef.current = t < 1 ? requestAnimationFrame(tick) : null;
+    };
+    frameRef.current = requestAnimationFrame(tick);
+    return () => {
+      if (frameRef.current !== null) cancelAnimationFrame(frameRef.current);
+      frameRef.current = null;
+    };
+  }, [target, durationMs]);
+
+  return shown;
+}
+
 export function ScriptedPulse({ pulse }: { pulse: PulseState }) {
   const d = derivePulse(pulse);
+  // The two headline figures count; everything else (tone, badge, sparkline,
+  // breakdown, funnel) reads the scripted value directly and switches at once.
+  // They ease with the same curve over the same duration from complementary
+  // starts, so `shownSuccess + shownFailure` is exactly 100 on every frame.
+  const shownSuccessPct = useCountUp(d.successRatePct);
+  const shownFailurePct = useCountUp(d.failureRatePct);
 
   // Same precedence the live dashboard applies (see PulseMock): red only while
   // the incident is actively degrading, green once it is back at baseline,
@@ -210,7 +276,7 @@ export function ScriptedPulse({ pulse }: { pulse: PulseState }) {
               Checkout success rate
             </div>
             <div className={cn("mt-2 text-5xl leading-none font-semibold tracking-tight tabular-nums", toneText[heroTone])}>
-              {d.successRatePct.toFixed(1)}%
+              {shownSuccessPct.toFixed(1)}%
             </div>
             <div className="mt-2 font-mono text-[11px] tabular-nums text-text-secondary">{d.freshness}</div>
           </div>
@@ -258,7 +324,7 @@ export function ScriptedPulse({ pulse }: { pulse: PulseState }) {
         />
         <StatTile
           label="Checkout failure rate"
-          value={`${d.failureRatePct.toFixed(1)}%`}
+          value={`${shownFailurePct.toFixed(1)}%`}
           caption={d.freshness}
           tone={incidentActive && !resolved ? "red" : "neutral"}
         />

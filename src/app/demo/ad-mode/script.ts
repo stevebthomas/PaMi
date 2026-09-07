@@ -198,6 +198,38 @@ export const NPC_TYPING = {
 
 export type NpcTypingConfig = typeof NPC_TYPING;
 
+/* ------------------------------------------------------------- beat pacing */
+
+/**
+ * The three deliberate HOLDS in the back half of the ad. They are the only
+ * places the take asks the audience to wait on purpose, so they live together
+ * here as one tunable block rather than as magic numbers inside their beats.
+ *
+ * All three are ordinary within-beat timings — the recovery pair are `auto`
+ * delays and so is the scorecard — which means they cost no extra keypress,
+ * ArrowRight mid-hold still flushes the beat and advances off the one press,
+ * and the fold treats every one of them as already landed.
+ *
+ * Retune here after a recording pass; nothing else needs to change.
+ */
+/** PULSE PAYOFF sits on the unchanged spike this long before the first
+ * recovery step, so the fix reads as a consequence of Raj's message rather
+ * than a cut. */
+export const RECOVERY_HOLD_MS = 2600;
+/** Gap between the three recovery steps (17 -> 12 -> 6 -> 3). */
+export const RECOVERY_STEP_MS = 1200;
+/** RECKONING holds on the plain recovered desktop this long before the
+ * scorecard overlay renders and starts its own bar-fill. */
+export const SCORECARD_HOLD_MS = 2200;
+/**
+ * How long the scripted Pulse hero (and the failure-rate tile) takes to COUNT
+ * from the previous reading to the new one. Purely a render decoration in
+ * ScriptedApps — it never touches scene state, the recorded sparkline samples
+ * or the real PulseMock — so a recovery step still lands as one discrete
+ * scripted value; it just stops the digits from teleporting.
+ */
+export const PULSE_COUNT_UP_MS = 500;
+
 /** Delay before the next character of a scripted player line. */
 export function playerCharDelayMs(char: string, cfg: PlayerTypingConfig = PLAYER_TYPING): number {
   const span = Math.max(0, cfg.perCharMaxMs - cfg.perCharMinMs);
@@ -1151,11 +1183,23 @@ export const SCRIPT: Step[] = [
     // dashboard's three states with it: "Incident active" (red) while it is
     // still at the spike, "Recovering" (amber) on the way back, "Back to
     // baseline" (green) once it lands. Pulse front, Chattr staggered behind.
+    //
+    // THE BEAT OPENS ON A HELD BREATH. Arriving straight from Raj's "should
+    // settle in the next few minutes", an instant recovery would make the fix
+    // look like a cut rather than a consequence — so the first RECOVERY_HOLD_MS
+    // of this beat sit on the UNCHANGED spike (17% / 468, red, "Incident
+    // active"), the system still visibly hurting, before the walk starts. The
+    // three steps then land RECOVERY_STEP_MS apart. Every number on the way is
+    // a real recorded sample, so the sparkline still draws the true hump; only
+    // the on-screen digits are eased (see ScriptedPulse's count-up).
     apply: (s) => setPulse(show({ ...s, day: 1, minutes: 850 }, ["chattr", "pulse"]), 850, 17, 468),
     autos: [
-      { delayMs: 1200, apply: (s) => setPulse(s, 860, 12, 468) },
-      { delayMs: 2400, apply: (s) => setPulse(s, 870, 6, 468) },
-      { delayMs: 3600, apply: (s) => setPulse(s, 880, DEMO_BASELINE_FAILURE_PCT, 468) },
+      { delayMs: RECOVERY_HOLD_MS, apply: (s) => setPulse(s, 860, 12, 468) },
+      { delayMs: RECOVERY_HOLD_MS + RECOVERY_STEP_MS, apply: (s) => setPulse(s, 870, 6, 468) },
+      {
+        delayMs: RECOVERY_HOLD_MS + RECOVERY_STEP_MS * 2,
+        apply: (s) => setPulse(s, 880, DEMO_BASELINE_FAILURE_PCT, 468),
+      },
     ],
   },
 
@@ -1163,7 +1207,16 @@ export const SCRIPT: Step[] = [
   {
     id: "reckoning",
     label: "RECKONING",
-    apply: (s) => ({ ...s, day: 1, minutes: 1005, overlay: "scorecard" }),
+    // The day lands before it is graded. The beat ENTERS with no overlay at
+    // all — the recovered desk, Pulse still on it at a green 97% — and holds
+    // there for SCORECARD_HOLD_MS so the recovery gets a moment to be true
+    // before the verdict slides over it. The overlay then arrives through the
+    // ordinary auto/session path, so ArrowRight mid-hold flushes it and
+    // advances off the one press, and the FOLD counts the scorecard as part of
+    // this beat's completed state (an auto is replayed by `completeStep`), the
+    // same as it was when the patch set it at entry.
+    apply: (s) => ({ ...s, day: 1, minutes: 1005 }),
+    autos: [{ delayMs: SCORECARD_HOLD_MS, apply: (s) => ({ ...s, overlay: "scorecard" }) }],
   },
 
   /* 13 */
