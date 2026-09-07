@@ -11,7 +11,8 @@
  * `scheduleAutoAdvance`). That between-beats gap is the same flat two seconds
  * the blanket rule gives every other pair of visible motions, so the seam
  * between two beats is paced exactly like a seam inside one. The FINAL beat
- * (the eval screen) completes and STAYS: there is no wrap-around.
+ * (EVALS DOC — the open eval batch, the frame the ad now ends on) completes and
+ * STAYS: there is no wrap-around, and nothing is scheduled after it.
  *
  * NO BEAT WAITS FOR A HUMAN. The two Office beats make their own pick through
  * `autoAssign`, every player line is typed by the engine through the real
@@ -72,8 +73,7 @@
  *     chains settle and go idle before the bubble handler read the flag, and
  *     that handler then took the idle branch off the very same keypress.
  *   - the text-field guard still applies whenever no timeline is running, so
- *     typing in the eval screen's Reason / Good response inputs, or in the
- *     composer between beats, can never drive or reset a take.
+ *     typing in the composer between beats can never drive or reset a take.
  *
  * The CHROME here is the real app's: the real StatusBar (difficulty pill, +15m,
  * battery meter, clock), the real Wallpaper and ambient time-of-day tint, the
@@ -116,7 +116,6 @@ import {
   type DemoWindowLayout,
   type DeskSize,
 } from "./windowLayout";
-import { EvalScreen, type Trace } from "../shared/EvalScreen";
 import { Banners, type BannerItem } from "./Banners";
 import {
   ScriptedChattr,
@@ -127,7 +126,6 @@ import {
 } from "./ScriptedApps";
 import { Day2Transition, ScorecardReveal } from "./ScorecardReveal";
 import {
-  EVAL_BATCH_TOTAL,
   EVAL_DOC_TITLE,
   GAP_MS,
   CHIP_PRESS_MS,
@@ -152,19 +150,6 @@ import {
   type PlayerTypingConfig,
   type SceneState,
 } from "./script";
-
-/** The single eval trace the ad lands on. The counter reads "trace 3 of 30",
- * the same EVAL_BATCH_TOTAL the Day-2 document states, so the two surfaces
- * agree on how big the batch is. Hardcoded for filming, no real eval behind
- * it. */
-const AD_TRACES: Trace[] = [
-  {
-    no: 3,
-    meta: "listing-assistant · draft · 9:04 AM",
-    sample:
-      "Vintage-Inspired Countertop Companion. Barely Used, Full of Character! This retro chrome toaster still toasts like it means it, and honestly, this toaster has seen things. A statement piece for any counter, priced to move.",
-  },
-];
 
 /**
  * A banner's on-screen DWELL, and its exit fade.
@@ -456,8 +441,8 @@ export default function AdModeShot() {
    *
    * IT CANNOT DOUBLE-FIRE OR OVERTAKE THE OPERATOR. Three guards, in order:
    *   - only one timer exists at a time (`clearAutoAdvance` first);
-   *   - the LAST beat schedules nothing, so the ad ends on the eval screen and
-   *     stays there rather than wrapping around;
+   *   - the LAST beat schedules nothing, so the ad ends on the evals document
+   *     and stays there rather than wrapping around;
    *   - the callback re-checks SESSION IDENTITY before advancing. Every
    *     ArrowRight/ArrowLeft/R retires the session it was scheduled under (a
    *     new one is created per beat entry), so a timer that somehow survived a
@@ -822,9 +807,9 @@ export default function AdModeShot() {
       // one value, so a press can never both skip and advance.
       const active = timelineActiveRef.current;
 
-      // Idle: the original text-field guard applies, so typing in the eval
-      // screen's Reason / Good response inputs (or in the composer between
-      // beats) can never drive the take. While a timeline IS running, the
+      // Idle: the original text-field guard applies, so typing in the
+      // composer between beats can never drive the take. It still covers every
+      // field on the desk, not just that one. While a timeline IS running, the
       // operator keeps every hotkey even though the composer has focus — that
       // is the whole reason this listener is on the capture phase.
       if (!active) {
@@ -1217,11 +1202,6 @@ export default function AdModeShot() {
           stack, so a stray banner would still read on camera. */}
       {scene.overlay === "scorecard" && <ScorecardReveal key={`scorecard-${runKey}`} />}
       {scene.overlay === "day2" && <Day2Transition key={`day2-${runKey}`} />}
-      {scene.overlay === "eval" && (
-        <div key={`eval-${runKey}`} className="fixed inset-0 z-40 overflow-y-auto bg-canvas">
-          <EvalScreen traces={AD_TRACES} total={EVAL_BATCH_TOTAL} />
-        </div>
-      )}
 
       <Banners items={banners} />
 

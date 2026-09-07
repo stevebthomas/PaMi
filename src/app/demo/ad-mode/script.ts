@@ -55,7 +55,11 @@ import type { AgentId } from "@/lib/sim/types";
 /** The four apps with scripted content. Every other dock tile is present (the
  * real dock is rendered in full) but inert during a take. */
 export type FrontApp = "chattr" | "pulse" | "taskflow" | "office" | "docs";
-export type Overlay = "none" | "scorecard" | "day2" | "eval";
+/** The full-screen cards the ad puts over the desk. There is no "eval" member
+ * any more: the take now ENDS on the evals document (see the last step in
+ * SCRIPT), so nothing sets an eval overlay and nothing renders one. The shared
+ * EvalScreen component itself is untouched — /demo/day2 still films it. */
+export type Overlay = "none" | "scorecard" | "day2";
 
 export type ChannelId =
   | "general"
@@ -857,9 +861,9 @@ function setPulse(
  * cannot show a chip labelled one thing and a window titled another.
  *
  * EVAL_BATCH_TOTAL is the number the whole back half of the ad is built to
- * make legible: it is the count line on the doc, the length of the numbered
- * list, and the denominator in the eval overlay's "Reviewing trace 3 of 30".
- * Change it here and all three follow.
+ * make legible, and now the number the ad ENDS on: it is the count line on the
+ * doc and the length of the numbered list under it. Change it here and both
+ * follow.
  */
 export const EVAL_DOC_ID = "ai-eval-batch-listing-assistant";
 export const EVAL_DOC_TITLE = "AI Eval Batch — Listing Assistant";
@@ -1561,29 +1565,30 @@ export const SCRIPT: Step[] = [
     ],
   },
 
-  /* 15 */
+  /* 15 — THE LAST BEAT. The ad ends here. */
   {
     id: "evals-doc",
-    label: "EVALS DOC",
+    label: "EVALS DOC (final)",
     // The document itself, in its own window, in front of the thread that sent
     // it — the real product's shape for an opened attachment (Desktop gives a
     // doc its OWN DesktopWindow, titled with the doc's title and carrying the
-    // Docs FileText icon, rather than pushing it into the Docs app shell).
+    // Docs FileText icon, rather than pushing it into the Docs app shell). Two
+    // windows, so the desk lays them out SPLIT: Derek's thread on the left, the
+    // batch he just sent on the right.
     //
-    // The whole point of the frame is the NUMBER: the count line and the
-    // numbered list have to make "30" unmistakable in one glance, because the
-    // eval overlay two beats later says "trace 3 of 30" and the two have to
-    // agree.
+    // THIS IS THE CLOSING FRAME (director's call: the ad used to run one beat
+    // further, into a full-screen eval overlay reviewing "trace 3 of 30"; that
+    // beat is deleted). Everything the closer has to say is in this shot, so
+    // the whole point of the frame is the NUMBER: the count line and the
+    // numbered list have to make "30" unmistakable in one glance, because that
+    // is the last thing on camera.
+    //
+    // Playback COMPLETES here and holds: the auto-advance schedules nothing
+    // after the final beat (see AdModeShot's scheduleAutoAdvance), so the take
+    // rests on the open document until the operator resets. ArrowRight at this
+    // beat still fast-forwards its entry hold, and then clamps.
     apply: (s) => show({ ...s, minutes: 545 }, ["chattr", "docs"], "docs"),
   },
-
-  /* 16 */
-  {
-    id: "eval",
-    label: "EVAL (final)",
-    apply: (s) => ({ ...s, overlay: "eval" }),
-  },
-
 ];
 
 /* ------------------------------------------------- folding a finished beat */
