@@ -62,7 +62,10 @@ export type ChannelId =
   | "dm-raj"
   | "dm-priya"
   | "dm-derek"
-  | "dm-marcus";
+  | "dm-marcus"
+  // Theo's thread. Empty for most of the take: its one line is the automated
+  // away-reply the WRONG PICK beat triggers (see that step).
+  | "dm-theo";
 
 export type ChattrMessage = {
   id: string;
@@ -312,17 +315,27 @@ export const CHANNELS: { id: ChannelId; label: string }[] = [
 
 /**
  * The DM sidebar, mirroring what the REAL ChannelList would derive at this
- * point in the day. The live list is the three static CHANNELS DMs (Raj,
- * Priya, Derek) plus every DM_CONTACTS registry entry whose `availableWhen`
- * predicate is currently true. Mid-morning, with no fix path chosen yet,
- * that's Marcus alone: Jordan and Chen only appear once `tradeoffChoice` is
- * set, and Maya is not a DM contact at all (her thread is #design-review).
+ * point in the day: the three static CHANNELS DMs (Raj, Priya, Derek) in their
+ * shipping order, then every DM_CONTACTS registry entry whose `availableWhen`
+ * predicate is currently true, in registry order.
+ *
+ * Mid-morning, with no fix path chosen yet, the live registry yields Marcus
+ * alone: Jordan and Chen only appear once `tradeoffChoice` is set, and Maya is
+ * not a DM contact at all (her thread is #design-review).
+ *
+ * THEO is the shoot's one addition. He is unregistered in the live sim (no
+ * dialogue, no persona), but the ad's WRONG PICK beat needs his automated
+ * away-reply to land in a real thread, so the take carries him as if he were a
+ * registry contact — which puts him AFTER the static three and after Marcus,
+ * the last of the currently-available registry entries, exactly where appending
+ * one more DM_CONTACTS entry would place him. Hardcoded for filming.
  */
 export const DIRECT_MESSAGES: { id: ChannelId; label: string }[] = [
   { id: "dm-raj", label: "Raj" },
   { id: "dm-priya", label: "Priya" },
   { id: "dm-derek", label: "Derek" },
   { id: "dm-marcus", label: "Marcus" },
+  { id: "dm-theo", label: "Theo" },
 ];
 
 /** The composer placeholder, resolved the way the real MessageInput resolves
@@ -513,8 +526,24 @@ export function derivePulse(pulse: PulseState): DerivedPulse {
 
 /* --------------------------------------------------------- patch builders */
 
-/** Appends one message to a channel. Pure, so re-invoking the state updater
- * (React strict mode does) can never double-post. */
+/**
+ * Appends one message to a channel. Pure, so re-invoking the state updater
+ * (React strict mode does) can never double-post.
+ *
+ * APPEND-ONLY, AND LOUD ABOUT IT. This is the ONE writer of `messages`, and it
+ * only ever spreads the existing thread — nothing in this file, or in the
+ * engine, may replace a thread or the map. The two guards below turn the two
+ * ways a line could still silently VANISH on camera into a hard failure during
+ * a rehearsal rather than a mystery in a take:
+ *
+ *  - a channel with no seeded thread (a new ChannelId that reached the sidebar
+ *    or a scripted line but never got its `[]` in INITIAL_SCENE) renders as an
+ *    empty channel, which reads exactly like "the history disappeared";
+ *  - a duplicate id is a duplicate React key in MessageListView, and React
+ *    renders ONE row for two messages — so the earlier line (e.g. Priya's 9:14
+ *    seed, whose hand-written id shares this same `${channel}-${n}` namespace)
+ *    would appear to be replaced by the newer one.
+ */
 function say(
   s: SceneState,
   channel: ChannelId,
@@ -524,11 +553,18 @@ function say(
   text: string,
 ): SceneState {
   const existing = s.messages[channel];
+  if (!existing) {
+    throw new Error(`ad-mode: channel "${channel}" has no seeded thread in INITIAL_SCENE`);
+  }
+  const id = `${channel}-${existing.length}`;
+  if (existing.some((m) => m.id === id)) {
+    throw new Error(`ad-mode: duplicate message id "${id}" in ${channel}`);
+  }
   return {
     ...s,
     messages: {
       ...s.messages,
-      [channel]: [...existing, { id: `${channel}-${existing.length}`, agentId, sender, time, text }],
+      [channel]: [...existing, { id, agentId, sender, time, text }],
     },
   };
 }
@@ -663,16 +699,33 @@ export const INITIAL_SCENE: SceneState = {
     "dm-priya": [],
     "dm-derek": [],
     "dm-marcus": [],
+    // Theo's thread is empty until the WRONG PICK beat's automated away-reply.
+    // Seeded here (rather than created on first use) because `say` is
+    // append-only and refuses to write to an unseeded channel.
+    "dm-theo": [],
   },
-  // Scripted Pulse values. Two samples so the sparkline has a line to draw at
-  // the very first frame. Hardcoded for filming, no real logic.
+  /**
+   * Scripted Pulse values. Hardcoded for filming, no real logic.
+   *
+   * THE TAKE OPENS INSIDE THE INCIDENT, so these are already degraded: Priya's
+   * 9:14 line above has reported the spike and the clock reads 9:15, so the
+   * dashboard's own numbers have to agree with the message the audience just
+   * read. The series carries two healthy PRE-incident samples (8:30 and 9:00,
+   * both earlier than Priya's message) so the sparkline has a line to draw and
+   * a baseline to fall away from, and then the first degraded reading at 9:15 —
+   * INCIDENT_MINUTE, the minute the sparkline draws its incident marker at. No
+   * sample at or after 9:15 is ever healthy again until the recovery at the
+   * PULSE PAYOFF beat, so nothing between Priya's message and the reveal can
+   * put a healthy frame on camera.
+   */
   pulse: {
-    rate: 3,
-    attempts: 268,
-    t: 540,
+    rate: DEMO_ALARM_FAILURE_PCT,
+    attempts: 289,
+    t: INCIDENT_MINUTE,
     history: [
       { t: 510, rate: 2.6 },
       { t: 540, rate: 3 },
+      { t: INCIDENT_MINUTE, rate: DEMO_ALARM_FAILURE_PCT },
     ],
   },
   assignedTo: null,
@@ -693,6 +746,11 @@ export const SCRIPT: Step[] = [
     // (rather than being deleted along with the beat that used to precede it)
     // purely to hold this beat's place for the operator HUD and the ArrowLeft
     // fold; it has no work left to do.
+    //
+    // Pulse is not on the desk yet, but INITIAL_SCENE's dashboard numbers are
+    // already degraded (see its `pulse` comment), so an actor who opens Pulse
+    // from the dock on this beat gets a 91% / "Incident active" board that
+    // agrees with Priya's line rather than a healthy one that contradicts it.
     apply: (s) => s,
   },
 
@@ -702,28 +760,92 @@ export const SCRIPT: Step[] = [
     label: "STACKING",
     // Pulse comes up IN FRONT of the Chattr window that is already open, one
     // cascade step down-right of it: the desk starts stacking.
-    apply: (s) => setPulse(show({ ...s, day: 1, minutes: 580 }, ["chattr", "pulse"]), 580, 3, 268),
-    // The automated burst. Three sub-events on a timer while the actor just
-    // watches Pulse: badge climbs, numbers climb, banners start landing.
+    //
+    // ALREADY DIPPED ON THE FIRST PAINTED FRAME. Pulse must never open at the
+    // healthy 97% here: Priya's 9:14 line (beat 0) has already told the
+    // audience checkouts are failing, so a healthy dashboard that snaps red a
+    // second and a half later reads as staged AND contradicts the message
+    // still on screen behind it. The entry patch therefore lands the beat's
+    // FIRST degraded reading — 9% failure / 91% success over 322 attempts — in
+    // the very same update that opens the window, so the window's first paint
+    // is red-toned with the incident badge already up. `enterStep` applies this
+    // patch before the layout effect places the window, so there is no frame in
+    // which the Pulse body exists with the old numbers in it.
+    //
+    // This is the OLD +1.7s auto, folded into beat entry, and it brings that
+    // auto's other work with it (Chattr badge 3, #incidents unread), so every
+    // bit of the burst's content survives and the climb keeps its cadence: 9%
+    // on entry, then the three stakeholder pings below.
+    apply: (s) =>
+      markUnread(
+        setPulse(
+          show({ ...s, day: 1, minutes: 580, chattrBadge: 3 }, ["chattr", "pulse"]),
+          580,
+          DEMO_ALARM_FAILURE_PCT,
+          322,
+        ),
+        "incidents",
+      ),
+    // The automated burst: THREE stakeholders piling on while the actor just
+    // watches Pulse — Priya, then Raj, then Derek — over a badge and a failure
+    // rate that keep climbing underneath them.
+    //
+    // Every one of the three is a REAL thread line, so each banner is tied to
+    // the message it previews and each unread ring points at something that
+    // exists. Priya's and Raj's indicator holds are PINNED (`indicatorMs`)
+    // rather than length-scaled, purely to make the on-camera order of the
+    // three banners deterministic: pinned, they land at ~2.5s and ~3.4s, both
+    // strictly before the earliest Derek's un-pinned formula can produce
+    // (~4.4s), so a take can never show the pile-up out of order. The holds
+    // are invisible anyway — Pulse is front, and #incidents is the open
+    // channel — but they are still real, so clicking Chattr mid-hold shows the
+    // indicator exactly like the live app.
     autos: [
       {
         delayMs: 1700,
-        apply: (s) => markUnread(setPulse({ ...s, chattrBadge: 3 }, 590, 9, 322), "incidents"),
+        apply: (s) => markUnread(setPulse({ ...s, chattrBadge: 7 }, 600, 17, 361), "incidents"),
+        exchange: [
+          {
+            kind: "npc",
+            channel: "dm-priya",
+            agentId: "priya",
+            sender: "Priya",
+            time: "9:42 AM",
+            text: "support queue is filling up with checkout complaints",
+            indicatorMs: 800,
+            apply: (s) => markUnread(s, "dm-priya"),
+            banner: {
+              agentId: "priya",
+              sender: "Priya",
+              preview: "support queue is filling up with checkout complaints",
+            },
+          },
+        ],
+      },
+      {
+        delayMs: 2600,
+        // The engineering side hearing about it independently: Raj is already
+        // in the logs before anyone has asked him to be.
+        exchange: [
+          {
+            kind: "npc",
+            channel: "dm-raj",
+            agentId: "raj",
+            sender: "Raj",
+            time: "9:43 AM",
+            text: "Saw the Pulse spike. Pulling logs now. Give me a few.",
+            indicatorMs: 800,
+            apply: (s) => markUnread(s, "dm-raj"),
+            banner: {
+              agentId: "raj",
+              sender: "Raj",
+              preview: "Saw the Pulse spike. Pulling logs now. Give me a few.",
+            },
+          },
+        ],
       },
       {
         delayMs: 3400,
-        apply: (s) =>
-          markUnread(setPulse({ ...s, chattrBadge: 7 }, 600, 17, 361), "incidents", "dm-priya"),
-        // Not tied to a thread line (there is no matching message), so this one
-        // keeps its original timer timing.
-        banner: {
-          agentId: "priya",
-          sender: "Priya",
-          preview: "support queue is filling up with checkout complaints",
-        },
-      },
-      {
-        delayMs: 5100,
         // Derek's DM goes through the same engine as every other NPC line even
         // though Pulse is front and the indicator is therefore invisible: if
         // the actor clicks Chattr mid-hold, the indicator is there, exactly
@@ -753,8 +875,9 @@ export const SCRIPT: Step[] = [
     id: "whos-taking-this",
     label: "WHO IS TAKING THIS",
     // Chattr comes back to the front; Pulse stays open behind it, still
-    // showing the spike. Derek asks the question here and the NEXT beat answers
-    // it — badly.
+    // showing the spike. A full three-line exchange in Derek's DM: he asks, the
+    // player answers on camera through the real composer, and he signs off. The
+    // NEXT beat is the player making good on that answer — badly.
     apply: (s) =>
       read(
         show({ ...s, day: 1, minutes: 605, chattrBadge: 0, unread: [] }, ["chattr", "pulse"], "chattr"),
@@ -774,6 +897,26 @@ export const SCRIPT: Step[] = [
           preview: "Can you let me know who is taking this?",
         },
       },
+      // Typed into the REAL composer, character by character, and sent through
+      // the real Enter path — the same engine every other player line uses.
+      {
+        kind: "player",
+        channel: "dm-derek",
+        time: "10:05 AM",
+        text: "Should I assign someone from engineering?",
+      },
+      // No banner: this thread is the one on screen, so the line lands in front
+      // of the camera already. A banner here would announce a message the
+      // audience is watching arrive — the same visible-channel rule the engine
+      // applies to the typing indicator.
+      {
+        kind: "npc",
+        channel: "dm-derek",
+        agentId: "derek",
+        sender: "Derek",
+        time: "10:06 AM",
+        text: "Sounds good, just keep me posted.",
+      },
     ],
   },
 
@@ -782,15 +925,21 @@ export const SCRIPT: Step[] = [
     id: "wrong-pick",
     label: "WRONG PICK",
     // The answer to Derek's question, and it is the wrong one. Office opens in
-    // front of Chattr (Pulse steps off the desk for this beat) with Derek's DM
-    // still on screen behind it, so his reply lands in a thread the camera can
-    // already see.
+    // front of Chattr (Pulse steps off the desk for this beat).
     //
     // The beat plays ITSELF: `autoAssign` flips Theo's card to "Assigned ✓"
     // 1.2s in — the same UI a click leaves behind — and `onAssign` then lands
-    // the pushback 2s after that, through the normal NPC engine (indicator in
-    // dm-derek, banner as the line lands). Only Theo gets a reaction; the
-    // roster shows he is out today, which is the joke.
+    // the consequence. Only Theo gets a reaction; the roster card next to the
+    // button already says "Out today", which is the joke.
+    //
+    // THE CONSEQUENCE COMES FROM THEO, NOT FROM DEREK. Nobody narrates the
+    // mistake: the assignment simply bounces back off an out-of-office
+    // auto-reply, and the player is left to notice. It fires 400ms after the
+    // assignment lands and, uniquely in this script, with `indicatorMs: 0` — no
+    // length-scaled "Theo is typing" hold — because an away-reply is a machine
+    // answering instantly, not a person composing. The banner is the only way
+    // it reads on camera (Office is front, and Theo's DM is not the thread on
+    // screen), so it carries Theo's own sprite.
     //
     // The actor can still beat the script to it: clicking any Assign button
     // first claims the beat's one assignment and cancels the auto, and clicking
@@ -799,19 +948,23 @@ export const SCRIPT: Step[] = [
     autoAssign: { person: "Theo", delayMs: 1200 },
     onAssign: {
       person: "Theo",
-      delayMs: 2000,
+      delayMs: 400,
       exchange: [
         {
           kind: "npc",
-          channel: "dm-derek",
-          agentId: "derek",
-          sender: "Derek",
+          channel: "dm-theo",
+          agentId: "theo",
+          sender: "Theo",
           time: "10:07 AM",
-          text: "Theo wasn't even in the office today. Try again.",
+          text: "I'm not in the office today.",
+          indicatorMs: 0,
+          // Theo's DM is not the thread on screen, so it takes the unread
+          // treatment the real sidebar would give it.
+          apply: (s) => markUnread(s, "dm-theo"),
           banner: {
-            agentId: "derek",
-            sender: "Derek",
-            preview: "Theo wasn't even in the office today. Try again.",
+            agentId: "theo",
+            sender: "Theo",
+            preview: "I'm not in the office today.",
           },
         },
       ],
@@ -880,12 +1033,17 @@ export const SCRIPT: Step[] = [
   {
     id: "misread-4",
     label: "MISREAD 4 of 5",
+    // ANSWERING IN THE THREAD THAT ASKED. Priya's two setup lines — her 9:14
+    // seed and the 11:40 postmortem line the beat before — are both in
+    // #incidents, so the player's reply to them belongs in #incidents too, not
+    // in a side DM. Opening the channel is also what clears the unread ring the
+    // previous beat left on it, exactly like the real app.
     apply: (s) =>
-      read(show({ ...s, day: 1, minutes: 702 }, ["chattr", "pulse"], "chattr"), "dm-priya"),
+      read(show({ ...s, day: 1, minutes: 702 }, ["chattr", "pulse"], "chattr"), "incidents"),
     exchange: [
       {
         kind: "player",
-        channel: "dm-priya",
+        channel: "incidents",
         time: "11:42 AM",
         text: "Already flagged it. Told him around 400 checkouts were affected.",
       },
@@ -896,16 +1054,20 @@ export const SCRIPT: Step[] = [
   {
     id: "misread-5",
     label: "MISREAD 5 of 5",
-    // Priya's correction is the longest line in the ad, so its indicator holds
-    // the longest — the point of the length-scaled formula.
+    // The correction lands in #incidents, directly under the line it corrects,
+    // and #incidents is the thread on screen — so this is the one NPC line in
+    // the ad whose indicator is actually VISIBLE while it holds. It is also the
+    // longest line in the ad, so it holds the longest: the length-scaled
+    // formula finally gets to be on camera. No banner, per the same
+    // visible-channel rule — the audience is watching it arrive.
     apply: (s) => ({
       ...show({ ...s, day: 1, minutes: 705 }, ["chattr", "pulse"], "chattr"),
-      activeChannel: "dm-priya",
+      activeChannel: "incidents",
     }),
     exchange: [
       {
         kind: "npc",
-        channel: "dm-priya",
+        channel: "incidents",
         agentId: "priya",
         sender: "Priya",
         time: "11:45 AM",
@@ -918,9 +1080,12 @@ export const SCRIPT: Step[] = [
   {
     id: "course-correct",
     label: "COURSE CORRECT",
-    // Office in front, Chattr behind it so Derek's thread is still on the desk
-    // when he reacts. Clears the earlier assignment so the roster is live again
-    // for the right pick.
+    // Office in front, Chattr behind it. Clears the earlier assignment so the
+    // roster is live again for the right pick.
+    //
+    // Chattr is still showing #incidents from the misread beats, so Derek's
+    // confirmation lands in a thread that is NOT on screen and its banner is
+    // what carries it — the same rule every other off-screen line follows.
     //
     // Symmetrical with WRONG PICK: the script assigns Raj itself 1.5s in and
     // Derek's confirmation follows 1.5s after that, unless the actor clicks an
@@ -948,6 +1113,36 @@ export const SCRIPT: Step[] = [
 
   /* 10 */
   {
+    id: "raj-root-cause",
+    label: "RAJ ROOT CAUSE",
+    // The engineer reports back, and the ad finally says WHAT was wrong. This
+    // is the setup the recovery beat needs: without it the numbers just fall
+    // on their own, which reads as the incident fixing itself.
+    //
+    // Chattr comes forward with Raj's DM open (opening it clears the unread
+    // ring the STACKING burst left on him, exactly like the real app), and
+    // Pulse is declared FIRST so it takes the earlier cascade step and sits
+    // staggered behind — still showing the spike Raj is about to explain, and
+    // already in place for the payoff beat that follows.
+    //
+    // Normal length-scaled indicator, and no banner: this is the thread on
+    // screen, so the audience watches Raj compose it rather than being told
+    // about it by a notification.
+    apply: (s) => read(show({ ...s, day: 1, minutes: 835 }, ["pulse", "chattr"], "chattr"), "dm-raj"),
+    exchange: [
+      {
+        kind: "npc",
+        channel: "dm-raj",
+        agentId: "raj",
+        sender: "Raj",
+        time: "1:55 PM",
+        text: "Confirmed. Apple Pay token validation is timing out on their end, not ours. We shipped a retry buffer to absorb it. Rate should settle in the next few minutes.",
+      },
+    ],
+  },
+
+  /* 11 */
+  {
     id: "pulse-payoff",
     label: "PULSE PAYOFF",
     // Scripted recovery, no real data: the failure rate walks 17 -> 12 -> 6 ->
@@ -964,14 +1159,14 @@ export const SCRIPT: Step[] = [
     ],
   },
 
-  /* 11 */
+  /* 12 */
   {
     id: "reckoning",
     label: "RECKONING",
     apply: (s) => ({ ...s, day: 1, minutes: 1005, overlay: "scorecard" }),
   },
 
-  /* 12 */
+  /* 13 */
   {
     id: "closer-transition",
     label: "CLOSER, DAY 2",
@@ -980,7 +1175,7 @@ export const SCRIPT: Step[] = [
     apply: (s) => show({ ...s, day: 2, minutes: 540, overlay: "day2" }, ["chattr"]),
   },
 
-  /* 13 */
+  /* 14 */
   {
     id: "maya-follow-up",
     label: "MAYA FOLLOW UP",
@@ -1002,7 +1197,7 @@ export const SCRIPT: Step[] = [
     ],
   },
 
-  /* 14 */
+  /* 15 */
   {
     id: "derek-assignment",
     label: "DEREK ASSIGNMENT",
@@ -1024,7 +1219,7 @@ export const SCRIPT: Step[] = [
     ],
   },
 
-  /* 15 */
+  /* 16 */
   {
     id: "eval",
     label: "EVAL (final)",
@@ -1033,6 +1228,39 @@ export const SCRIPT: Step[] = [
 ];
 
 /* ------------------------------------------------- folding a finished beat */
+
+/**
+ * THE ONE STANDING INVARIANT OF THIS ROUTE: chat history never shrinks.
+ *
+ * Real threads only ever grow, so no beat — not a step `apply`, not an `auto`,
+ * not an assign reaction, and not the Day 2 transition — may drop a line that
+ * has already been on camera. That includes the seeds: Priya's 9:14 AM
+ * #incidents message is the first thing the ad shows, and it has to still be
+ * there at the closer.
+ *
+ * Asserted here rather than trusted, because the failure mode is silent: a
+ * patch that rebuilt `messages` instead of spreading it would simply paint a
+ * shorter thread, and nothing else in the take would look wrong. `completeStep`
+ * runs on every ArrowLeft retake and on every fold, so this check sees every
+ * beat's real end state; `say`'s own two guards (see above) cover the live
+ * forward path, where a line lands through `landLine` instead.
+ */
+export function assertThreadsGrow(
+  before: SceneState,
+  after: SceneState,
+  stepId: string,
+): void {
+  for (const channel of Object.keys(before.messages) as ChannelId[]) {
+    const had = before.messages[channel].length;
+    const has = after.messages[channel]?.length ?? -1;
+    if (has < had) {
+      throw new Error(
+        `ad-mode: beat "${stepId}" left ${channel} with ${has} message(s), down from ${had}; ` +
+          `chat history is append-only`,
+      );
+    }
+  }
+}
 
 /**
  * The assignment half of a completed beat: the card is flipped, and the step's
@@ -1072,7 +1300,9 @@ export function completeStep(state: SceneState, step: Step): SceneState {
   if (step.autoAssign) s = completeAssign(s, step, step.autoAssign.person);
   // A finished beat has an empty composer and no indicator on screen: the send
   // path clears one and the landing line clears the other.
-  return { ...s, composer: "", typing: null };
+  const done: SceneState = { ...s, composer: "", typing: null };
+  assertThreadsGrow(state, done, step.id);
+  return done;
 }
 
 /**
