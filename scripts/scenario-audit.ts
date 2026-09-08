@@ -18,8 +18,8 @@ import { updateFindingsLog, renderFindingsSummaryTable } from "./lib/findings-lo
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PROJECT_ROOT = path.resolve(__dirname, "..");
-const OUT_PATH = path.join(PROJECT_ROOT, "scenario-audit-day1.md");
-const FINDINGS_LOG_PATH = path.join(PROJECT_ROOT, "scenario-audit-findings-log.json");
+const OUT_PATH = path.join(PROJECT_ROOT, "playtests", "scenario-audit-day1.md");
+const FINDINGS_LOG_PATH = path.join(PROJECT_ROOT, "playtests", "scenario-audit-findings-log.json");
 
 loadDotEnvLocal();
 

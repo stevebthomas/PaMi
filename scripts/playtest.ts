@@ -1110,7 +1110,7 @@ function renderAdversarialReportMarkdown(attempts: AdversarialAttempt[]): string
   return lines.join("\n");
 }
 
-const FINDINGS_LOG_PATH = path.join(PROJECT_ROOT, "scenario-audit-findings-log.json");
+const FINDINGS_LOG_PATH = path.join(PROJECT_ROOT, "playtests", "scenario-audit-findings-log.json");
 
 // Namespaced apart from scenario-audit's own event-id-based ids (see
 // scenario-audit.ts) so the two diagnostics can safely share one log file
