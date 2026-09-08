@@ -1,5 +1,8 @@
 <p align="center">
-  <img alt="PaMi" src="public/brand/pami_lockup_horizontal_final.png" width="220">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="public/brand/pami_lockup_horizontal_white.png">
+    <img alt="PaMi" src="public/brand/pami_lockup_horizontal_final.png" width="220">
+  </picture>
 </p>
 
 <!-- INTRO DRAFT: awaiting owner's voice pass -->

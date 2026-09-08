@@ -29,7 +29,7 @@ Note: the brand green `#5B9C81` is **not** the same as the app's existing UI acc
 
 **Provenance notes:**
 1. The icon-only source file (`pami_logo_transparent.png`) was missing from the delivered zip — `pami-icon.png` was cropped from the stacked lockup; replace with the original when available.
-2. No dark-mode lockup exists (the black wordmark disappears on a dark canvas) — needed from the designer.
+2. Dark-surface lockup: `pami_lockup_horizontal_white.png` (white wordmark, same icon). Use it wherever the black wordmark would sit on a dark background — the README serves it via a `<picture>` element keyed on `prefers-color-scheme`. Stacked/wordmark-only white variants still don't exist.
 
 ---
 
