@@ -1,8 +1,8 @@
-# Rally: Product Requirements (Day 1)
+# PaMi: Product Requirements (Day 1)
 
 ## 1. Overview
 
-Rally is a single-player, browser-based training simulation that puts a brand-new project manager through one
+PaMi is a single-player, browser-based training simulation that puts a brand-new project manager through one
 simulated workday at BazaarLoop, a fictional secondhand marketplace (an Etsy/eBay mix built for a younger,
 mobile-first audience). The player works inside a pixel-art desktop of apps (team chat, a live metrics dashboard, a
 ticket board, an engineering floor view, and a glossary assistant) and lives through Day 1: a live payments incident

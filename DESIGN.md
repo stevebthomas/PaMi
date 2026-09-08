@@ -1,9 +1,35 @@
-# DESIGN.md — Rally Visual System
+# DESIGN.md — PaMi Visual System
 
 Source: research report on "professional with a Duolingo touch" direction, refined toward Brilliant.org specifically as the closest match. Feed this file to Claude Code on every UI task so it has a consistent target instead of defaulting to generic AI-tool aesthetics.
 
 ## Direction in one sentence
 Credible-first, warm-second. Linear/Stripe/Notion-grade professional foundation, with warmth concentrated in feedback moments (the scorecard, encouraging microcopy) rather than spread across every surface.
+
+---
+
+## Brand
+
+**Color tokens:**
+- Terracotta (brand primary/accent): `#966C5F`
+- Brand green (secondary): `#5B9C81`
+- Wordmark text: `#1A1A1A`
+
+Note: the brand green `#5B9C81` is **not** the same as the app's existing UI accent green `#2F7D4F` (`--green-600`). The UI green is deliberately unchanged, and swapping it for the brand green is a pending design decision, not an accident.
+
+**Wordmark:** "PaMi" in Poppins Medium, `#1A1A1A`, tightened P–a kerning. Poppins is not loaded in the app — never fake the wordmark in Geist; use the PNG assets instead.
+
+**Asset usage:**
+
+| Asset | Usage |
+|---|---|
+| `public/brand/pami-icon.png` | Favicon/app icon (also copied to `src/app/icon.png`, which Next serves as the favicon) |
+| `public/brand/pami_lockup_horizontal_final.png` | In-app header/landing card, README, OG image |
+| `public/brand/pami_lockup_stacked_final.png` | Splash/loading screens (currently unused — the app has no product-branded splash; the `/demo/day2` loading screen is in-fiction BazaarLoop and must not carry product branding) |
+| `public/brand/pami_wordmark_only_final.png` | Tight horizontal spots where the icon is already present |
+
+**Provenance notes:**
+1. The icon-only source file (`pami_logo_transparent.png`) was missing from the delivered zip — `pami-icon.png` was cropped from the stacked lockup; replace with the original when available.
+2. No dark-mode lockup exists (the black wordmark disappears on a dark canvas) — needed from the designer.
 
 ---
 

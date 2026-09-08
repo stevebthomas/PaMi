@@ -5,7 +5,7 @@ import type { Metadata } from "next";
 import Day2DemoShot from "./Day2DemoShot";
 
 export const metadata: Metadata = {
-  title: "Rally — Demo Day 2 (filming)",
+  title: "PaMi — Demo Day 2 (filming)",
 };
 
 export default function Day2DemoPage() {

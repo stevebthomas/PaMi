@@ -1,4 +1,4 @@
-# Rally: Roadmap
+# PaMi: Roadmap
 
 This roadmap describes what is shipped, what is planned, and the longer-term investments the codebase would
 need before it can grow past a single day. It is grounded in the current code. Where something is

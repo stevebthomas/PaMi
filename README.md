@@ -1,11 +1,10 @@
 <p align="center">
   <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="public/brand/rally-logotype-dark.png">
-    <img alt="Rally" src="public/brand/rally-logotype-light.png" width="220">
+    <img alt="PaMi" src="public/brand/pami_lockup_horizontal_final.png" width="220">
   </picture>
 </p>
 
-# Rally
+# PaMi
 
 A realistic training simulation for new Project Managers. You play a brand-new PM at BazaarLoop, a
 fictional secondhand-marketplace startup, working one simulated day inside a pixel-art desktop

@@ -12,9 +12,17 @@ const bodyFont = Geist({
   subsets: ["latin"],
 });
 
+const description =
+  "PaMi is a gamified, AI-powered simulation of Day 1 as a PM at a marketplace startup, working a live payments incident.";
+
 export const metadata: Metadata = {
-  title: "Rally — BazaarLoop",
-  description: "Rally is a gamified, AI-powered simulation of Day 1 as a PM at a marketplace startup, working a live payments incident.",
+  title: "PaMi — BazaarLoop",
+  description,
+  openGraph: {
+    title: "PaMi — BazaarLoop",
+    description,
+    images: ["/brand/pami_lockup_horizontal_final.png"],
+  },
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
